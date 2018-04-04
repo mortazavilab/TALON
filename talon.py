@@ -51,9 +51,23 @@ def read_gtf_file(gtf_file):
 
     genes.print_tree()
     genes.get_genes_in_range("chr1", 30000, 40000, "+")
+    return genes
                 
 def process_sam_file(sam_file):
-    pass
+    """ Reads transcripts from a SAM file
+
+        Args:
+            sam_file: Path to the SAM file
+
+        Returns:
+    """
+    with open(sam_file) as sam:
+        for line in sam:
+            line = line.strip()
+ 
+            # Ignore header
+            if line.startswith("@"):
+                continue
 
 def main():
     options = getOptions()
