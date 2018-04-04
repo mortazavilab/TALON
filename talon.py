@@ -26,9 +26,9 @@ def read_gtf_file(gtf_file):
             gtf_file: Path to the GTF file
 
         Returns:
-            genes: A dictionary mapping each chromosome to an interval tree
-            data structure. Each interval tree contains intervals corresponding 
-            to gene class objects. 
+            genes: A GeneTree object, which consists of a  dictionary mapping 
+            each chromosome to an interval tree data structure. Each interval 
+            tree contains intervals corresponding to gene class objects. 
     """
     genes = GeneTree()
 
@@ -47,38 +47,13 @@ def read_gtf_file(gtf_file):
 
             # Process genes
             if entry_type == "gene":
-                add_gene_from_gtf(tab_fields, genes)
+                genes.add_gene_from_gtf(tab_fields)
 
     genes.print_tree()
+    genes.get_genes_in_range("chr1", 30000, 40000, "+")
                 
-def add_gene_from_gtf(gene, gene_tree):
-    """ Adds gene from a GTF file to an existing dictionary of chromosome 
-        interval trees.
-
-        Args: 
-            gene: A list containing fields from a GTF file gene entry. 
-            Example:
-            ['chr1', 'HAVANA', 'gene', '11869', '14409', '.', '+', '.', 
-             'gene_id "ENSG00000223972.5"; 
-             gene_type "transcribed_unprocessed_pseudogene"; 
-             gene_status "KNOWN"; gene_name "DDX11L1"; level 2; 
-             havana_gene "OTTHUMG00000000961.2";'] 
-
-            gene_tree: Object that stores genes as intervals. The provided gene
-            will be added to this structure.
- 
-        Returns:
-            gene_tree: Input gene_tree with one additional gene added to it.
-    """
-    chromosome = gene[0]
-    description = gene[-1]
-    gene_name = (description.split("gene_name ")[1]).split('"')[1]
-    start = int(gene[3])
-    end = int(gene[4])
-    strand = gene[6]
-
-    gene_tree.add_gene(gene_name, chromosome, start, end, strand)
-    return gene_tree 
+def process_sam_file(sam_file):
+    pass
 
 def main():
     options = getOptions()
@@ -87,6 +62,11 @@ def main():
 
     # Process the GTF annotations
     read_gtf_file(gtf_file)
+
+    # Process the SAM files
+    sam_files = infile_list.split(",")
+    for sam in sam_files:
+        process_sam_file(sam)
 
 if __name__ == '__main__':
     main()
