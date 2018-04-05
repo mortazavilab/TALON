@@ -1,0 +1,2 @@
+# Useful test command
+python talon.py --f test_files/GM12878_chr1_clean.sam -g test_files/gencode.v24.annotation.chr1.gtf

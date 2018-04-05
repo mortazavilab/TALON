@@ -3,6 +3,7 @@
 #------------------------------------------------------------------------------
 
 from intervaltree import Interval, IntervalTree
+from gene import Gene
 
 class GeneTree(object):
     """ Stores locations of genes as intervals with the goal of querying them 
@@ -15,9 +16,13 @@ class GeneTree(object):
         Attributes:
             chromosomes: A dictionary mapping chromosome name to an interval 
             tree containing genes that are located on that chromosome.
+ 
+            gene_ids: A dictionary containing the ID of every gene in the
+            structure. Used to detect collisions.
     """
     def __init__(self):
         self.chromosomes = {}
+        self.gene_ids = {}
 
     def add_chromosome(self, chrom_name):
         """ Add a chromosome (with empty interval tree) to the GeneTree
@@ -29,14 +34,18 @@ class GeneTree(object):
         self.chromosomes[chrom_name] = IntervalTree()
         return
 
-    def add_gene(self, gene, chromosome, start, end, strand):
-        # TODO: gene object instead of gene name
-        """ Add a gene to the GeneTree. The gene's start-end interval is added 
-            to the chromosome's interval tree, and is used as a key to retrieve 
-            the gene name. 
+    def add_gene(self, gene_id, gene_name, chromosome, start, end, strand):
+        """ Creates a gene object and adds it to the GeneTree. The gene's 
+            start-end interval is added to the chromosome's interval tree, and 
+            is used as a key to retrieve the gene. 
+
+            All positions are 1-based.
 
             Args:
-                gene: Name of the gene (string)
+                gene_id: Accession ID of the gene. Must be unique.
+
+                gene_name: Human-readable name of the gene. Optional, and does
+                not have to be unique (although that is generally preferable)
 
                 chromosome: Name of the chromosome that the gene is on 
                 (string).
@@ -56,8 +65,20 @@ class GeneTree(object):
 
         if chromosome not in self.chromosomes:
             self.add_chromosome(chromosome)
-        
+
+        if gene_id in self.gene_ids:
+            raise KeyError('Gene IDs must be unique. ' + gene_id + \
+                           " is duplicated.")       
+ 
+        gene = Gene(gene_id, chromosome, start, end, strand)
+
+        # Set gene name if available
+        if gene_name != None:
+            gene.set_name(gene_name)
+
         self.chromosomes[chromosome][start:end] = gene
+        self.gene_ids[gene_id] = 1
+
         return  
 
     def add_gene_from_gtf(self, gene_info):
@@ -73,17 +94,21 @@ class GeneTree(object):
                 havana_gene "OTTHUMG00000000961.2";']
 
         """
+        gene_name = None
         chromosome = gene_info[0]
         description = gene_info[-1]
-        if "gene_name" not in description:
-            raise ValueError('GTF entry lacks a gene_name field')
+        if "gene_id" not in description:
+            raise ValueError('GTF entry lacks a gene_id field')
+        gene_id = (description.split("gene_id ")[1]).split('"')[1]
 
-        gene_name = (description.split("gene_name ")[1]).split('"')[1]
+        if "gene_name" in description:
+            gene_name = (description.split("gene_name ")[1]).split('"')[1]
         start = int(gene_info[3])
         end = int(gene_info[4])
         strand = gene_info[6]
 
-        self.add_gene(gene_name, chromosome, start, end, strand)
+        self.add_gene(gene_id, gene_name, chromosome, start, end, strand)
+        return
 
     def get_genes_in_range(self, chromosome, start, end, strand):
         """ Finds genes that overlap with the provided start-end interval.
@@ -103,8 +128,8 @@ class GeneTree(object):
                 "-" if it is on the reverse strand
 
             Returns:
-                List of genes that overlap the query interval. Currently this 
-                is a list of gene names, but later it will be gene objects.
+                List of genes (objects of class Gene) that overlap the query 
+                interval. 
         """
         if start > end:
             raise ValueError('Gene start must be less than or equal to end.')
@@ -118,10 +143,15 @@ class GeneTree(object):
         end += 1
  
         overlapping_gene_intervals  = self.chromosomes[chromosome][start:end]
-        overlapping_genes = [x.data for x in overlapping_gene_intervals]
-        return overlapping_genes
 
-        
+        # Only report genes on the same strand as the query
+        overlapping_genes = []
+        for interval in overlapping_gene_intervals:
+            gene = interval.data
+            if gene.strand == strand:
+                overlapping_genes.append(gene)
+
+        return overlapping_genes
 
     def print_tree(self):
         """ Print a rudimentary visual representation of the GeneTree. """

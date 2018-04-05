@@ -48,9 +48,17 @@ def read_gtf_file(gtf_file):
             # Process genes
             if entry_type == "gene":
                 genes.add_gene_from_gtf(tab_fields)
+            elif entry_type == "transcript":
+                pass
+            elif entry_type == "exon":
+                pass
+            else: 
+                pass
 
-    genes.print_tree()
-    genes.get_genes_in_range("chr1", 30000, 40000, "+")
+    #genes.print_tree()
+    g = genes.get_genes_in_range("chr1", 30000, 40000, "+")
+    for gene in g:
+        gene.print_gene()
     return genes
                 
 def process_sam_file(sam_file):
