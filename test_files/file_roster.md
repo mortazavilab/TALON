@@ -1,12 +1,4 @@
-## test_gtf.txt
-### Description:
-Small set of chromosome 1 and chromosome 2 gene annotations (with transcripts 
-and exons) derived from original file
-/bio/dwyman/pacbio_f2016/data/GENCODEv24/gencode.v24.annotation.gtf
-
-### Uses:
-Good for GTF parsing development because the small file size allows lines to be
-printed without lots of extra exit statements.
+# File Roster
 
 ## gencode.v24.annotation.chr1.gtf
 ### Description:
@@ -39,3 +31,13 @@ Created using command:
 Good SAM input file that is large enough to contain many different transcript
 cases, but small enough to run quickly. I used the uncorrected version of this 
 dataset frequently to test and develop TranscriptClean. 
+
+## test.gtf
+### Description:
+Small set of chromosome 1 and chromosome 2 gene annotations (with transcripts
+and exons) derived from original file
+/bio/dwyman/pacbio_f2016/data/GENCODEv24/gencode.v24.annotation.gtf
+
+### Uses:
+Good for GTF parsing development because the small file size allows lines to be
+printed without lots of extra exit statements.
