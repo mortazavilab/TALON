@@ -59,7 +59,7 @@ def read_gtf_file(gtf_file):
                     currGene.add_transcript(currTranscript)
                 currTranscript = get_transcript_from_gtf(tab_fields)
             elif entry_type == "exon":
-                pass
+               currTranscript.add_exon_from_gtf(tab_fields)
             else: 
                 pass
 

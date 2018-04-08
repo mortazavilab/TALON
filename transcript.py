@@ -40,7 +40,38 @@ class Transcript(object):
         self.identifier = identifier
         self.name = name
 
-    #def add_exon(self,
+    def add_exon(self, exon_start, exon_end):
+        """Adds an exon (start-end position pair) to the transcript."""
+
+        if exon_start > exon_end:
+            raise ValueError('Exon start (' + str(exon_start) + ')' + \
+                'is supposed to be before the exon end (' + str(exon_end) + ')')
+ 
+        exon = [exon_start, exon_end]
+        self.exons.append(exon)
+        return
+
+    def add_exon_from_gtf(self, exon_info):
+        """ Adds an exon to the transcript using information from a GTF entry
+
+            Args:
+               exon_info: A list containing fields from a GTF file exon entry.
+               Example:   
+               ['chr1', 'HAVANA', 'exon', '11869', '12227', '.', '+', '.', 
+                'gene_id "ENSG00000223972.5"; transcript_id "ENST00000456328.2"; 
+                gene_type "transcribed_unprocessed_pseudogene"; 
+                gene_status "KNOWN"; gene_name "DDX11L1"; 
+                transcript_type "processed_transcript"; 
+                transcript_status "KNOWN"; transcript_name "DDX11L1-002"; 
+                exon_number 1; exon_id "ENSE00002234944.1"; level 2; 
+                tag "basic"; transcript_support_level "1"; 
+                havana_gene "OTTHUMG00000000961.2"; 
+                havana_transcript "OTTHUMT00000362751.1";'] 
+        """
+        start = int(exon_info[3])
+        end = int(exon_info[4])
+        self.add_exon(start, end)
+        return
 
     def print_transcript(self):
         """ Print a string representation of the Transcript. Good for debugging
@@ -57,7 +88,9 @@ class Transcript(object):
         print "\tLocation: " + self.chromosome + ":" + str(self.start) + "-" + \
               str(self.end) + "(" + self.strand + ")"
 
-        # TODO: Print exons too, at least in shorthand
+        # Print exons
+        for exon in self.exons:
+            print "\tExon: " + "-".join([str(x) for x in exon])
         return 
 
 def get_transcript_from_gtf(transcript_info):
@@ -94,4 +127,4 @@ def get_transcript_from_gtf(transcript_info):
 
     transcript = Transcript(transcript_id, name, chromosome, start, end, strand)
     return transcript
- 
+
