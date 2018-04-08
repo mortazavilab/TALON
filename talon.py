@@ -5,8 +5,10 @@
 # assigns them transcript and gene identifiers based on a GTF annotation.
 # Novel transcripts are assigned new identifiers.
 
+from gene import *
 from genetree import GeneTree
 from optparse import OptionParser
+from transcript import *
 
 def getOptions():
     parser = OptionParser()
@@ -31,6 +33,8 @@ def read_gtf_file(gtf_file):
             tree contains intervals corresponding to gene class objects. 
     """
     genes = GeneTree()
+    currGene = None
+    currTranscript = None
 
     with open(gtf_file) as gtf:
         for line in gtf:
@@ -47,9 +51,13 @@ def read_gtf_file(gtf_file):
 
             # Process genes
             if entry_type == "gene":
-                genes.add_gene_from_gtf(tab_fields)
+                if currGene != None:
+                    genes.add_gene(currGene)
+                currGene = get_gene_from_gtf(tab_fields)
             elif entry_type == "transcript":
-                pass
+                if currTranscript != None:
+                    currGene.add_transcript(currTranscript)
+                currTranscript = get_transcript_from_gtf(tab_fields)
             elif entry_type == "exon":
                 pass
             else: 
@@ -59,8 +67,8 @@ def read_gtf_file(gtf_file):
     g = genes.get_genes_in_range("chr1", 30000, 40000, "+")
     for gene in g:
         gene.print_gene()
-    return genes
-                
+    #return genes
+
 def process_sam_file(sam_file):
     """ Reads transcripts from a SAM file
 

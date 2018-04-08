@@ -24,19 +24,26 @@ class Gene(object):
             strand: "+" if the gene is on the forward strand, "-" if it is on 
             the reverse strand
 
-            transcripts:
+            transcripts: A dictionary that contains transcript IDs mapped to 
+            Transcript objects. These objects represent transcripts that come
+            from this gene.
 
     """
-    # TODO: Update transcript description in comment
 
-    def __init__(self, identifier, chromosome, start, end, strand):
-        self.name = ""
+    def __init__(self, identifier, name, chromosome, start, end, strand):
+        start = int(start)
+        end = int(end)
+
+        self.name = name
         self.identifier = identifier
         self.chromosome = chromosome
-        self.start = int(start)
-        self.end = int(end)
+        self.start = start
+        self.end = end
         self.strand = strand
         self.transcripts = {}
+
+        if start > end:
+            raise ValueError('Gene start must be less than or equal to end.')
 
     def set_name(self, name):
         """ Sets the name attribute of the Gene to the provided value.
@@ -44,11 +51,29 @@ class Gene(object):
         self.name = name
         return
 
+    def add_transcript(self, transcript):
+        """ Adds a key-value pair (transcript identifier -> Transcript oject)
+            to the gene's transcript dictionary
+
+            Args:
+                transcript: object of type Transcript. Must overlap with the 
+                location of the gene.
+        """ 
+        transcript_id = transcript.identifier
+
+        if transcript.chromosome != self.chromosome:
+            raise ValueError('Different chromosomes found for gene and ' + \
+                'its transcript: ' + self.identifier + " and " + \
+                 transcript_id)
+        
+        self.transcripts[transcript_id] = transcript
+        return             
+
     def print_gene(self):
         """ Print a string representation of the Gene. Good for debugging. """
 
         if self.name != "":
-            # Include identifier in output if there is one
+            # Include name in output if there is one
             print self.identifier + " (" + self.name + "):"
         else:
             print self.identifier + ":"
@@ -56,5 +81,37 @@ class Gene(object):
         print "\tLocation: " + self.chromosome + ":" + str(self.start) + "-" + \
               str(self.end) + "(" + self.strand + ")"
         
-        # TODO: Print transcripts too, at least in shorthand 
+        # Print transcripts in shorthand 
+        for transcript in self.transcripts:
+            print "\t Transcript: " + transcript
+
         return
+
+def get_gene_from_gtf(gene_info):
+    """ Creates a Gene object from a GTF file entry
+
+        Args:
+            gene_info: A list containing fields from a GTF file gene entry.
+            Example:
+            ['chr1', 'HAVANA', 'gene', '11869', '14409', '.', '+', '.',
+            'gene_id "ENSG00000223972.5";
+            gene_type "transcribed_unprocessed_pseudogene";
+            gene_status "KNOWN"; gene_name "DDX11L1"; level 2;
+            havana_gene "OTTHUMG00000000961.2";']
+
+    """
+    gene_name = None
+    chromosome = gene_info[0]
+    description = gene_info[-1]
+    if "gene_id" not in description:
+        raise ValueError('GTF entry lacks a gene_id field')
+    gene_id = (description.split("gene_id ")[1]).split('"')[1]
+
+    if "gene_name" in description:
+        gene_name = (description.split("gene_name ")[1]).split('"')[1]
+    start = int(gene_info[3])
+    end = int(gene_info[4])
+    strand = gene_info[6]
+
+    gene = Gene(gene_id, gene_name, chromosome, start, end, strand)
+    return gene
