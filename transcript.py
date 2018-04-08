@@ -73,6 +73,18 @@ class Transcript(object):
         self.add_exon(start, end)
         return
 
+    def exon_string(self):
+        """ Returns a string representation of the transcript object consisting
+        of its constitutive exon coordinates 
+        """
+
+        exon_string = ""
+        for exon in self.exons:
+            if exon_string != "":
+                exon_string += "_"
+            exon_string += "-".join([str(x) for x in exon])
+        return exon_string
+
     def print_transcript(self):
         """ Print a string representation of the Transcript. Good for debugging
         """
