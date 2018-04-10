@@ -37,12 +37,12 @@ class SamTranscript(Transcript):
     """
 
     def __init__(self, sam_id, identifier, name, chromosome, start, end, \
-                 strand, samFields):
+                 strand, samFields, exons):
         self.chromosome = chromosome
         self.start = int(start)
         self.end = int(end)
         self.strand = strand
-        self.exons = []
+        self.exons = exons
         self.samFields = samFields
 
         self.sam_id = sam_id
@@ -58,17 +58,103 @@ def get_sam_transcript(samFields):
         Returns:
             A SamTranscript object
     """
-    
     sam_id = samFields[0]
-    flag = samFields[1]
+    flag = int(samFields[1])
     chromosome = samFields[2]
     start = int(samFields[3])
+
     cigar = samFields[5]
     seq = samFields[9]
+    otherFields = samFields[11:len(samFields)]
 
     end = compute_transcript_end(start, cigar)
-    print end
-    exit()
+    introns = get_introns(otherFields, start, cigar)
+    exon_coords = [start] + introns + [end]
+    exons = [exon_coords[i:i + 2] for i in xrange(0, len(exon_coords), 2)]
+    if flag in [16, 272]:
+        strand = "-"
+    else:
+        strand = "+" 
+    sam = SamTranscript(sam_id, None, None, chromosome, start, end, strand, \
+                         samFields, exons)
+    return sam
+
+def get_introns(fields, start, cigar):
+    """ Locates the jI field in a list of SAM fields or computes
+        it from the CIGAR string and start position if it isn't found. 
+   
+        Example jI strings:
+            no introns: jI:B:i,-1
+            two introns: jI:B:i,167936516,167951806,167951862,167966628
+
+        Args:
+            fields: List containing fields from a sam entry.
+
+            start: The start position of the transcript with respect to the
+            forward strand
+
+            cigar: SAM CIGAR string describing match operations to the reference
+            genome
+
+        Returns:
+            intron_list: intron starts and ends in a list (sorted order)
+    """
+    indices = [i for i, s in enumerate(fields) if 'jI:B:i' in s]
+
+    if len(indices) == 1:
+        jI = fields[indices[0]]
+    elif len(indices) == 0:
+        jI = compute_jI(start, cigar)
+    else:
+        raise ValueError('SAM entry contains more than one jI:B:i field')
+
+    intron_list = [int(x) for x in jI.split(",")[1:]]
+    if intron_list[0] == -1:
+        return []
+    else:
+        return intron_list
+
+def compute_jI(start, cigar):
+    """ If the input sam file doesn't have the custom STARlong-derived jI tag, 
+        we need to compute it. This is done by stepping
+            through the CIGAR string, where introns are represented by the N
+            operation.
+
+       start: The start position of the transcript with respect to the
+            forward strand
+
+       cigar: SAM CIGAR string describing match operations to the reference
+       genome
+
+       Returns: jI string representation of intron start and end positions.
+           Example jI strings:
+              no introns: jI:B:i,-1
+              two introns: jI:B:i,167936516,167951806,167951862,167966628 
+    """
+
+    operations, counts = split_cigar(cigar)
+    jI = ["jI:B:i"]
+    genomePos = start
+
+    # Iterate over cigar operations
+    for op,ct in zip(operations, counts):
+        if op == "N":
+            # This is an intron
+            intronStart = genomePos
+            intronEnd = genomePos + ct - 1
+
+            jI.append(str(intronStart))
+            jI.append(str(intronEnd))
+
+        if op not in ["S", "I"]:
+            genomePos += ct
+
+    # If the transcript has no introns, add -1 to the tag
+    if len(jI) == 1:
+        jI.append("-1")
+
+    jIstr = ",".join(jI)
+    return jIstr
 
 def compute_transcript_end(start, cigar):
     """ Given the start position and CIGAR string of a mapped SAM transcript,

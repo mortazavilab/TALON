@@ -6,8 +6,9 @@
 # Novel transcripts are assigned new identifiers.
 
 from gene import *
-from genetree import GeneTree
+from genetree import *
 from optparse import OptionParser
+from sam_transcript import *
 from transcript import *
 
 def getOptions():
@@ -57,8 +58,6 @@ def read_gtf_file(gtf_file):
             elif entry_type == "transcript":
                 if currTranscript != None:
                     currGene.add_transcript(currTranscript)
-                    print currTranscript.exon_string()
-                    exit()
                 currTranscript = get_transcript_from_gtf(tab_fields)
             elif entry_type == "exon":
                currTranscript.add_exon_from_gtf(tab_fields)
@@ -66,19 +65,22 @@ def read_gtf_file(gtf_file):
                 pass
 
     #genes.print_tree()
-    g = genes.get_genes_in_range("chr1", 30000, 40000, "+")
-    for gene in g:
-        gene.print_gene()
-    #return genes
+    #g = genes.get_genes_in_range("chr1", 30000, 40000, "+")
+    #for gene in g:
+    #    gene.print_gene()
+    return genes
 
-def process_sam_file(sam_file):
+def process_sam_file(sam_file, genes):
     """ Reads transcripts from a SAM file
 
         Args:
             sam_file: Path to the SAM file
 
-        Returns:
+        Returns: 
     """
+
+    transcripts = {}
+
     with open(sam_file) as sam:
         for line in sam:
             line = line.strip()
@@ -86,6 +88,20 @@ def process_sam_file(sam_file):
             # Ignore header
             if line.startswith("@"):
                 continue
+             
+            sam = line.split("\t")
+            
+            # Only use uniquely mapped transcripts for now
+            if sam[1] in ["0", "16"]:
+                sam_transcript = get_sam_transcript(sam)
+                chromosome = sam_transcript.chromosome
+                start = sam_transcript.start
+                end = sam_transcript.end
+                strand = sam_transcript.strand
+                g = genes.get_genes_in_range(chromosome, start, end, strand) 
+                for gene in g:
+                    gene.print_gene()
+                exit()
 
 def main():
     options = getOptions()
@@ -93,12 +109,12 @@ def main():
     gtf_file = options.gtf_file
 
     # Process the GTF annotations
-    read_gtf_file(gtf_file)
+    genes = read_gtf_file(gtf_file)
 
     # Process the SAM files
     sam_files = infile_list.split(",")
     for sam in sam_files:
-        process_sam_file(sam)
+        process_sam_file(sam, genes)
 
 if __name__ == '__main__':
     main()

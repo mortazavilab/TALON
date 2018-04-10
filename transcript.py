@@ -19,7 +19,8 @@ class Transcript(object):
            strand: "+" if the transcript is on the forward strand, and "-" if
            it is on the reverse strand
 
-           exons: Data structure containing at least one exon
+           exons: List containing start and end position of each exon in sorted
+           order
 
        Optional Attributes:
            gene: 
@@ -48,7 +49,7 @@ class Transcript(object):
                 'is supposed to be before the exon end (' + str(exon_end) + ')')
  
         exon = [exon_start, exon_end]
-        self.exons.append(exon)
+        self.exons += exon
         return
 
     def add_exon_from_gtf(self, exon_info):
