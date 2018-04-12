@@ -4,6 +4,17 @@ sys.path.append("..")
 from sam_transcript import *
 
 class TestGetIntrons(object):
+    def test_noIntrons(self):
+        """ This example (from transcript c14004/f1p1/2578 in 
+            GM12878_chr1_clean.sam) has no introns and one exon. The function
+            is supposed to return an empty list."
+        """
+        fields = [ "NH:i:1", "HI:i:1", "NM:i:1", "MD:Z:590C1987", "jM:B:c,-1",
+                   "jI:B:i,-1"] 
+        start = 107056706 
+        cigar = "2578M"
+
+        assert get_introns(fields, start, cigar) == []
 
     def test_multiexon_without_jI(self):
         """ This example (from transcript c3098/f3p2/3199 in

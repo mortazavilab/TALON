@@ -2,8 +2,9 @@
 # Author: Dana Wyman
 #------------------------------------------------------------------------------
 
-from transcript import *
+from genetree import *
 import re
+from transcript import *
 
 class SamTranscript(Transcript):
     """ Stores information about a gene transcript that comes from a sam file, 
@@ -69,8 +70,8 @@ def get_sam_transcript(samFields):
 
     end = compute_transcript_end(start, cigar)
     introns = get_introns(otherFields, start, cigar)
-    exon_coords = [start] + introns + [end]
-    exons = [exon_coords[i:i + 2] for i in xrange(0, len(exon_coords), 2)]
+    exons = get_exons(start, end, introns)
+    #exons = [exon_coords[i:i + 2] for i in xrange(0, len(exon_coords), 2)]
     if flag in [16, 272]:
         strand = "-"
     else:
@@ -78,6 +79,24 @@ def get_sam_transcript(samFields):
     sam = SamTranscript(sam_id, None, None, chromosome, start, end, strand, \
                          samFields, exons)
     return sam
+
+def get_exons(start, end, introns):
+    """ Transforms intron coordinates and adds in start and end to create
+        a list representing the exon starts and ends in the transcript."""
+    
+    exons = [start]
+    for i in range(0,len(introns)):
+        if i % 2 == 0:
+            # This is an intron start, i.e. an exon end. Subtract 1 to get the
+            # exon base
+            exons.append(introns[i] - 1)
+        else:
+            # This is an intron end, i.e. an exon start. Add 1 to get the
+            # exon base
+            exons.append(introns[i] + 1)
+    exons.append(end)
+    return exons
+    
 
 def get_introns(fields, start, cigar):
     """ Locates the jI field in a list of SAM fields or computes
@@ -180,13 +199,68 @@ def compute_transcript_end(start, cigar):
     return end - 1
 
 def split_cigar(cigar):
-        """ Takes CIGAR string from SAM and splits it into two lists:
-            one with capital letters (match operators), and one with
-            the number of bases that each operation applies to. """
+    """ Takes CIGAR string from SAM and splits it into two lists:
+        one with capital letters (match operators), and one with
+        the number of bases that each operation applies to. """
 
-        alignTypes = re.sub('[0-9]', " ", cigar).split()
-        counts = re.sub('[A-Z]', " ", cigar).split()
-        counts = [int(i) for i in counts]
+    alignTypes = re.sub('[0-9]', " ", cigar).split()
+    counts = re.sub('[A-Z]', " ", cigar).split()
+    counts = [int(i) for i in counts]
 
-        return alignTypes, counts
+    return alignTypes, counts
+
+def get_best_gene_match(chromosome, start, end, strand, genes):
+    """ Finds genes that intersect with a location, and if there
+        is more than one, selects the gene with the largest degree of overlap
+
+        Args:
+            chromosome: Chromosome that the transcript is located on
+            (format "chr1")
+
+            start: The start position of the transcript with respect to the
+            forward strand
+
+            end: The end position of the transcript with respect to the
+            forward strand
+
+            strand: "+" if the transcript is on the forward strand, and "-" if
+            it is on the reverse strand
+
+            genes: a GeneTree object with genes organized by chromosome in an
+            interval tree data structure
+    """
+
+    # Get all genes that overlap the transcript location
+    gene_matches = genes.get_genes_in_range(chromosome, start, end, strand)
+    nMatches = len(gene_matches) 
+    if nMatches == 0:
+        return None
+
+    elif nMatches == 1:
+        return gene_matches[0]
+
+    else:
+        # Find the best match
+        bestMatch = None
+        bestOverlap = 0
+        for match in gene_matches:
+            overlap = get_overlap([start, end], [match.start, match.end])
+            if overlap > bestOverlap:
+                bestMatch = match
+                bestOverlap = overlap
+        return bestMatch
+
+def get_overlap(a, b):
+    """ Computes the amount of overlap between two intervals.
+        Returns 0 if there is no overlap. The function treats the start and 
+        ends of each interval as inclusive, meaning that if a = b = [10, 20], 
+        the overlap reported would be 11, not 10.
+
+        Args: 
+            a: First interval, formattted as a list
+            b: Second interval, formatted as a list
+    """
+    overlap = max(0, min(a[1], b[1]) - max(a[0], b[0]) + 1)
+    return overlap
+
 

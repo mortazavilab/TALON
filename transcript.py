@@ -23,7 +23,7 @@ class Transcript(object):
            order
 
        Optional Attributes:
-           gene: 
+           gene_id: ID of the gene that this transcript belongs to 
 
            transcript_id: Accession ID of transcript, i.e. and Ensembl ID
 
@@ -31,7 +31,8 @@ class Transcript(object):
 
     """
 
-    def __init__(self, identifier, name, chromosome, start, end, strand):
+    def __init__(self, identifier, name, chromosome, \
+                 start, end, strand, gene_id):
         self.chromosome = chromosome
         self.start = int(start)
         self.end = int(end)
@@ -40,6 +41,7 @@ class Transcript(object):
 
         self.identifier = identifier
         self.name = name
+        self.gene_id = gene_id
 
     def add_exon(self, exon_start, exon_end):
         """Adds an exon (start-end position pair) to the transcript."""
@@ -69,22 +71,33 @@ class Transcript(object):
                 havana_gene "OTTHUMG00000000961.2"; 
                 havana_transcript "OTTHUMT00000362751.1";'] 
         """
+        description = exon_info[-1]
         start = int(exon_info[3])
         end = int(exon_info[4])
+
+        if "transcript_id" not in description:
+            raise ValueError('GTF exon entry lacks a transcript_id field')
+        transcript_id = (description.split("transcript_id ")[1]).split('"')[1]
+        
+        if transcript_id != self.identifier:
+            raise ValueError('Transcript ID assigned to exon does not match '+ \
+                            'transcript it is being assigned to (' + \
+                             transcript_id + ' != ' + self.identifier + ')')
+
         self.add_exon(start, end)
         return
 
-    def exon_string(self):
-        """ Returns a string representation of the transcript object consisting
-        of its constitutive exon coordinates 
-        """
+#    def exon_string(self):
+#        """ Returns a string representation of the transcript object consisting
+#        of its constitutive exon coordinates 
+#        """
 
-        exon_string = ""
-        for exon in self.exons:
-            if exon_string != "":
-                exon_string += "_"
-            exon_string += "-".join([str(x) for x in exon])
-        return exon_string
+#        exon_string = ""
+#        for exon in self.exons:
+#            if exon_string != "":
+#                exon_string += "_"
+#            exon_string += "-".join([str(x) for x in exon])
+#        return exon_string
 
     def print_transcript(self):
         """ Print a string representation of the Transcript. Good for debugging
@@ -102,8 +115,7 @@ class Transcript(object):
               str(self.end) + "(" + self.strand + ")"
 
         # Print exons
-        for exon in self.exons:
-            print "\tExon: " + "-".join([str(x) for x in exon])
+        print "\tExon: " + "_".join([str(x) for x in self.exons])
         return 
 
 def get_transcript_from_gtf(transcript_info):
@@ -131,13 +143,18 @@ def get_transcript_from_gtf(transcript_info):
     strand = transcript_info[6]
 
     name = None
+    gene_id = None
     if "transcript_id" not in description:
             raise ValueError('GTF entry lacks a transcript_id field')
     transcript_id = (description.split("transcript_id ")[1]).split('"')[1]
 
     if "transcript_name" in description:
-        gene_name = (description.split("transcript_name ")[1]).split('"')[1]
+        name = (description.split("transcript_name ")[1]).split('"')[1]
 
-    transcript = Transcript(transcript_id, name, chromosome, start, end, strand)
+    if "gene_id" in description:
+        gene_id = (description.split("gene_id ")[1]).split('"')[1]
+
+    transcript = Transcript(transcript_id, name, chromosome, start, end, \
+                            strand, gene_id)
     return transcript
 

@@ -25,7 +25,7 @@ class Gene(object):
             the reverse strand
 
             transcripts: A dictionary that contains transcript IDs mapped to 
-            Transcript objects. These objects represent transcripts that come
+            Transcript objects. These objects are the transcripts that come 
             from this gene.
 
     """
@@ -59,15 +59,114 @@ class Gene(object):
                 transcript: object of type Transcript. Must overlap with the 
                 location of the gene.
         """ 
-        transcript_id = transcript.identifier
-
-        if transcript.chromosome != self.chromosome:
-            raise ValueError('Different chromosomes found for gene and ' + \
-                'its transcript: ' + self.identifier + " and " + \
-                 transcript_id)
-        
-        self.transcripts[transcript_id] = transcript
+        if transcript.gene_id == self.identifier:
+            # In order to belong to a gene, the transcript gene_id must
+            # match
+            transcript_id = transcript.identifier
+            self.transcripts[transcript_id] = transcript
+        else:
+            raise ValueError('Gene ID of transcript must match gene ' + \
+                  'in order for assignment to be made.')
         return             
+
+    def lookup_transcript_strict(self, query_transcript):
+        """ Checks whether the gene contains a transcript with an exon string
+            that matches that of the query_transcript (including exact 3' and 
+            5' ends). If yes, the matching transcript is returned. If not, the 
+            function returns None.
+
+            Args:
+                query_transcript: Transcript object
+        """
+        query_str = "_".join([str(x) for x in query_transcript.exons])
+        for transcript in self.transcripts:
+            transcript_str = "_".join([str(x) for x in transcript.exons])
+            if query_str == transcript_str:
+                return transcript
+        return None
+
+    def lookup_transcript_permissive_both(self, query_transcript):
+        """ Checks whether the gene contains a transcript with an exon string
+            that matches that of the query_transcript, but allow differences at
+            the 5' and 3' end. If yes, the matching transcript is returned. 
+            If not, the function returns None.
+
+            Args:
+                query_transcript: Transcript object
+        """
+        query_exons = query_transcript.exons[:]
+        query_strand = query_transcript.strand
+
+        query_exons.pop(0)
+        query_exons.pop(-1)
+        query_str = "_".join([str(x) for x in query_exons])
+        for transcript_id in self.transcripts:
+            transcript = self.transcripts[transcript_id]
+            transcript_exons = transcript.exons[:]
+            transcript_exons.pop(0)
+            transcript_exons.pop(-1)
+            transcript_str = "_".join([str(x) for x in transcript_exons])
+            if query_str == transcript_str:
+                return transcript
+        return None
+
+    def lookup_transcript_permissive5(self, query_transcript):
+        """ Checks whether the gene contains a transcript with an exon string
+            that matches that of the query_transcript, but allow differences at
+            the 5' end. If yes, the matching transcript is returned. If not, the
+            function returns None.
+
+            Args:
+                query_transcript: Transcript object
+        """
+        query_exons = query_transcript.exons[:]
+        query_strand = query_transcript.strand
+
+        # Find index of 5' end, dependent on strand
+        if query_strand == "+":
+            index_5prime = 0
+        elif query_strand == "-":
+            index_5prime = -1
+        
+        query_exons.pop(index_5prime)
+        query_str = "_".join([str(x) for x in query_exons])
+        for transcript_id in self.transcripts:
+            transcript = self.transcripts[transcript_id]
+            transcript_exons = transcript.exons[:]
+            transcript_exons.pop(index_5prime)
+            transcript_str = "_".join([str(x) for x in transcript_exons])
+            if query_str == transcript_str:
+                return transcript
+        return None
+
+    def lookup_transcript_permissive3(self, query_transcript):
+        """ Checks whether the gene contains a transcript with an exon string
+            that matches that of the query_transcript, but allow differences at
+            the 3' end. If yes, the matching transcript is returned. If not, the
+            function returns None.
+
+            Args:
+                query_transcript: Transcript object
+        """
+        query_exons = query_transcript.exons[:]
+        query_strand = query_transcript.strand
+ 
+        # Find index of 3'end, dependent on strand
+        if query_strand == "+":
+            index_3prime = -1
+        elif query_strand == "-":
+            index_3prime = 0
+        query_exons.pop(index_3prime)
+        query_str = "_".join([str(x) for x in query_exons])
+            
+        for transcript_id in self.transcripts:
+            transcript = self.transcripts[transcript_id]
+            transcript_exons = transcript.exons[:]
+            transcript_exons.pop(index_3prime)
+            transcript_str = "_".join([str(x) for x in transcript_exons])
+            if query_str == transcript_str:
+                return transcript
+        return None
 
     def print_gene(self):
         """ Print a string representation of the Gene. Good for debugging. """
