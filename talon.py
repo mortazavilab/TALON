@@ -127,14 +127,14 @@ def process_sam_file(sam_file, genes):
             start = sam_transcript.start
             end = sam_transcript.end
             strand = sam_transcript.strand
-            gene = get_best_gene_match(chromosome, start, end, strand, genes)
-            if gene != None:
+            gene_match = get_best_gene_match(chromosome, start, end, strand, genes)
+            for gene in gene_match:
                 transcript_match = gene.lookup_transcript_permissive_both(sam_transcript, False)
                 if transcript_match != None:
+                    # If a match is found, it isn't necessary to look at other genes.
                     print sam_transcript.sam_id
                     known_detected += 1
-                
-                #    exit()
+                    break
 
             #exit()
     #print transcripts_processed

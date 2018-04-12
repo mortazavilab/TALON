@@ -234,20 +234,23 @@ def get_best_gene_match(chromosome, start, end, strand, genes):
     gene_matches = genes.get_genes_in_range(chromosome, start, end, strand)
     nMatches = len(gene_matches) 
     if nMatches == 0:
-        return None
+        return []
 
     elif nMatches == 1:
-        return gene_matches[0]
+        return gene_matches
 
     else:
         # Find the best match
-        bestMatch = None
+        bestMatch = []
         bestOverlap = 0
         for match in gene_matches:
             overlap = get_overlap([start, end], [match.start, match.end])
             if overlap > bestOverlap:
-                bestMatch = match
+                bestMatch = [match]
                 bestOverlap = overlap
+            elif overlap == bestOverlap:
+                bestMatch.append(match)
+           
         return bestMatch
 
 def get_overlap(a, b):
