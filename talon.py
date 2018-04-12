@@ -30,7 +30,7 @@ def read_gtf_file(gtf_file):
             gtf_file: Path to the GTF file
 
         Returns:
-            genes: A GeneTree object, which consists of a  dictionary mapping 
+            genes: A GeneTree object, which consists of a dictionary mapping 
             each chromosome to an interval tree data structure. Each interval 
             tree contains intervals corresponding to gene class objects. 
     """
@@ -101,6 +101,7 @@ def process_sam_file(sam_file, genes):
 
     transcripts = {}
     known_detected = 0
+    transcripts_processed = 0
 
     with open(sam_file) as sam:
         for line in sam:
@@ -120,22 +121,24 @@ def process_sam_file(sam_file, genes):
             if len(sam[9]) < 200:
                 continue           
    
+            transcripts_processed += 1
             sam_transcript = get_sam_transcript(sam)
             chromosome = sam_transcript.chromosome
             start = sam_transcript.start
             end = sam_transcript.end
             strand = sam_transcript.strand
-            #if sam_transcript.sam_id == "c25862/f52p88/3496":
             gene = get_best_gene_match(chromosome, start, end, strand, genes)
             if gene != None:
-                transcript_match = gene.lookup_transcript_permissive_both(sam_transcript)
+                transcript_match = gene.lookup_transcript_permissive_both(sam_transcript, False)
                 if transcript_match != None:
-                    transcript_match.print_transcript()
+                    print sam_transcript.sam_id
                     known_detected += 1
+                
                 #    exit()
 
             #exit()
-    print known_detected
+    #print transcripts_processed
+    #print known_detected
 
 def main():
     options = getOptions()

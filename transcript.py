@@ -51,7 +51,10 @@ class Transcript(object):
                 'is supposed to be before the exon end (' + str(exon_end) + ')')
  
         exon = [exon_start, exon_end]
-        self.exons += exon
+        if self.strand == "+":
+            self.exons += exon
+        elif self.strand == "-":
+            self.exons = exon + self.exons
         return
 
     def add_exon_from_gtf(self, exon_info):
@@ -83,7 +86,7 @@ class Transcript(object):
             raise ValueError('Transcript ID assigned to exon does not match '+ \
                             'transcript it is being assigned to (' + \
                              transcript_id + ' != ' + self.identifier + ')')
-
+        exon_number = (description.split("exon_number ")[1]).split('"')[1]
         self.add_exon(start, end)
         return
 

@@ -85,7 +85,7 @@ class Gene(object):
                 return transcript
         return None
 
-    def lookup_transcript_permissive_both(self, query_transcript):
+    def lookup_transcript_permissive_both(self, query_transcript, verbose):
         """ Checks whether the gene contains a transcript with an exon string
             that matches that of the query_transcript, but allow differences at
             the 5' and 3' end. If yes, the matching transcript is returned. 
@@ -93,6 +93,8 @@ class Gene(object):
 
             Args:
                 query_transcript: Transcript object
+
+                verbose: If true, print strings along the way
         """
         query_exons = query_transcript.exons[:]
         query_strand = query_transcript.strand
@@ -100,12 +102,23 @@ class Gene(object):
         query_exons.pop(0)
         query_exons.pop(-1)
         query_str = "_".join([str(x) for x in query_exons])
+
+        if verbose == True:
+            print "========================================"
+            print query_str
+            print "----------------------------------------"
+
         for transcript_id in self.transcripts:
             transcript = self.transcripts[transcript_id]
             transcript_exons = transcript.exons[:]
             transcript_exons.pop(0)
             transcript_exons.pop(-1)
             transcript_str = "_".join([str(x) for x in transcript_exons])
+
+            if verbose == True:
+                print transcript.name
+                print transcript_str
+                print "................."
             if query_str == transcript_str:
                 return transcript
         return None
