@@ -131,10 +131,10 @@ def process_sam_file(sam_file, transcripts, exon_tree):
             matches = get_transcript_match(sam_transcript, transcripts, exon_tree)
             if len(matches) > 0:
                 print sam_transcript.sam_id
-                print matches
-                print len(sam_transcript.exons)
+                #print matches
+                #print len(sam_transcript.exons)
                 known_detected += 1
-    print known_detected
+    #print known_detected
 
 def get_transcript_match(sam_transcript, transcripts, exon_tree):
     chromosome = sam_transcript.chromosome
@@ -151,9 +151,15 @@ def get_transcript_match(sam_transcript, transcripts, exon_tree):
         cutoff_3 = 0
 
         if i == 0:
-            cutoff_5 = 100000
+            if strand == "+":
+                cutoff_5 = 100000
+            else:
+                cutoff_3 = 100000
         if i == len(sam_transcript.exons) - 2:
-            cutoff_3 = 100000
+            if strand == "+":
+                cutoff_3 = 100000
+            else:
+                cutoff_5 = 100000
   
         matches, diffs = get_loose_exon_matches(chromosome, start, end, \
                                                 strand, exon_tree, cutoff_5, \

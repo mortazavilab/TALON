@@ -239,12 +239,12 @@ def get_loose_exon_matches(chromosome, start, end, strand, exons, cutoff_5, \
 
     # Get all exons that overlap the query location
     exon_matches = exons.get_exons_in_range(chromosome, start, end, strand)
-    
+     
     # Compute the 5' and 3' differences
     for match in exon_matches:
         query_range = [start, end]
         match_range = [match.start, match.end]
-        
+         
         diff_5, diff_3 = get_difference(query_range, match_range, strand)
         
         # Enforce similarity cutoff
@@ -259,7 +259,7 @@ def get_difference(a, b, strand):
         Example: a = [ 0, 10]  b = [ 2, 8 ] on + strand
             5' difference =  -2
             3' difference =  +2
-        
+
         Args:
             a: First interval, formattted as a list
             b: Second interval, formatted as a list
