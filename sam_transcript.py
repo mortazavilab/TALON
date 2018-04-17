@@ -209,10 +209,10 @@ def split_cigar(cigar):
 
     return alignTypes, counts
 
-def get_best_exon_match(chromosome, start, end, strand, exons):
-    """ Finds exons that intersect with a location, and if there
-        is more than one, selects the exon with the minimum 5' and 3' 
-        difference.
+def get_loose_exon_matches(chromosome, start, end, strand, exons, cutoff_5, \
+                           cutoff_3):
+    """ Finds and returns all annotation exons that overlap the query location 
+        and which start and end within 10 basepairs of the query.
 
         Args:
             chromosome: Chromosome that the query is located on
@@ -229,34 +229,29 @@ def get_best_exon_match(chromosome, start, end, strand, exons):
 
             exons: An ExonTree object with genes organized by chromosome in an
             interval tree data structure
+
+            cutoff_5: Permitted difference at 5' end
+     
+            cutoff_3: Permitted difference at 3' end
     """
+    loose_matches = []
+    differences = []
 
     # Get all exons that overlap the query location
     exon_matches = exons.get_exons_in_range(chromosome, start, end, strand)
-    nMatches = len(exon_matches) 
-    if nMatches == 0:
-        return [], []
-    else:
-        # Find the best match
-        best_match = []
-        best_match_diff = []
-        best_diff = 100000000
-        for match in exon_matches:
-            diff_5, diff_3 = get_difference([start, end], \
-                                            [match.start, match.end], strand)
-            # Similarity cutoff: differences may not exceed 10 bp
-            if abs(diff_5) <= 10 and abs(diff_3) <= 10:
-                tot_diff = abs(diff_5) + abs(diff_3)
-                #print str(diff_5) + "-" + str(diff_3)
-                #print match.identifier
-                if tot_diff < best_diff:
-                    best_match = [match]
-                    best_match_diff = [[diff_5, diff_3]]
-                    best_diff = tot_diff
-                elif tot_diff == best_diff:
-                    best_match.append(match)
-                    best_match_diff.append([diff_5, diff_3])
-        return best_match, best_match_diff
+    
+    # Compute the 5' and 3' differences
+    for match in exon_matches:
+        query_range = [start, end]
+        match_range = [match.start, match.end]
+        
+        diff_5, diff_3 = get_difference(query_range, match_range, strand)
+        
+        # Enforce similarity cutoff
+        if abs(diff_5) <= cutoff_5 and abs(diff_3) <= cutoff_3:
+            loose_matches.append(match)
+            differences.append([diff_5, diff_3])
+    return loose_matches, differences
 
 def get_difference(a, b, strand):
     """ Computes the 5' and 3' difference between two exon intervals. 

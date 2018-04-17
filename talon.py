@@ -95,7 +95,7 @@ def read_gtf_file(gtf_file):
 
     return genes, transcripts, exons
 
-def process_sam_file(sam_file, exon_tree):
+def process_sam_file(sam_file, transcripts, exon_tree):
     """ Reads transcripts from a SAM file
 
         Args:
@@ -104,7 +104,7 @@ def process_sam_file(sam_file, exon_tree):
         Returns:
     """
 
-    transcripts = {}
+    #sam_transcripts = {}
     known_detected = 0
     transcripts_processed = 0
 
@@ -128,27 +128,15 @@ def process_sam_file(sam_file, exon_tree):
 
             transcripts_processed += 1
             sam_transcript = get_sam_transcript(sam)
-            if len(sam_transcript.exons) == 2:
-                get_transcript_match_singleExon(sam_transcript, exon_tree)
-            else:
-                pass
-                #get_transcript_match_multiexon(sam_transcript, exon_tree)
+            matches = get_transcript_match(sam_transcript, transcripts, exon_tree)
+            if len(matches) > 0:
+                print sam_transcript.sam_id
+                print matches
+                print len(sam_transcript.exons)
+                known_detected += 1
+    print known_detected
 
-def get_transcript_match_singleExon(sam_transcript, exon_tree):
-    chromosome = sam_transcript.chromosome
-    start = sam_transcript.start
-    end = sam_transcript.end
-    strand = sam_transcript.strand
-    exons = sam_transcript.exons
-    
-    matches, diffs = get_best_exon_match(chromosome, start, end, \
-                                                     strand, exon_tree)
-    if len(matches) > 0:
-        print sam_transcript.sam_id
-        print matches[0].transcript_ids
-        exit()
-
-def get_transcript_match_multiexon(sam_transcript, exon_tree):
+def get_transcript_match(sam_transcript, transcripts, exon_tree):
     chromosome = sam_transcript.chromosome
     strand = sam_transcript.strand
     exons = sam_transcript.exons
@@ -158,19 +146,39 @@ def get_transcript_match_multiexon(sam_transcript, exon_tree):
     for i in range(0, len(sam_transcript.exons), 2):
         start = exons[i]
         end = exons[i+1]
-      
-        matches, diffs = get_best_exon_match(chromosome, start, end, \
-                                                     strand, exon_tree)
-        print str(start) + "-" + str(end)
-        print str(matches[0].start) + "-" + str(matches[0].end)
-        print diffs
-        match = matches[0]
+
+        cutoff_5 = 0
+        cutoff_3 = 0
+
         if i == 0:
-            transcript_pool = match.transcript_ids
+            cutoff_5 = 100000
+        if i == len(sam_transcript.exons) - 2:
+            cutoff_3 = 100000
+  
+        matches, diffs = get_loose_exon_matches(chromosome, start, end, \
+                                                strand, exon_tree, cutoff_5, \
+                                                cutoff_3)
+        
+        # Pool all of the transcripts that matched this exon
+        match_pool = set()
+        for match in matches:
+            match_pool = match_pool.union(match.transcript_ids)
+                
+        # Now intersect the match_pool with transcripts for the previous exons
+        if i == 0:
+            transcript_pool = match_pool
         else:
-            transcript_pool = transcript_pool & match.transcript_ids
-        print transcript_pool
-    return
+            transcript_pool = transcript_pool.intersection(match_pool)
+
+    # Remove any transcript matches that have an incorrect number of exons
+    final_transcript_pool = set()
+    sam_exon_ct = len(sam_transcript.exons)
+    for transcript_id in transcript_pool:
+        transcript = transcripts[transcript_id]
+        if len(transcript.exons) == sam_exon_ct:
+            final_transcript_pool.add(transcript_id)       
+
+    return final_transcript_pool
 
 def process_sam_file_old(sam_file, genes):
     """ Reads transcripts from a SAM file
@@ -234,7 +242,7 @@ def main():
     # Process the SAM files
     sam_files = infile_list.split(",")
     for sam in sam_files:
-        process_sam_file(sam, exons)
+        process_sam_file(sam, transcripts, exons)
 
 if __name__ == '__main__':
     main()
