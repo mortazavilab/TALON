@@ -10,6 +10,7 @@ from exontree import *
 from optparse import OptionParser
 from sam_transcript import *
 from transcript import *
+from transcript_match_tracker import *
 import warnings
 
 def getOptions():
@@ -85,7 +86,7 @@ def read_gtf_file(gtf_file):
                     currTranscript = genes[gene_id].transcripts[transcript_id]
                     currTranscript.add_exon_from_gtf(tab_fields)
                     exon = create_exon_from_gtf(tab_fields)
-                    exons.add_exon(exon)
+                    exons.add_exon(exon, exon.identifier)
 
     # Now create the GeneTree structure
     #gt = GeneTree()
@@ -126,15 +127,60 @@ def process_sam_file(sam_file, transcripts, exon_tree):
             if len(sam[9]) < 200:
                 continue
 
-            transcripts_processed += 1
             sam_transcript = get_sam_transcript(sam)
-            matches = get_transcript_match(sam_transcript, transcripts, exon_tree)
-            if len(matches) > 0:
-                print sam_transcript.sam_id
+            known = look_for_transcript_matches(sam_transcript, transcripts, exon_tree)
+            if known:
+                known_detected += 1
+            transcripts_processed += 1
+            #sam_transcript = get_sam_transcript(sam)
+            #matches = get_transcript_match(sam_transcript, transcripts, exon_tree)
+            #if len(matches) > 0:
+            #    print sam_transcript.sam_id + " " + ",".join([x.name for x in matches])
                 #print matches
                 #print len(sam_transcript.exons)
-                known_detected += 1
-    #print known_detected
+            #    known_detected += 1
+    print known_detected
+
+def look_for_transcript_matches(query_transcript, transcripts, exon_tree):
+    """ Performs search for matches to the query transcript, one exon at a time.
+
+        Args:
+            query_transcript: Transcript object to be matched
+
+            transcripts: Dictionary of transcript_id -> transcript object.
+            This is the catalog of transcripts that we've seen before.
+
+            exon_tree: ExonTree structure storing the exons that we have seen
+            before.            
+
+        Returns:
+
+    """
+    exons = query_transcript.exons
+    chromosome = query_transcript.chromosome
+    strand = query_transcript.strand
+    tracker = MatchTracker(len(exons)/2)   
+ 
+    exon_num = 0
+    for i in range(0, len(exons), 2):
+        start = exons[i]
+        end = exons[i+1]
+
+        cutoff_5, cutoff_3 = set_cutoffs_permissibleEnds(i, \
+                             len(exons), strand)
+        matches, diffs = get_loose_exon_matches(chromosome, start, end, \
+                                                strand, exon_tree, cutoff_5, \
+                                                cutoff_3)
+
+        # Get transcripts that contain the exon matches
+        t_matches = set()
+        for match in matches:
+            t_matches = t_matches.union(match.transcript_ids)
+        tracker.exon_matches.append(t_matches)
+        exon_num += 1
+
+    tracker.compute_match_sets(transcripts)
+    return len(tracker.full_matches) > 0
 
 def get_transcript_match(sam_transcript, transcripts, exon_tree):
     chromosome = sam_transcript.chromosome
@@ -142,29 +188,23 @@ def get_transcript_match(sam_transcript, transcripts, exon_tree):
     exons = sam_transcript.exons
     transcript_pool = set()
 
+    n_exons_with_match = 0
     # Find a match for each exon
     for i in range(0, len(sam_transcript.exons), 2):
         start = exons[i]
         end = exons[i+1]
 
-        cutoff_5 = 0
-        cutoff_3 = 0
+        cutoff_5, cutoff_3 = set_cutoffs_permissibleEnds(i, \
+                             len(sam_transcript.exons), strand)
 
-        if i == 0:
-            if strand == "+":
-                cutoff_5 = 100000
-            else:
-                cutoff_3 = 100000
-        if i == len(sam_transcript.exons) - 2:
-            if strand == "+":
-                cutoff_3 = 100000
-            else:
-                cutoff_5 = 100000
-  
         matches, diffs = get_loose_exon_matches(chromosome, start, end, \
                                                 strand, exon_tree, cutoff_5, \
                                                 cutoff_3)
-        
+        if len(matches) > 0:
+            n_exons_with_match += 1
+        #else:
+        #    exon_tree.add_novel_exon()
+
         # Pool all of the transcripts that matched this exon
         match_pool = set()
         for match in matches:
@@ -177,65 +217,39 @@ def get_transcript_match(sam_transcript, transcripts, exon_tree):
             transcript_pool = transcript_pool.intersection(match_pool)
 
     # Remove any transcript matches that have an incorrect number of exons
-    final_transcript_pool = set()
+    final_transcript_pool = []
     sam_exon_ct = len(sam_transcript.exons)
     for transcript_id in transcript_pool:
         transcript = transcripts[transcript_id]
         if len(transcript.exons) == sam_exon_ct:
-            final_transcript_pool.add(transcript_id)       
+            final_transcript_pool.append(transcript)       
 
     return final_transcript_pool
 
-def process_sam_file_old(sam_file, genes):
-    """ Reads transcripts from a SAM file
+def set_cutoffs_permissibleEnds(exon_index, n_exons, strand):
+    """ Selects 3' and 5' difference cutoffs depending on the exon index and 
+        strand. For internal exons, both cutoffs should be set to zero, but
+        more flexibility is allowed on the 3' and 5' ends.
 
         Args:
-            sam_file: Path to the SAM file
-
-        Returns: 
+            exon_index: index we are at in the exon vector
+            tot_exons: total number of exons in the transcript
+            strand: strand that the exon is on. 
     """
+    cutoff_5 = 0
+    cutoff_3 = 0
 
-    transcripts = {}
-    known_detected = 0
-    transcripts_processed = 0
-
-    with open(sam_file) as sam:
-        for line in sam:
-            line = line.strip()
- 
-            # Ignore header
-            if line.startswith("@"):
-                continue
-             
-            sam = line.split("\t")
-            
-            # Only use uniquely mapped transcripts for now
-            if sam[1] not in ["0", "16"]:
-                continue
-            
-            # Only use reads that are >= 200 bp long
-            if len(sam[9]) < 200:
-                continue           
-   
-            transcripts_processed += 1
-            sam_transcript = get_sam_transcript(sam)
-            chromosome = sam_transcript.chromosome
-            start = sam_transcript.start
-            end = sam_transcript.end
-            strand = sam_transcript.strand
-            gene_match = get_best_gene_match(chromosome, start, end, strand, genes)
-            for gene in gene_match:
-                print sam_transcript.sam_id + ": " + gene.name
-                transcript_match = gene.lookup_transcript_permissive_both(sam_transcript, False)
-                if transcript_match != None:
-                    # If a match is found, it isn't necessary to look at other genes.
-                    #print sam_transcript.sam_id
-                    known_detected += 1
-                    break
-
-            #exit()
-    #print transcripts_processed
-    #print known_detected
+    if exon_index == 0:
+        if strand == "+":
+            cutoff_5 = 100000
+        else:
+            cutoff_3 = 100000
+    if exon_index == n_exons - 2:
+        if strand == "+":
+            cutoff_3 = 100000
+        else:
+            cutoff_5 = 100000
+    return cutoff_5, cutoff_3
 
 def main():
     options = getOptions()

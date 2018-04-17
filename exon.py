@@ -38,7 +38,8 @@ class Exon(object):
         self.identifier = identifier
         self.gene_id = gene_id
         self.transcript_ids = set()
-        self.transcript_ids.add(transcript_id)
+        if transcript_id != None:
+            self.transcript_ids.add(transcript_id)
 
 def create_exon_from_gtf(exon_info):
     """ Creates an exon object using information from a GTF entry
@@ -72,4 +73,3 @@ def create_exon_from_gtf(exon_info):
     exon = Exon(exon_id, chromosome, start, end, strand, gene_id, \
                 transcript_id)
     return exon
-
