@@ -6,7 +6,7 @@
 # Novel transcripts are assigned new identifiers.
 
 from gene import *
-from genetree import *
+from exontree import *
 from optparse import OptionParser
 from sam_transcript import *
 from transcript import *
@@ -34,7 +34,9 @@ def read_gtf_file(gtf_file):
             each chromosome to an interval tree data structure. Each interval 
             tree contains intervals corresponding to gene class objects. 
     """
-    genes = {} # GeneTree()
+    genes = {}
+    transcripts = {}
+    exons = ExonTree()
     currGene = None
     currTranscript = None
 
@@ -64,6 +66,7 @@ def read_gtf_file(gtf_file):
                     "Check order of GTF file.", RuntimeWarning)
                 else:
                     genes[gene_id].add_transcript(transcript)
+                    transcripts[transcript.identifier] = transcript
             elif entry_type == "exon": 
                 info = tab_fields[-1]
                 transcript_id = (info.split("transcript_id ")[1]).split('"')[1]
@@ -81,16 +84,95 @@ def read_gtf_file(gtf_file):
                 else:
                     currTranscript = genes[gene_id].transcripts[transcript_id]
                     currTranscript.add_exon_from_gtf(tab_fields)
+                    exon = create_exon_from_gtf(tab_fields)
+                    exons.add_exon(exon)
 
     # Now create the GeneTree structure
-    gt = GeneTree()
-    for gene_id in genes:
-        gene = genes[gene_id]
-        gt.add_gene(gene)
+    #gt = GeneTree()
+    #for gene_id in genes:
+    #    gene = genes[gene_id]
+    #    gt.add_gene(gene)
 
-    return gt
+    return genes, transcripts, exons
 
-def process_sam_file(sam_file, genes):
+def process_sam_file(sam_file, exon_tree):
+    """ Reads transcripts from a SAM file
+
+        Args:
+            sam_file: Path to the SAM file
+
+        Returns:
+    """
+
+    transcripts = {}
+    known_detected = 0
+    transcripts_processed = 0
+
+    with open(sam_file) as sam:
+        for line in sam:
+            line = line.strip()
+
+            # Ignore header
+            if line.startswith("@"):
+                continue
+
+            sam = line.split("\t")
+
+            # Only use uniquely mapped transcripts for now
+            if sam[1] not in ["0", "16"]:
+                continue
+
+            # Only use reads that are >= 200 bp long
+            if len(sam[9]) < 200:
+                continue
+
+            transcripts_processed += 1
+            sam_transcript = get_sam_transcript(sam)
+            if len(sam_transcript.exons) == 2:
+                get_transcript_match_singleExon(sam_transcript, exon_tree)
+            else:
+                pass
+                #get_transcript_match_multiexon(sam_transcript, exon_tree)
+
+def get_transcript_match_singleExon(sam_transcript, exon_tree):
+    chromosome = sam_transcript.chromosome
+    start = sam_transcript.start
+    end = sam_transcript.end
+    strand = sam_transcript.strand
+    exons = sam_transcript.exons
+    
+    matches, diffs = get_best_exon_match(chromosome, start, end, \
+                                                     strand, exon_tree)
+    if len(matches) > 0:
+        print sam_transcript.sam_id
+        print matches[0].transcript_ids
+        exit()
+
+def get_transcript_match_multiexon(sam_transcript, exon_tree):
+    chromosome = sam_transcript.chromosome
+    strand = sam_transcript.strand
+    exons = sam_transcript.exons
+    transcript_pool = set()
+
+    # Find a match for each exon
+    for i in range(0, len(sam_transcript.exons), 2):
+        start = exons[i]
+        end = exons[i+1]
+      
+        matches, diffs = get_best_exon_match(chromosome, start, end, \
+                                                     strand, exon_tree)
+        print str(start) + "-" + str(end)
+        print str(matches[0].start) + "-" + str(matches[0].end)
+        print diffs
+        match = matches[0]
+        if i == 0:
+            transcript_pool = match.transcript_ids
+        else:
+            transcript_pool = transcript_pool & match.transcript_ids
+        print transcript_pool
+    return
+
+def process_sam_file_old(sam_file, genes):
     """ Reads transcripts from a SAM file
 
         Args:
@@ -129,10 +211,11 @@ def process_sam_file(sam_file, genes):
             strand = sam_transcript.strand
             gene_match = get_best_gene_match(chromosome, start, end, strand, genes)
             for gene in gene_match:
+                print sam_transcript.sam_id + ": " + gene.name
                 transcript_match = gene.lookup_transcript_permissive_both(sam_transcript, False)
                 if transcript_match != None:
                     # If a match is found, it isn't necessary to look at other genes.
-                    print sam_transcript.sam_id
+                    #print sam_transcript.sam_id
                     known_detected += 1
                     break
 
@@ -146,12 +229,12 @@ def main():
     gtf_file = options.gtf_file
 
     # Process the GTF annotations
-    genes = read_gtf_file(gtf_file)
+    genes, transcripts, exons = read_gtf_file(gtf_file)
 
     # Process the SAM files
     sam_files = infile_list.split(",")
     for sam in sam_files:
-        process_sam_file(sam, genes)
+        process_sam_file(sam, exons)
 
 if __name__ == '__main__':
     main()

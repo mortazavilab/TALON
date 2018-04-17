@@ -209,49 +209,74 @@ def split_cigar(cigar):
 
     return alignTypes, counts
 
-def get_best_gene_match(chromosome, start, end, strand, genes):
-    """ Finds genes that intersect with a location, and if there
-        is more than one, selects the gene with the largest degree of overlap
+def get_best_exon_match(chromosome, start, end, strand, exons):
+    """ Finds exons that intersect with a location, and if there
+        is more than one, selects the exon with the minimum 5' and 3' 
+        difference.
 
         Args:
-            chromosome: Chromosome that the transcript is located on
+            chromosome: Chromosome that the query is located on
             (format "chr1")
 
-            start: The start position of the transcript with respect to the
+            start: The start position of the query with respect to the
             forward strand
 
-            end: The end position of the transcript with respect to the
+            end: The end position of the query with respect to the
             forward strand
 
-            strand: "+" if the transcript is on the forward strand, and "-" if
+            strand: "+" if the query is on the forward strand, and "-" if
             it is on the reverse strand
 
-            genes: a GeneTree object with genes organized by chromosome in an
+            exons: An ExonTree object with genes organized by chromosome in an
             interval tree data structure
     """
 
-    # Get all genes that overlap the transcript location
-    gene_matches = genes.get_genes_in_range(chromosome, start, end, strand)
-    nMatches = len(gene_matches) 
+    # Get all exons that overlap the query location
+    exon_matches = exons.get_exons_in_range(chromosome, start, end, strand)
+    nMatches = len(exon_matches) 
     if nMatches == 0:
-        return []
-
-    elif nMatches == 1:
-        return gene_matches
-
+        return [], []
     else:
         # Find the best match
-        bestMatch = []
-        bestOverlap = 0
-        for match in gene_matches:
-            overlap = get_overlap([start, end], [match.start, match.end])
-            if overlap > bestOverlap:
-                bestMatch = [match]
-                bestOverlap = overlap
-            elif overlap == bestOverlap:
-                bestMatch.append(match)
-           
-        return bestMatch
+        best_match = []
+        best_match_diff = []
+        best_diff = 100000000
+        for match in exon_matches:
+            diff_5, diff_3 = get_difference([start, end], \
+                                            [match.start, match.end], strand)
+            # Similarity cutoff: differences may not exceed 10 bp
+            if abs(diff_5) <= 10 and abs(diff_3) <= 10:
+                tot_diff = abs(diff_5) + abs(diff_3)
+                #print str(diff_5) + "-" + str(diff_3)
+                #print match.identifier
+                if tot_diff < best_diff:
+                    best_match = [match]
+                    best_match_diff = [[diff_5, diff_3]]
+                    best_diff = tot_diff
+                elif tot_diff == best_diff:
+                    best_match.append(match)
+                    best_match_diff.append([diff_5, diff_3])
+        return best_match, best_match_diff
+
+def get_difference(a, b, strand):
+    """ Computes the 5' and 3' difference between two exon intervals. 
+
+        Example: a = [ 0, 10]  b = [ 2, 8 ] on + strand
+            5' difference =  -2
+            3' difference =  +2
+        
+        Args:
+            a: First interval, formattted as a list
+            b: Second interval, formatted as a list
+    """
+    if strand == "+":
+        diff_5 = a[0] - b[0] 
+        diff_3 = a[1] - b[1]
+    elif strand == "-":
+        diff_5 = a[1] - b[1]
+        diff_3 = a[0] - b[0]
+
+    return diff_5, diff_3
 
 def get_overlap(a, b):
     """ Computes the amount of overlap between two intervals.
