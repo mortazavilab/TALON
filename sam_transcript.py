@@ -267,9 +267,10 @@ def get_difference(a, b, strand):
     if strand == "+":
         diff_5 = a[0] - b[0] 
         diff_3 = a[1] - b[1]
-    elif strand == "-":
-        diff_5 = a[1] - b[1]
-        diff_3 = a[0] - b[0]
+
+    elif strand == "-":    
+        diff_5 = b[1] - a[1]
+        diff_3 = b[0] - a[0]
 
     return diff_5, diff_3
 

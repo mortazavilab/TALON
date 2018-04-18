@@ -24,6 +24,10 @@ def getOptions():
     parser.add_option("--gtf", "-g", dest = "gtf_file",
         help = "GTF annotation containing genes, transcripts, and exons.",
         metavar = "FILE", type = "string")
+    parser.add_option("--o", dest = "outfile",
+        help = "Outfile name",
+        metavar = "FILE", type = "string")
+    
     (options, args) = parser.parse_args()
     return options
 
@@ -183,7 +187,7 @@ def look_for_transcript_matches(query_transcript, transcripts, genes, exon_tree)
     exons = query_transcript.exons
     chromosome = query_transcript.chromosome
     strand = query_transcript.strand
-    tracker = MatchTracker(len(exons)/2)   
+    tracker = MatchTracker(query_transcript, len(exons)/2)   
  
     exon_num = 0
     for i in range(0, len(exons), 2):
@@ -207,12 +211,12 @@ def look_for_transcript_matches(query_transcript, transcripts, genes, exon_tree)
 
     tracker.compute_match_sets(transcripts)
     if len(tracker.full_matches) > 0:
-        transcript_match = transcripts[tracker.full_matches[0]]
+        transcript_match, diff = tracker.get_best_full_match(transcripts)
     else:
         # Create a novel transcript. Before the object can be created, the 
         # transcript must be assigned to a gene, or a novel gene created.
+        diff = [None, None]
         transcript_match, transcripts, genes, exon_tree = create_novel_transcript(query_transcript, tracker, transcripts, genes, exon_tree)    
-    diff = [None, None]
     return transcript_match, diff, transcripts, genes, exon_tree
         
 def create_novel_transcript(sam_transcript, tracker, transcripts, genes, exon_tree):
@@ -311,12 +315,13 @@ def main():
     infile_list = options.infile_list
     dataset_list = options.dataset_label_list
     gtf_file = options.gtf_file
+    out = options.outfile
 
     # Process the GTF annotations
     genes, transcripts, exons = read_gtf_file(gtf_file)
 
     # Process the SAM files
-    o = open("transcript_assignments.txt", 'w')
+    o = open(out, 'w')
     o.write("\t".join(["dataset", "read_ID", "chromosome", "start", "end", \
                        "strand", "gene_id", "gene_name", "transcript_id", \
                        "transcript_name", "annotation_status", "diff_5", \

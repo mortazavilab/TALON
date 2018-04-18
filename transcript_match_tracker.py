@@ -27,8 +27,8 @@ class MatchTracker(object):
             matches to the query transcript (i.e. some exons match)
 
     """
-    #TODO: update description once I implement match class
-    def __init__(self, n_exons):
+    def __init__(self, query, n_exons):
+        self.query = query
         self.n_exons = n_exons
         self.exon_matches = [[] for i in range(n_exons)]
         self.transcript_matches = []
@@ -79,6 +79,56 @@ class MatchTracker(object):
         self.partial_matches = list(partial_matches)
 
         return
+
+    def get_best_full_match(self, transcripts):
+        """ Iterates over the full matches in the tracker and determines 
+            which one is the best fit to the query transcript. This is done
+            by computing the differences at the 3' and 5' ends for each.
+
+            Logic: 
+                1) If diff_3 = diff_5 = 0, that is the best. 
+                2) Next best is diff_3 = 0.
+                3) Next best is diff_5 = 0.
+                4) After that, just minimize tot_diff
+                    
+            If there are no full matches, it returns None.
+
+            Args: 
+                transcripts: dictionary mapping transcript_id -> transcript
+                object. Necessary in order to get from the transcript ids
+                stored in the match tracker to the objects themselves. 
+        """
+        best_match = None
+        best_diff_3 = 1000000
+        best_diff_5 = 1000000
+        best_tot_diff = 1000000
+        query_pos = [self.query.start, self.query.end]
+        strand = self.query.strand
+        for match_id in self.full_matches:
+            match = transcripts[match_id]
+            match_pos = [match.start, match.end]
+            diff_5, diff_3 = get_difference(query_pos, match_pos, strand)
+            tot_diff = abs(diff_3) + abs(diff_5)
+            
+            if diff_5 == diff_3 == 0:
+                return match, [diff_5, diff_3]
+            elif diff_3 == 0:
+                best_match = match
+                best_diff_3 = diff_3
+                best_diff_5 = diff_5
+                best_tot_diff = tot_diff
+            elif diff_5 == 0:
+                if best_diff_3 != 0:
+                    best_match = match
+                    best_diff_3 = diff_3
+                    best_diff_5 = diff_5
+                    best_tot_diff = tot_diff
+            elif tot_diff < best_tot_diff:
+                best_match = match
+                best_diff_3 = diff_3
+                best_diff_5 = diff_5
+                best_tot_diff = tot_diff
+        return best_match, [best_diff_5, best_diff_3]
 
 class Match(object):
     """ Describes the relationship of a query interval to an annotated object
