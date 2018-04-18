@@ -58,6 +58,8 @@ class ExonTree(object):
 
         if chromosome not in self.chromosomes:
             self.add_chromosome(chromosome)
+        if exon.start == exon.end:
+            return
 
         # Check for collisions. If the input exon matches an existing exon ID,
         # then merge their transcript sets.
@@ -69,7 +71,7 @@ class ExonTree(object):
         self.exons[exon_id] = exon
         return
 
-    def add_novel_exon(self, chromosome, start, end, strand):
+    def add_novel_exon(self, chromosome, start, end, strand, gene_id, transcript_id):
         """ Creates an exon from the provided information and adds it to the
             exon tree. It is assigned an ID based on the number of novel exons
             that are in the tree already.
@@ -91,7 +93,7 @@ class ExonTree(object):
         """
         self.novel += 1
         new_id = "novel_exon." + str(self.novel)
-        new_exon = Exon(new_id, chromosome, start, end, strand, None, None)
+        new_exon = Exon(new_id, chromosome, start, end, strand, gene_id, transcript_id)
         self.add_exon(new_exon, new_id)
         return
 
@@ -120,7 +122,8 @@ class ExonTree(object):
             raise ValueError('Exon start must be less than or equal to end.')
 
         if chromosome not in self.chromosomes:
-            raise KeyError('Chromosome not found among genes: ' + chromosome)
+            return []
+            #raise KeyError('Chromosome not found among genes: ' + chromosome)
 
         # Add 1 to the query end because in the interval tree data structure,
         # ranges are inclusive of the lower limit, but non-inclusive of the 

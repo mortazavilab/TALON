@@ -239,7 +239,7 @@ def get_loose_exon_matches(chromosome, start, end, strand, exons, cutoff_5, \
 
     # Get all exons that overlap the query location
     exon_matches = exons.get_exons_in_range(chromosome, start, end, strand)
-     
+    
     # Compute the 5' and 3' differences
     for match in exon_matches:
         query_range = [start, end]

@@ -28,6 +28,10 @@ class Gene(object):
             Transcript objects. These objects are the transcripts that come 
             from this gene.
 
+            novel: A counter that keeps track of how many novel transcripts have
+            been added to this gene (so that an appropriate ID can be made for
+            the next one)
+
     """
 
     def __init__(self, identifier, name, chromosome, start, end, strand):
@@ -41,6 +45,7 @@ class Gene(object):
         self.end = end
         self.strand = strand
         self.transcripts = {}
+        self.novel = 0        
 
         if start > end:
             raise ValueError('Gene start must be less than or equal to end.')

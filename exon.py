@@ -41,6 +41,13 @@ class Exon(object):
         if transcript_id != None:
             self.transcript_ids.add(transcript_id)
 
+    def print_exon(self):
+        """ Prints a string representation of the exon"""
+        print self.identifier + ": " + self.chromosome + ":" + \
+              str(self.start) + "-" + str(self.end)
+        print self.transcript_ids
+        return
+
 def create_exon_from_gtf(exon_info):
     """ Creates an exon object using information from a GTF entry
 
@@ -73,3 +80,4 @@ def create_exon_from_gtf(exon_info):
     exon = Exon(exon_id, chromosome, start, end, strand, gene_id, \
                 transcript_id)
     return exon
+
