@@ -27,8 +27,7 @@ class MatchTracker(object):
             matches to the query transcript (i.e. some exons match)
 
     """
-    def __init__(self, query, n_exons):
-        self.query = query
+    def __init__(self, n_exons):
         self.n_exons = n_exons
         self.exon_matches = [[] for i in range(n_exons)]
         self.transcript_matches = []
@@ -80,7 +79,7 @@ class MatchTracker(object):
 
         return
 
-    def get_best_full_match(self, transcripts):
+    def get_best_full_match(self, query, transcripts):
         """ Iterates over the full matches in the tracker and determines 
             which one is the best fit to the query transcript. This is done
             by computing the differences at the 3' and 5' ends for each.
@@ -98,12 +97,16 @@ class MatchTracker(object):
                 object. Necessary in order to get from the transcript ids
                 stored in the match tracker to the objects themselves. 
         """
+        print self.full_matches 
+        if len(self.full_matches) == 0:
+            return None, ["NA", "NA"]
         best_match = None
         best_diff_3 = 1000000
         best_diff_5 = 1000000
         best_tot_diff = 1000000
-        query_pos = [self.query.start, self.query.end]
-        strand = self.query.strand
+        query_pos = [query.start, query.end]
+        
+        strand = query.strand
         for match_id in self.full_matches:
             match = transcripts[match_id]
             match_pos = [match.start, match.end]

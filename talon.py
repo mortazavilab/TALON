@@ -135,8 +135,9 @@ def process_sam_file(sam_file, dataset, genes, transcripts, exon_tree, o):
             # Only use reads that are >= 200 bp long
             if len(sam[9]) < 200:
                 continue
-
+            
             sam_transcript = get_sam_transcript(sam)
+            print sam_transcript.sam_id
             match, diff, transcripts, genes, exon_tree = look_for_transcript_matches(sam_transcript, transcripts, genes, exon_tree)
 
             if match != None:
@@ -187,7 +188,7 @@ def look_for_transcript_matches(query_transcript, transcripts, genes, exon_tree)
     exons = query_transcript.exons
     chromosome = query_transcript.chromosome
     strand = query_transcript.strand
-    tracker = MatchTracker(query_transcript, len(exons)/2)   
+    tracker = MatchTracker(len(exons)/2)   
  
     exon_num = 0
     for i in range(0, len(exons), 2):
@@ -211,7 +212,7 @@ def look_for_transcript_matches(query_transcript, transcripts, genes, exon_tree)
 
     tracker.compute_match_sets(transcripts)
     if len(tracker.full_matches) > 0:
-        transcript_match, diff = tracker.get_best_full_match(transcripts)
+        transcript_match, diff = tracker.get_best_full_match(query_transcript, transcripts)
     else:
         # Create a novel transcript. Before the object can be created, the 
         # transcript must be assigned to a gene, or a novel gene created.
