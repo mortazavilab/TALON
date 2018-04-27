@@ -175,6 +175,8 @@ gene_and_transcript_venns <- function(data, name1, name2, outprefix) {
     print(p1)
     dev.off()
     print(paste("Number of unique genes found across datasets: ", length(unique(c(genes1, genes2))), sep = ""))
+    print(paste("Percent genes shared across datasets: ", 
+          length(intersect(genes1,genes2))*100/length(unique(c(genes1, genes2))), sep = ""))
     #print(length(intersect(genes1,genes2))*100/length(genes1))
 
     plotname = paste(outprefix, "transcript_venn.png", sep = "_")
@@ -197,8 +199,9 @@ gene_and_transcript_venns <- function(data, name1, name2, outprefix) {
 
     print(p2)
     dev.off()
-    print(length(intersect(isoforms1, isoforms2))*100/length(isoforms1))
     print(paste("Number of unique transcripts found across datasets: ", length(unique(c(isoforms1, isoforms2))), sep = ""))
+    print(paste("Percent isoforms shared across datasets: ",
+          length(intersect(isoforms1,isoforms2))*100/length(unique(c(isoforms1, isoforms2))), sep = ""))
 }
 
 plot_gene_tpm_correlation <- function(data, name1, name2, outprefix) {
@@ -279,8 +282,8 @@ plot_transcript_tpm_correlation <- function(data, name1, name2, outprefix) {
 
     # Plot
     plotname = paste(outprefix, "transcript_TPM_corr.png", sep = "_")
-    xlabel = paste("log2(TPM+1) of gene in ", name1, sep="")
-    ylabel = paste("log2(TPM+1) of gene in ", name2, sep="")
+    xlabel = paste("log2(TPM+1) of isoform in ", name1, sep="")
+    ylabel = paste("log2(TPM+1) of isoform in ", name2, sep="")
     png(filename = plotname,
     width = 2000, height = 2000, units = "px",
         bg = "white",  res = 300)
