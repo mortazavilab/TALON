@@ -11,6 +11,7 @@ main <-function() {
     args = commandArgs(trailingOnly = TRUE)
     data_file = args[1]
     prefix = args[2]
+    data_names = unlist(strsplit(args[3], ","))
     
     # Read data
     customTheme = setupRun()
@@ -19,12 +20,12 @@ main <-function() {
                       col_names = TRUE, na = "NA")
     #-------------------------------Filter
     filtered_data = filter_transcripts(data)
-    gene_and_transcript_venns(filtered_data, "PB36", "PB38", prefix)
+    gene_and_transcript_venns(filtered_data, data_names[1], data_names[2], prefix)
     plot_3prime_difference_hist(filtered_data, prefix, customTheme)
     plot_5prime_difference_hist(filtered_data, prefix, customTheme)
     print_known_novel(filtered_data)
-    plot_gene_tpm_correlation(filtered_data, "PB36", "PB38", prefix)
-    plot_transcript_tpm_correlation(filtered_data, "PB36", "PB38", prefix)
+    plot_gene_tpm_correlation(filtered_data, data_names[1], data_names[2], prefix)
+    plot_transcript_tpm_correlation(filtered_data, data_names[1], data_names[2], prefix)
 }
 
 # ------------------Functions------------------------------------------
@@ -162,7 +163,14 @@ gene_and_transcript_venns <- function(data, name1, name2, outprefix) {
      width = 3000, height = 3000, units = "px",
     bg = "white",  res = 300)
 
-    p1 = draw.pairwise.venn(area1=length(genes1), area2=length(genes2), cross.area=length(intersect(genes1,genes2)), category = c(name1, name2), fill = c("navy", "cornflowerblue"), lty = "blank", euler.d = T,scaled = T, label.col="black", fontfamily = rep("Helvetica", 3), cat.fontfamily = rep("Helvetica", 2), alpha = 0.65, cat.pos = c(350,10), cat.dist = c(0.052, 0.052), cat.cex = c(1.5,1.5), cex = rep(1.5,3))
+    p1 = draw.pairwise.venn(area1=length(genes1), area2=length(genes2), cross.area=length(intersect(genes1,genes2)), 
+             category = c(name1, name2), fill = c("navy", "cornflowerblue"), 
+             lty = "blank", euler.d = T, scaled = T, label.col="black",
+             #ext.text = T, ext.percent = 100, ext.pos = 180, ext.line.lwd = 0, 
+             fontfamily = rep("Helvetica", 3), cat.fontfamily = rep("Helvetica", 2), 
+             alpha = 0.65, cat.pos = c(350,10), cat.dist = c(0.052, 0.052), 
+             cat.cex = c(4,4), cex = rep(4,3), margin = 0.05)
+    # cex is font size for number labels
 
     print(p1)
     dev.off()
@@ -177,7 +185,16 @@ gene_and_transcript_venns <- function(data, name1, name2, outprefix) {
     # Transcript venn diagram
     isoforms1 = unique(subset(data, dataset == name1)$transcript_id)
     isoforms2 = unique(subset(data, dataset == name2)$transcript_id)
-    p2 = draw.pairwise.venn(area1=length(isoforms1), area2=length(isoforms2), cross.area=length(intersect(isoforms1, isoforms2)), category = c(name1, name2), fill = c("navy", "cornflowerblue"), lty = "blank", euler.d = T,scaled = T, label.col="black", fontfamily = rep("Helvetica", 3), cat.fontfamily = rep("Helvetica", 2), alpha = 0.65, cat.pos = c(350,10), cat.dist = c(0.052, 0.052), cat.cex = c(1.5,1.5), cex = rep(1.5,3), inverted=T, ext.text = T)
+
+    p2 = draw.pairwise.venn(area1=length(isoforms1), area2=length(isoforms2), cross.area=length(intersect(isoforms1,isoforms2)),
+             category = c(name1, name2), fill = c("navy", "cornflowerblue"),
+             lty = "blank", euler.d = T, scaled = T, label.col="black",
+             #ext.text = T, ext.percent = 100, ext.pos = 180, ext.line.lwd = 0,
+             fontfamily = rep("Helvetica", 3), cat.fontfamily = rep("Helvetica", 2),
+             alpha = 0.65, cat.pos = c(350,10), cat.dist = c(0.052, 0.052),
+             cat.cex = c(4,4), cex = rep(4,3), margin = 0.05)
+    # cex is font size for number labels
+
     print(p2)
     dev.off()
     print(length(intersect(isoforms1, isoforms2))*100/length(isoforms1))
@@ -212,10 +229,8 @@ plot_gene_tpm_correlation <- function(data, name1, name2, outprefix) {
     m$logTPM.2 = log(m$TPM.2 + 1, base=2)
     
     # Correlations: beware- Pearson's correlation changes a lot depending on whether it is run on the looged data or not.
-    pearsonCorr = cor.test(~TPM.1 + TPM.2, data=m, method = "pearson", continuity = FALSE, conf.level = 0.95)$estimate
-    spearmanCorr = cor.test(~TPM.1 + TPM.2, data=m, method = "spearman", continuity = FALSE, conf.level = 0.95, exact=FALSE)$estimate
-    #pearsonCorr = cor.test(m$TPM.1, m$TPM.2, method = "pearson")$estimate
-    #spearmanCorr = cor.test(m$TPM.1, m$TPM.2, method = "spearman", exact=FALSE)$estimate
+    pearsonCorr = cor.test(~logTPM.1 + logTPM.2, data=m, method = "pearson", continuity = FALSE, conf.level = 0.95)$estimate
+    spearmanCorr = cor.test(~logTPM.1 + logTPM.2, data=m, method = "spearman", continuity = FALSE, conf.level = 0.95, exact=FALSE)$estimate
 
     # Plot 
     plotname = paste(outprefix, "gene_TPM_corr.png", sep = "_")
@@ -258,11 +273,9 @@ plot_transcript_tpm_correlation <- function(data, name1, name2, outprefix) {
     m$logTPM.1 = log(m$TPM.1 + 1, base=2)
     m$logTPM.2 = log(m$TPM.2 + 1, base=2)
 
-    # Correlations: beware- Pearson's correlation changes a lot depending on whether it is run on the looged data or not.
-    pearsonCorr = cor.test(~TPM.1 + TPM.2, data=m, method = "pearson", continuity = FALSE, conf.level = 0.95)$estimate
-    spearmanCorr = cor.test(~TPM.1 + TPM.2, data=m, method = "spearman", continuity = FALSE, conf.level = 0.95, exact=FALSE)$estimate
-    #pearsonCorr = cor.test(m$TPM.1, m$TPM.2, method = "pearson")$estimate
-    #spearmanCorr = cor.test(m$TPM.1, m$TPM.2, method = "spearman", exact=FALSE)$estimate
+    # Correlations: beware- Pearson's correlation changes a lot depending on whether it is run on the logged data or not.
+    pearsonCorr = cor.test(~logTPM.1 + logTPM.2, data=m, method = "pearson", continuity = FALSE, conf.level = 0.95)$estimate
+    spearmanCorr = cor.test(~logTPM.1 + logTPM.2, data=m, method = "spearman", continuity = FALSE, conf.level = 0.95, exact=FALSE)$estimate
 
     # Plot
     plotname = paste(outprefix, "transcript_TPM_corr.png", sep = "_")
