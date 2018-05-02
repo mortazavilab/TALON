@@ -47,6 +47,8 @@ setupRun <- function() {
     library(gtable)
     library(VennDiagram)
     library(dplyr)
+    library(RColorBrewer)
+    #library(colorRamps)
 
     # Create custom theme for plots
     # axis.text controls tick mark labels
@@ -75,7 +77,6 @@ getMedMaxLabel <- function(v) {
     if (abs(minV) > maxV) {
         maxV = minV
     }
-    print(maxV)
     medianLabel = paste("Median dist =", medianV, sep = " ")
     meanLabel = paste("Mean dist =", meanV, sep = " ")
     maxLabel = paste("Max dist =", maxV, sep = " ")
@@ -168,8 +169,8 @@ gene_and_transcript_venns <- function(data, name1, name2, outprefix) {
              lty = "blank", euler.d = T, scaled = T, label.col="black",
              #ext.text = T, ext.percent = 100, ext.pos = 180, ext.line.lwd = 0, 
              fontfamily = rep("Helvetica", 3), cat.fontfamily = rep("Helvetica", 2), 
-             alpha = 0.65, cat.pos = c(350,10), cat.dist = c(0.052, 0.052), 
-             cat.cex = c(4,4), cex = rep(4,3), margin = 0.05)
+             alpha = 0.65, cat.pos = c(340,20), cat.dist = c(0.052, 0.052), 
+             cat.cex = c(4,4), cex = rep(4,3), margin = 0.05)#, inverted = T)
     # cex is font size for number labels
 
     print(p1)
@@ -193,8 +194,8 @@ gene_and_transcript_venns <- function(data, name1, name2, outprefix) {
              lty = "blank", euler.d = T, scaled = T, label.col="black",
              #ext.text = T, ext.percent = 100, ext.pos = 180, ext.line.lwd = 0,
              fontfamily = rep("Helvetica", 3), cat.fontfamily = rep("Helvetica", 2),
-             alpha = 0.65, cat.pos = c(350,10), cat.dist = c(0.052, 0.052),
-             cat.cex = c(4,4), cex = rep(4,3), margin = 0.05)
+             alpha = 0.65, cat.pos = c(340,20), cat.dist = c(0.052, 0.052),
+             cat.cex = c(4,4), cex = rep(4,3), margin = 0.05)#, inverted = T)
     # cex is font size for number labels
 
     print(p2)
@@ -234,7 +235,9 @@ plot_gene_tpm_correlation <- function(data, name1, name2, outprefix) {
     # Correlations: beware- Pearson's correlation changes a lot depending on whether it is run on the looged data or not.
     pearsonCorr = cor.test(~logTPM.1 + logTPM.2, data=m, method = "pearson", continuity = FALSE, conf.level = 0.95)$estimate
     spearmanCorr = cor.test(~logTPM.1 + logTPM.2, data=m, method = "spearman", continuity = FALSE, conf.level = 0.95, exact=FALSE)$estimate
-
+    m$dens = densCols(m$logTPM.1, m$logTPM.2, colramp = colorRampPalette(c("navy", "red")))
+    #m$dens = densCols(m$logTPM.1, m$logTPM.2, colramp = colorRampPalette(rev(brewer.pal(11,"RdYlBu"))))
+    #m$dens = densCols(m$logTPM.1, m$logTPM.2, colramp = colorRampPalette(blue2red(4)))
     # Plot 
     plotname = paste(outprefix, "gene_TPM_corr.png", sep = "_")
     xlabel = paste("log2(TPM+1) of gene in ", name1, sep="")
@@ -243,7 +246,7 @@ plot_gene_tpm_correlation <- function(data, name1, name2, outprefix) {
     width = 2000, height = 2000, units = "px",
         bg = "white",  res = 300)
 
-    p = ggplot(m, aes(x = logTPM.1, y = logTPM.2)) + geom_jitter(alpha = 0.5, col="navy") + theme_bw() + xlab(xlabel)  + ylab(ylabel) + theme(text= element_text(size=16)) + theme(axis.text.x = element_text(color = "black", size=16), axis.text.y = element_text(color = "black", size=16)) + annotate("text", x = 4, y = 15, label = paste("Pearson r: ", round(pearsonCorr, 3), "\nSpearman rho: ", round(spearmanCorr, 3), sep=""),  color="black", size = 7) + coord_cartesian(xlim=c(0,17), ylim=c(0,17))
+    p = ggplot(m, aes(x = logTPM.1, y = logTPM.2, col = dens)) + geom_point(size = 1, alpha = 0.7) + scale_color_identity() + theme_bw() + xlab(xlabel) + ylab(ylabel) + theme(text= element_text(size=16)) + theme(axis.text.x = element_text(color = "black", size=16), axis.text.y = element_text(color = "black", size=16)) + annotate("text", x = 4, y = 15, label = paste("Pearson r: ", round(pearsonCorr, 3), "\nSpearman rho: ", round(spearmanCorr, 3), sep=""),  color="black", size = 7) + coord_cartesian(xlim=c(0,17), ylim=c(0,17))
     print(p)
     dev.off()
     
@@ -279,6 +282,8 @@ plot_transcript_tpm_correlation <- function(data, name1, name2, outprefix) {
     # Correlations: beware- Pearson's correlation changes a lot depending on whether it is run on the logged data or not.
     pearsonCorr = cor.test(~logTPM.1 + logTPM.2, data=m, method = "pearson", continuity = FALSE, conf.level = 0.95)$estimate
     spearmanCorr = cor.test(~logTPM.1 + logTPM.2, data=m, method = "spearman", continuity = FALSE, conf.level = 0.95, exact=FALSE)$estimate
+    m$dens = densCols(m$logTPM.1, m$logTPM.2, colramp = colorRampPalette(c("navy", "red")))
+
 
     # Plot
     plotname = paste(outprefix, "transcript_TPM_corr.png", sep = "_")
@@ -288,7 +293,8 @@ plot_transcript_tpm_correlation <- function(data, name1, name2, outprefix) {
     width = 2000, height = 2000, units = "px",
         bg = "white",  res = 300)
  
-    p = ggplot(m, aes(x = logTPM.1, y = logTPM.2)) + geom_jitter(alpha = 0.5, col="navy") + theme_bw() + xlab(xlabel)  + ylab(ylabel) + theme(text= element_text(size=16)) + theme(axis.text.x = element_text(color = "black", size=16), axis.text.y = element_text(color = "black", size=16)) + annotate("text", x = 4, y = 15, label = paste("Pearson r: ", round(pearsonCorr, 3), "\nSpearman rho: ", round(spearmanCorr, 3), sep=""),  color="black", size = 7) + coord_cartesian(xlim=c(0,17), ylim=c(0,17))
+    p = ggplot(m, aes(x = logTPM.1, y = logTPM.2, col = dens)) + geom_point(size = 1, alpha=0.7) + scale_color_identity() + theme_bw() + xlab(xlabel) + ylab(ylabel) + theme(text= element_text(size=16)) + theme(axis.text.x = element_text(color = "black", size=16), axis.text.y = element_text(color = "black", size=16)) + annotate("text", x = 4, y = 15, label = paste("Pearson r: ", round(pearsonCorr, 3), "\nSpearman rho: ", round(spearmanCorr, 3), sep=""),  color="black", size = 7) + coord_cartesian(xlim=c(0,17), ylim=c(0,17))
+    #p = ggplot(m, aes(x = logTPM.1, y = logTPM.2)) + geom_jitter(alpha = 0.5, col="navy") + theme_bw() + xlab(xlabel)  + ylab(ylabel) + theme(text= element_text(size=16)) + theme(axis.text.x = element_text(color = "black", size=16), axis.text.y = element_text(color = "black", size=16)) + annotate("text", x = 4, y = 15, label = paste("Pearson r: ", round(pearsonCorr, 3), "\nSpearman rho: ", round(spearmanCorr, 3), sep=""),  color="black", size = 7) + coord_cartesian(xlim=c(0,17), ylim=c(0,17))
     print(p)
     dev.off()
 }
