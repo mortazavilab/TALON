@@ -53,6 +53,7 @@ def add_transcript_table(sqlite_file):
         - Start
         - End
         - Strand
+        - Length (sum of exon lengths)
         - Exon count
         - Exon IDs
         - Exon coords (comma-delimited list)
@@ -85,6 +86,8 @@ def add_transcript_table(sqlite_file):
         .format(tn=table_name, cn="end", ct="INTEGER"))
     c.execute("ALTER TABLE {tn} ADD COLUMN '{cn}' {ct}"\
         .format(tn=table_name, cn="strand", ct="TEXT"))
+    c.execute("ALTER TABLE {tn} ADD COLUMN '{cn}' {ct}"\
+        .format(tn=table_name, cn="length", ct="INTEGER"))
     c.execute("ALTER TABLE {tn} ADD COLUMN '{cn}' {ct}"\
         .format(tn=table_name, cn="exon_count", ct="INTEGER"))
     c.execute("ALTER TABLE {tn} ADD COLUMN '{cn}' {ct}"\
@@ -156,6 +159,7 @@ def add_exon_table(sqlite_file):
         - Start
         - End
         - Strand
+        - Length
         - Transcript IDs (comma-delimited list)
         - Annotated (0/1)
         - Dataset of origin
@@ -182,6 +186,8 @@ def add_exon_table(sqlite_file):
         .format(tn=table_name, cn="strand", ct="TEXT"))
     c.execute("ALTER TABLE {tn} ADD COLUMN '{cn}' {ct}"\
         .format(tn=table_name, cn="transcript_ids", ct="TEXT"))
+    c.execute("ALTER TABLE {tn} ADD COLUMN '{cn}' {ct}"\
+        .format(tn=table_name, cn="length", ct="INTEGER"))
     c.execute("ALTER TABLE {tn} ADD COLUMN '{cn}' {ct}"\
         .format(tn=table_name, cn="annotated", ct="INTEGER"))
     c.execute("ALTER TABLE {tn} ADD COLUMN '{cn}' {ct}"\
@@ -232,13 +238,14 @@ def read_gtf_file(gtf_file):
             gtf_file: Path to the GTF file
 
         Returns:
-            genes: A GeneTree object, which consists of a dictionary mapping
-            each chromosome to an interval tree data structure. Each interval
-            tree contains intervals corresponding to gene class objects.
+            genes: A dictionary mapping gene IDs to corresponding gene objects
+            transcripts: A dictionary mapping gene IDs to corresponding 
+                   transcript objects
+            exons: A dictionary mapping exon IDs to corresponding exon objects
     """
     genes = {}
     transcripts = {}
-    exons = ExonTree()
+    exons = {} #ExonTree()
     currGene = None
     currTranscript = None
 
@@ -255,9 +262,12 @@ def read_gtf_file(gtf_file):
             chrom = tab_fields[0]
             entry_type = tab_fields[2]
 
+            # Entry is a gene
             if entry_type == "gene":
                 gene = get_gene_from_gtf(tab_fields)
                 genes[gene.identifier] = gene
+
+            # Entry is a transcript
             elif entry_type == "transcript":
                 transcript = get_transcript_from_gtf(tab_fields)
                 gene_id = transcript.gene_id
@@ -265,10 +275,12 @@ def read_gtf_file(gtf_file):
                     warnings.warn("Tried to add transcript " + \
                     transcript.identifier + " to a gene that doesn't " + \
                     "exist in dict (" + gene_id + "). " + \
-                    "Check order of GTF file.", RuntimeWarning)
+                    "Skipping this entry.", RuntimeWarning)
                 else:
                     genes[gene_id].add_transcript(transcript)
                     transcripts[transcript.identifier] = transcript
+
+            # Entry is an exon
             elif entry_type == "exon":
                 info = tab_fields[-1]
                 transcript_id = (info.split("transcript_id ")[1]).split('"')[1]
@@ -277,20 +289,32 @@ def read_gtf_file(gtf_file):
                 if gene_id not in genes:
                     warnings.warn("Tried to add exon to a gene that doesn't"+ \
                     " exist in dict (" + gene_id + "). " + \
-                    "Check order of GTF file.", RuntimeWarning)
+                    "Skipping this entry.", RuntimeWarning)
                 elif transcript_id not in genes[gene_id].transcripts:
                     warnings.warn("Tried to add exon to a transcript (" + \
                     transcript_id + ") that isn't in "+ \
                     " gene transcript set (" + gene_id + "). " + \
-                    "Check order of GTF file.", RuntimeWarning)
+                    "Skipping this entry.", RuntimeWarning)
                 else:
                     currTranscript = genes[gene_id].transcripts[transcript_id]
                     currTranscript.add_exon_from_gtf(tab_fields)
                     exon = create_exon_from_gtf(tab_fields)
-                    exons.add_exon(exon, exon.identifier)
+                    if exon.identifier not in exons:
+                        exons[exon.identifier] = exon
+                    #exons.add_exon(exon, exon.identifier)
 
 
     return genes, transcripts, exons
+
+def populate_db(sqlite_file, genes, transcripts, exons):
+    """
+    
+    """
+    # Connecting to the database file
+    conn = sqlite3.connect(sqlite_file)
+    c = conn.cursor()
+
+    
 
 def make_tracker(genes, transcripts, exons, outprefix, annot_name):
     """ Iterates over GTF-derived transcripts and extracts the following 

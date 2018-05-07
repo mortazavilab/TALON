@@ -25,6 +25,8 @@ class Exon(object):
 
            strand: "+" if the exon is on the forward strand, and "-" if
            it is on the reverse strand
+ 
+           length: The length of the exon
 
     """
 
@@ -34,6 +36,7 @@ class Exon(object):
         self.start = int(start)
         self.end = int(end)
         self.strand = strand
+        self.length = self.end - self.start + 1
 
         self.identifier = identifier
         self.gene_id = gene_id

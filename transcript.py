@@ -43,8 +43,25 @@ class Transcript(object):
         self.name = name
         self.gene_id = gene_id
 
-    def add_exon(self, exon_start, exon_end):
-        """Adds an exon (start-end position pair) to the transcript."""
+    def get_length(self):
+        """ Computes the length of the transcript by summing the lengths of
+            its exons """
+
+        if len(self.exons) == 0:
+            raise ValueError('Transcript does not have any exons')
+
+        transcript_length = 0
+        for i in range(0, len(exons), 2):
+            start = exons[i]
+            end = exons[i+1]
+            curr_len = end - start + 1 
+            transcript_length += curr_len
+
+        return transcript_length
+
+    def add_exon_old(self, exon_start, exon_end):
+        """Adds an exon (start-end position pair) to the transcript.
+           Replaced by add_exon, which will use exon object instead of coords"""
 
         if exon_start > exon_end:
             raise ValueError('Exon start (' + str(exon_start) + ')' + \
@@ -57,50 +74,77 @@ class Transcript(object):
             self.exons = exon + self.exons
         return
 
-    def add_exon_from_gtf(self, exon_info):
-        """ Adds an exon to the transcript using information from a GTF entry
+    def add_exon(self, exon):
+        """Adds an exon object to the transcript."""
 
-            Args:
-               exon_info: A list containing fields from a GTF file exon entry.
-               Example:   
-               ['chr1', 'HAVANA', 'exon', '11869', '12227', '.', '+', '.', 
-                'gene_id "ENSG00000223972.5"; transcript_id "ENST00000456328.2"; 
-                gene_type "transcribed_unprocessed_pseudogene"; 
-                gene_status "KNOWN"; gene_name "DDX11L1"; 
-                transcript_type "processed_transcript"; 
-                transcript_status "KNOWN"; transcript_name "DDX11L1-002"; 
-                exon_number 1; exon_id "ENSE00002234944.1"; level 2; 
-                tag "basic"; transcript_support_level "1"; 
-                havana_gene "OTTHUMG00000000961.2"; 
-                havana_transcript "OTTHUMT00000362751.1";'] 
-        """
-        description = exon_info[-1]
-        start = int(exon_info[3])
-        end = int(exon_info[4])
+        if exon.start > exon.end:
+            raise ValueError('Exon start (' + str(exon_start) + ')' + \
+                'is supposed to be before the exon end (' + str(exon_end) + ')')
 
-        if "transcript_id" not in description:
-            raise ValueError('GTF exon entry lacks a transcript_id field')
-        transcript_id = (description.split("transcript_id ")[1]).split('"')[1]
-        
-        if transcript_id != self.identifier:
-            raise ValueError('Transcript ID assigned to exon does not match '+ \
-                            'transcript it is being assigned to (' + \
-                             transcript_id + ' != ' + self.identifier + ')')
-        exon_number = (description.split("exon_number ")[1]).split('"')[1]
-        self.add_exon(start, end)
+        # Check where in the list the exon should be added
+        for i in range(0,len(self.exons)):
+            existing_exon = self.exons[i]
+            if exon.end < existing_exon.start:
+                self.exons = self.exons[0:i] + [exon] + self.exons[i:]
+                return
+        self.exons.append(exon)
+        self.check_exon_validity()
         return
+                    
+    def check_exon_validity(self):
+        """ The transcript's exons are valid if:
+            1) Exons are in sorted order (ascending)
+            2) Exon bounds do not exceed transcript start and end
+            If these conditions are violated, this function raises an error.
+        """
+        prev = 0
+        for exon in self.exons:
+            if exon.start < self.start or exon.end > self.end:
+                raise ValueError('Invalid exon in transcript ' + \
+                      self.identifier + ': (' + exon.start + "-" + exon.end + \
+                      ') is located beyond start or end of transcript')
+            if exon.start <= prev:
+                # This error would indicate a TALON bug rather than user error,
+                # so we shouldn't see it.
+                raise ValueError('Exons of transcript ' + \
+                      self.identifier + ' are not stored in ascending order')
+            prev = exon.end
+        return
+        
 
-#    def exon_string(self):
-#        """ Returns a string representation of the transcript object consisting
-#        of its constitutive exon coordinates 
-#        """
+    #def add_exon_from_gtf(self, exon_info):
+    #    """ Adds an exon to the transcript using information from a GTF entry
 
-#        exon_string = ""
-#        for exon in self.exons:
-#            if exon_string != "":
-#                exon_string += "_"
-#            exon_string += "-".join([str(x) for x in exon])
-#        return exon_string
+    #        Args:
+    #           exon_info: A list containing fields from a GTF file exon entry.
+    #           Example:   
+    #           ['chr1', 'HAVANA', 'exon', '11869', '12227', '.', '+', '.', 
+    #            'gene_id "ENSG00000223972.5"; transcript_id "ENST00000456328.2"; 
+    #            gene_type "transcribed_unprocessed_pseudogene"; 
+    #            gene_status "KNOWN"; gene_name "DDX11L1"; 
+    #            transcript_type "processed_transcript"; 
+    #            transcript_status "KNOWN"; transcript_name "DDX11L1-002"; 
+    #            exon_number 1; exon_id "ENSE00002234944.1"; level 2; 
+    #            tag "basic"; transcript_support_level "1"; 
+    #            havana_gene "OTTHUMG00000000961.2"; 
+    #            havana_transcript "OTTHUMT00000362751.1";'] 
+    #    """
+    #    description = exon_info[-1]
+    #    start = int(exon_info[3])
+    #    end = int(exon_info[4])
+
+    #    if "transcript_id" not in description:
+    #        raise ValueError('GTF exon entry lacks a transcript_id field')
+    #    transcript_id = (description.split("transcript_id ")[1]).split('"')[1]
+        
+    #    if transcript_id != self.identifier:
+    #        raise ValueError('Transcript ID assigned to exon does not match '+ \
+    #                        'transcript it is being assigned to (' + \
+    #                         transcript_id + ' != ' + self.identifier + ')')
+    #    exon_number = (description.split("exon_number ")[1]).split('"')[1]
+    #    self.add_exon(start, end)
+    #    return
+
 
     def print_transcript(self):
         """ Print a string representation of the Transcript. Good for debugging
@@ -118,7 +162,7 @@ class Transcript(object):
               str(self.end) + "(" + self.strand + ")"
 
         # Print exons
-        print "\tExon: " + "_".join([str(x) for x in self.exons])
+        #print "\tExon: " + "_".join([str(x) for x in self.exons])
         return 
 
 def get_transcript_from_gtf(transcript_info):

@@ -60,8 +60,6 @@ class MatchTracker(object):
         if len(self.transcript_matches) != self.n_exons:
             raise ValueError('Cannot run compute_match_sets until all ' + \
                              ' query exons have been processed.')
-        #for elem in self.exon_matches:
-        #    print elem
 
         tmp_full_matches = set.intersection(*(self.transcript_matches))
         full_matches = set()
@@ -97,7 +95,6 @@ class MatchTracker(object):
                 object. Necessary in order to get from the transcript ids
                 stored in the match tracker to the objects themselves. 
         """
-        print self.full_matches 
         if len(self.full_matches) == 0:
             return None, ["NA", "NA"]
         best_match = None

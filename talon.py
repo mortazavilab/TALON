@@ -45,8 +45,8 @@ def read_gtf_file(gtf_file):
     genes = {}
     transcripts = {}
     exons = ExonTree()
-    currGene = None
-    currTranscript = None
+    #currGene = None
+    #currTranscript = None
 
     with open(gtf_file) as gtf:
         for line in gtf:
@@ -62,9 +62,12 @@ def read_gtf_file(gtf_file):
             entry_type = tab_fields[2]            
 
             if entry_type == "gene": 
+                # Create a new gene object
                 gene = get_gene_from_gtf(tab_fields)
                 genes[gene.identifier] = gene
             elif entry_type == "transcript":
+                # Create a new transcript object and add transcript to its
+                # corresponding gene object after performing sanity checks
                 transcript = get_transcript_from_gtf(tab_fields)
                 gene_id = transcript.gene_id
                 if gene_id not in genes:
@@ -75,7 +78,10 @@ def read_gtf_file(gtf_file):
                 else:
                     genes[gene_id].add_transcript(transcript)
                     transcripts[transcript.identifier] = transcript
-            elif entry_type == "exon": 
+            elif entry_type == "exon":
+                # Create a new exon object and add exon to its corresponding 
+                # transcript object after performing sanity checks. Also,
+                # add the exon to the ExonTree data structure 
                 info = tab_fields[-1]
                 transcript_id = (info.split("transcript_id ")[1]).split('"')[1]
                 gene_id = (info.split("gene_id ")[1]).split('"')[1]
@@ -91,9 +97,10 @@ def read_gtf_file(gtf_file):
                     "Check order of GTF file.", RuntimeWarning) 
                 else:
                     currTranscript = genes[gene_id].transcripts[transcript_id]
-                    currTranscript.add_exon_from_gtf(tab_fields)
+                    #currTranscript.add_exon_from_gtf(tab_fields)
                     exon = create_exon_from_gtf(tab_fields)
                     exons.add_exon(exon, exon.identifier)
+                    currTranscript.add_exon(exon)
 
     # Now create the GeneTree structure
     #gt = GeneTree()
@@ -137,7 +144,7 @@ def process_sam_file(sam_file, dataset, genes, transcripts, exon_tree, o):
                 continue
             
             sam_transcript = get_sam_transcript(sam)
-            print sam_transcript.sam_id
+            #print sam_transcript.sam_id
             match, diff, transcripts, genes, exon_tree = look_for_transcript_matches(sam_transcript, transcripts, genes, exon_tree)
 
             if match != None:
