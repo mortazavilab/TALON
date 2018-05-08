@@ -48,31 +48,21 @@ class Transcript(object):
             its exons """
 
         if len(self.exons) == 0:
-            raise ValueError('Transcript does not have any exons')
-
+            raise ValueError('Cannot compute length: Transcript does not ' + \
+                             'have any exons')
+        
         transcript_length = 0
-        for i in range(0, len(exons), 2):
-            start = exons[i]
-            end = exons[i+1]
-            curr_len = end - start + 1 
-            transcript_length += curr_len
-
+        for exon in self.exons:
+            transcript_length += exon.length
         return transcript_length
 
-    def add_exon_old(self, exon_start, exon_end):
-        """Adds an exon (start-end position pair) to the transcript.
-           Replaced by add_exon, which will use exon object instead of coords"""
-
-        if exon_start > exon_end:
-            raise ValueError('Exon start (' + str(exon_start) + ')' + \
-                'is supposed to be before the exon end (' + str(exon_end) + ')')
- 
-        exon = [exon_start, exon_end]
-        if self.strand == "+":
-            self.exons += exon
-        elif self.strand == "-":
-            self.exons = exon + self.exons
-        return
+    def get_exon_coords(self):
+        """ Returns a list of the exon coordinates in order """
+        exon_coords = []
+        for exon in self.exons:
+            exon_coords.append(exon.start)
+            exon_coords.append(exon.end)
+        return exon_coords
 
     def add_exon(self, exon):
         """Adds an exon object to the transcript."""
@@ -86,6 +76,7 @@ class Transcript(object):
             existing_exon = self.exons[i]
             if exon.end < existing_exon.start:
                 self.exons = self.exons[0:i] + [exon] + self.exons[i:]
+                self.check_exon_validity()
                 return
         self.exons.append(exon)
         self.check_exon_validity()
@@ -105,45 +96,11 @@ class Transcript(object):
                       ') is located beyond start or end of transcript')
             if exon.start <= prev:
                 # This error would indicate a TALON bug rather than user error,
-                # so we shouldn't see it.
+                # so we shouldn't see it. 
                 raise ValueError('Exons of transcript ' + \
-                      self.identifier + ' are not stored in ascending order')
+                      self.identifier + ' are not stored in ascending order.')
             prev = exon.end
         return
-        
-
-    #def add_exon_from_gtf(self, exon_info):
-    #    """ Adds an exon to the transcript using information from a GTF entry
-
-    #        Args:
-    #           exon_info: A list containing fields from a GTF file exon entry.
-    #           Example:   
-    #           ['chr1', 'HAVANA', 'exon', '11869', '12227', '.', '+', '.', 
-    #            'gene_id "ENSG00000223972.5"; transcript_id "ENST00000456328.2"; 
-    #            gene_type "transcribed_unprocessed_pseudogene"; 
-    #            gene_status "KNOWN"; gene_name "DDX11L1"; 
-    #            transcript_type "processed_transcript"; 
-    #            transcript_status "KNOWN"; transcript_name "DDX11L1-002"; 
-    #            exon_number 1; exon_id "ENSE00002234944.1"; level 2; 
-    #            tag "basic"; transcript_support_level "1"; 
-    #            havana_gene "OTTHUMG00000000961.2"; 
-    #            havana_transcript "OTTHUMT00000362751.1";'] 
-    #    """
-    #    description = exon_info[-1]
-    #    start = int(exon_info[3])
-    #    end = int(exon_info[4])
-
-    #    if "transcript_id" not in description:
-    #        raise ValueError('GTF exon entry lacks a transcript_id field')
-    #    transcript_id = (description.split("transcript_id ")[1]).split('"')[1]
-        
-    #    if transcript_id != self.identifier:
-    #        raise ValueError('Transcript ID assigned to exon does not match '+ \
-    #                        'transcript it is being assigned to (' + \
-    #                         transcript_id + ' != ' + self.identifier + ')')
-    #    exon_number = (description.split("exon_number ")[1]).split('"')[1]
-    #    self.add_exon(start, end)
-    #    return
 
 
     def print_transcript(self):

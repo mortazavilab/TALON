@@ -8,9 +8,9 @@ import sqlite3
 from sqlite3 import Error
 from optparse import OptionParser
 from gene import *
-from exontree import *
 from transcript import *
 from sam_transcript import *
+from exon import *
 import warnings
 import os
 
@@ -43,7 +43,7 @@ def create_database(path):
 
     return
 
-def add_transcript_table(sqlite_file):
+def add_transcript_table(database):
     """ Add a table to the database to track transcripts. Attributes are:
         - Transcript ID
         - Transcript Name
@@ -63,7 +63,7 @@ def add_transcript_table(sqlite_file):
     """
 
     # Connecting to the database file
-    conn = sqlite3.connect(sqlite_file)
+    conn = sqlite3.connect(database)
     c = conn.cursor()
 
     # Add table and set primary key column, which will be the transcript ID
@@ -105,7 +105,7 @@ def add_transcript_table(sqlite_file):
     conn.close()
     return
 
-def add_gene_table(sqlite_file):
+def add_gene_table(database):
     """ Add a table to the database to track genes. Attributes are:
         - Gene ID
         - Gene Name
@@ -120,7 +120,7 @@ def add_gene_table(sqlite_file):
     """
 
     # Connecting to the database file
-    conn = sqlite3.connect(sqlite_file)
+    conn = sqlite3.connect(database)
     c = conn.cursor()
 
     # Add table and set primary key column, which will be the transcript ID
@@ -152,7 +152,7 @@ def add_gene_table(sqlite_file):
     conn.close()
     return
 
-def add_exon_table(sqlite_file):
+def add_exon_table(database):
     """ Add a table to the database to track genes. Attributes are:
         - Exon ID
         - Chromosome
@@ -167,7 +167,7 @@ def add_exon_table(sqlite_file):
     """
 
     # Connecting to the database file
-    conn = sqlite3.connect(sqlite_file)
+    conn = sqlite3.connect(database)
     c = conn.cursor()
 
     # Add table and set primary key column, which will be the transcript ID
@@ -199,14 +199,14 @@ def add_exon_table(sqlite_file):
     conn.close()
     return
 
-def add_counter_table(sqlite_file):
+def add_counter_table(database):
     """ Add a table to the database to track novel events. Attributes are:
         - Category (gene, transcript, exon)
         - Novel (number of novel events of that category so far)
     """
 
     # Connecting to the database file
-    conn = sqlite3.connect(sqlite_file)
+    conn = sqlite3.connect(database)
     c = conn.cursor()
 
     # Add table and set primary key column, which will be the transcript ID
@@ -245,9 +245,7 @@ def read_gtf_file(gtf_file):
     """
     genes = {}
     transcripts = {}
-    exons = {} #ExonTree()
-    currGene = None
-    currTranscript = None
+    exons = {} 
 
     with open(gtf_file) as gtf:
         for line in gtf:
@@ -296,25 +294,116 @@ def read_gtf_file(gtf_file):
                     " gene transcript set (" + gene_id + "). " + \
                     "Skipping this entry.", RuntimeWarning)
                 else:
+                    exon_id = (info.split("exon_id ")[1]).split('"')[1]
+                    if exon_id not in exons:
+                        # Create new exon entry
+                        exon = create_exon_from_gtf(tab_fields)
+                        exons[exon_id] = exon
+                    else:
+                        # Update existing exon entry
+                        exon = exons[exon_id]
+                        exon.transcript_ids.add(transcript_id)
                     currTranscript = genes[gene_id].transcripts[transcript_id]
-                    currTranscript.add_exon_from_gtf(tab_fields)
-                    exon = create_exon_from_gtf(tab_fields)
-                    if exon.identifier not in exons:
-                        exons[exon.identifier] = exon
-                    #exons.add_exon(exon, exon.identifier)
-
+                    currTranscript.add_exon(exon)
 
     return genes, transcripts, exons
 
-def populate_db(sqlite_file, genes, transcripts, exons):
-    """
-    
+def populate_db(database, genes, transcripts, exons):
+    """ Iterate over GTF-derived gene, transcript, and exon entries in order
+        to add a record for each in the database
     """
     # Connecting to the database file
-    conn = sqlite3.connect(sqlite_file)
+    conn = sqlite3.connect(database)
     c = conn.cursor()
-
+    for gene_id in genes:
+        gene = genes[gene_id]
+        add_gene(c, gene)
+    for transcript_id in transcripts:
+        transcript = transcripts[transcript_id]
+        add_transcript(c, transcript)
     
+    conn.commit()
+    conn.close()
+    
+    return
+
+def add_gene(c, gene):
+    """ Given a conn.curser (c) to a database and a gene object,
+        this function adds an entry to the database's gene table """
+    gene_id = str_wrap(gene.identifier)
+    gene_name = str_wrap(gene.name)
+    chrom = str_wrap(gene.chromosome)
+    start = str(gene.start)
+    end = str(gene.end)
+    strand = str_wrap(gene.strand)
+    annot = "1"
+    
+    table_name = "genes"
+    cols = ", ".join(['{idf}','{nm}','{chrom}','{st}','{ed}','{std}','{an}'])
+    cols = " (" + cols + ") "
+    vals = ", ".join([gene_id, gene_name, chrom, start, end, strand, annot])
+    vals = " (" + vals + ") " 
+    command = "INSERT OR IGNORE INTO {tn}" + cols + "VALUES" + vals   
+    c.execute(command.format(tn=table_name, idf="identifier", nm="name", \
+              chrom="chromosome", st="start", ed="end", std="strand", \
+              an="annotated"))
+    return
+
+def add_transcript(c, transcript):
+    """ Given a curser (c) to a database and a transcript object,
+        this function adds an entry to the database's transcript table.
+        It also updates the gene table as appropriate.
+     """
+    # Information we can get from the transcript object
+    t_id = transcript.identifier
+    t_name = str_wrap(transcript.name)
+    g_id = transcript.gene_id
+    chrom = str_wrap(transcript.chromosome)
+    start = str(transcript.start)
+    end = str(transcript.end)
+    strand = str_wrap(transcript.strand)
+    length = transcript.get_length()
+    n_exons = len(transcript.exons)
+    exon_ids = str_wrap(",".join([x.identifier for x in transcript.exons]))
+    exon_coords = str_wrap(",".join(str(x) for x in 
+                               transcript.get_exon_coords()))
+    annot = "1"
+
+    # Get gene name and add the transcript ID to the gene
+    gene_id = transcript.gene_id
+    get_gene = 'SELECT "name","transcript_ids" FROM "genes" ' + \
+               'WHERE "identifier" = ?'
+    c.execute(get_gene,[g_id])
+    gene_name, gene_transcripts = c.fetchone()
+    gene_name = str(gene_name)
+    if gene_transcripts == None:
+        gene_transcripts = t_id
+    else:
+        if t_id not in gene_transcripts:
+            gene_transcripts = str(gene_transcripts) + "," + t_id
+    update_gene = 'UPDATE "genes" SET "transcript_ids" = ' + \
+              str_wrap(gene_transcripts) + ' WHERE "identifier" = ?'
+    c.execute(update_gene,[g_id])
+
+    cols = " (" + ", ".join([str_wrap_double(x) for x in ["identifier", "name", 
+                     "gene_id", "gene_name", "chromosome", "start","end",
+                     "strand","length","exon_count","exon_ids","exon_coords", 
+                     "annotated"]]) + ") "
+    vals = [t_id, t_name, gene_id, gene_name, chrom, start, end, strand, 
+            length, n_exons, exon_ids, exon_coords, annot]
+    
+    command = 'INSERT OR IGNORE INTO "transcripts"' + cols + "VALUES " + \
+              '(?,?,?,?,?,?,?,?,?,?,?,?,?)'
+    c.execute(command,vals)
+    return
+    
+def str_wrap(string):
+    """ Adds single quotes around the input string """
+    return "'" + string + "'"
+
+def str_wrap_double(string):
+    """ Adds double quotes around the input string """
+    return '"' + string + '"'
 
 def make_tracker(genes, transcripts, exons, outprefix, annot_name):
     """ Iterates over GTF-derived transcripts and extracts the following 
@@ -412,6 +501,7 @@ def main():
 
     # Process the GTF annotations
     genes, transcripts, exons = read_gtf_file(gtf_file)
+    populate_db(db_name, genes, transcripts, exons)
     #make_tracker(genes, transcripts, exons, outprefix, annot_name)
 
 if __name__ == '__main__':
