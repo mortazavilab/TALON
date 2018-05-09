@@ -2,7 +2,9 @@
 # Author: Dana Wyman
 # -----------------------------------------------------------------------------
 # This program reads in a GTF-formatted transcript annotation (ie GENCODE) and
-# structures it in the annotation format used by the TALON pipeline.
+# creates a SQLite database with gene, transcript, and exon tables.
+# This database is used by the TALON pipeline to maintain a registry of 
+# known annotations as well as novel discoveries.
 
 import sqlite3
 from sqlite3 import Error
@@ -43,12 +45,47 @@ def create_database(path):
 
     return
 
+def add_gene_table(database):
+    """ Add a table to the database to track genes. Attributes are:
+        - Gene ID
+        - Gene Name
+        - Chromosome
+        - Start
+        - End
+        - Strand
+        - Length (start to end of gene)
+        - Annotated (0/1)
+        - Dataset of origin
+        - Datasets in which gene was found (comma-delimited list)
+    """
+
+    # Connecting to the database file
+    conn = sqlite3.connect(database)
+    c = conn.cursor()
+
+    # Add table and set primary key column, which will be the gene ID
+    c.execute('CREATE TABLE "genes" ("identifier" TEXT PRIMARY KEY)')
+
+    # Add more columns (no default values)
+    c.execute('ALTER TABLE "genes" ADD COLUMN "name" TEXT')
+    c.execute('ALTER TABLE "genes" ADD COLUMN "chromosome" TEXT')
+    c.execute('ALTER TABLE "genes" ADD COLUMN "start" INTEGER')
+    c.execute('ALTER TABLE "genes" ADD COLUMN "end" INTEGER')
+    c.execute('ALTER TABLE "genes" ADD COLUMN "strand" TEXT')
+    c.execute('ALTER TABLE "genes" ADD COLUMN "length" TEXT')
+    c.execute('ALTER TABLE "genes" ADD COLUMN "annotated" INTEGER')
+    c.execute('ALTER TABLE "genes" ADD COLUMN "dataset_of_origin" TEXT')
+    c.execute('ALTER TABLE "genes" ADD COLUMN "datasets_containing" TEXT')
+
+    conn.commit()
+    conn.close()
+    return
+
 def add_transcript_table(database):
     """ Add a table to the database to track transcripts. Attributes are:
         - Transcript ID
         - Transcript Name
         - Gene ID
-        - Gene Name
         - Chromosome
         - Start
         - End
@@ -67,86 +104,21 @@ def add_transcript_table(database):
     c = conn.cursor()
 
     # Add table and set primary key column, which will be the transcript ID
-    table_name = "transcripts"
-    c.execute('CREATE TABLE {tn} ({nf} {ft} PRIMARY KEY)'\
-        .format(tn=table_name, nf="identifier", ft="TEXT"))
+    c.execute('CREATE TABLE "transcripts" ("identifier" TEXT PRIMARY KEY)')
 
     # Add more columns (empty)
-    c.execute("ALTER TABLE {tn} ADD COLUMN '{cn}' {ct}"\
-        .format(tn=table_name, cn="name", ct="TEXT"))
-    c.execute("ALTER TABLE {tn} ADD COLUMN '{cn}' {ct}"\
-        .format(tn=table_name, cn="gene_id", ct="TEXT"))
-    c.execute("ALTER TABLE {tn} ADD COLUMN '{cn}' {ct}"\
-        .format(tn=table_name, cn="gene_name", ct="TEXT"))
-    c.execute("ALTER TABLE {tn} ADD COLUMN '{cn}' {ct}"\
-        .format(tn=table_name, cn="chromosome", ct="TEXT"))
-    c.execute("ALTER TABLE {tn} ADD COLUMN '{cn}' {ct}"\
-        .format(tn=table_name, cn="start", ct="INTEGER"))
-    c.execute("ALTER TABLE {tn} ADD COLUMN '{cn}' {ct}"\
-        .format(tn=table_name, cn="end", ct="INTEGER"))
-    c.execute("ALTER TABLE {tn} ADD COLUMN '{cn}' {ct}"\
-        .format(tn=table_name, cn="strand", ct="TEXT"))
-    c.execute("ALTER TABLE {tn} ADD COLUMN '{cn}' {ct}"\
-        .format(tn=table_name, cn="length", ct="INTEGER"))
-    c.execute("ALTER TABLE {tn} ADD COLUMN '{cn}' {ct}"\
-        .format(tn=table_name, cn="exon_count", ct="INTEGER"))
-    c.execute("ALTER TABLE {tn} ADD COLUMN '{cn}' {ct}"\
-        .format(tn=table_name, cn="exon_ids", ct="TEXT"))
-    c.execute("ALTER TABLE {tn} ADD COLUMN '{cn}' {ct}"\
-        .format(tn=table_name, cn="exon_coords", ct="TEXT"))
-    c.execute("ALTER TABLE {tn} ADD COLUMN '{cn}' {ct}"\
-        .format(tn=table_name, cn="annotated", ct="INTEGER"))
-    c.execute("ALTER TABLE {tn} ADD COLUMN '{cn}' {ct}"\
-        .format(tn=table_name, cn="dataset_of_origin", ct="TEXT"))
-    c.execute("ALTER TABLE {tn} ADD COLUMN '{cn}' {ct}"\
-        .format(tn=table_name, cn="datasets_containing_transcript", ct="TEXT"))
-
-    conn.commit()
-    conn.close()
-    return
-
-def add_gene_table(database):
-    """ Add a table to the database to track genes. Attributes are:
-        - Gene ID
-        - Gene Name
-        - Chromosome
-        - Start
-        - End
-        - Strand
-        - Transcript IDs (comma-delimited list)
-        - Annotated (0/1)
-        - Dataset of origin
-        - Datasets in which gene was found (comma-delimited list)
-    """
-
-    # Connecting to the database file
-    conn = sqlite3.connect(database)
-    c = conn.cursor()
-
-    # Add table and set primary key column, which will be the transcript ID
-    table_name = "genes"
-    c.execute('CREATE TABLE {tn} ({nf} {ft} PRIMARY KEY)'\
-        .format(tn=table_name, nf="identifier", ft="TEXT"))  
-    
-    # Add more columns (empty)
-    c.execute("ALTER TABLE {tn} ADD COLUMN '{cn}' {ct}"\
-        .format(tn=table_name, cn="name", ct="TEXT"))
-    c.execute("ALTER TABLE {tn} ADD COLUMN '{cn}' {ct}"\
-        .format(tn=table_name, cn="chromosome", ct="TEXT"))
-    c.execute("ALTER TABLE {tn} ADD COLUMN '{cn}' {ct}"\
-        .format(tn=table_name, cn="start", ct="INTEGER"))
-    c.execute("ALTER TABLE {tn} ADD COLUMN '{cn}' {ct}"\
-        .format(tn=table_name, cn="end", ct="INTEGER"))
-    c.execute("ALTER TABLE {tn} ADD COLUMN '{cn}' {ct}"\
-        .format(tn=table_name, cn="strand", ct="TEXT"))
-    c.execute("ALTER TABLE {tn} ADD COLUMN '{cn}' {ct}"\
-        .format(tn=table_name, cn="transcript_ids", ct="TEXT"))
-    c.execute("ALTER TABLE {tn} ADD COLUMN '{cn}' {ct}"\
-        .format(tn=table_name, cn="annotated", ct="INTEGER"))
-    c.execute("ALTER TABLE {tn} ADD COLUMN '{cn}' {ct}"\
-        .format(tn=table_name, cn="dataset_of_origin", ct="TEXT"))
-    c.execute("ALTER TABLE {tn} ADD COLUMN '{cn}' {ct}"\
-        .format(tn=table_name, cn="datasets_containing_gene", ct="TEXT"))
+    c.execute('ALTER TABLE "transcripts" ADD COLUMN "name" TEXT')
+    c.execute('ALTER TABLE "transcripts" ADD COLUMN "gene_id" TEXT')
+    c.execute('ALTER TABLE "transcripts" ADD COLUMN "chromosome" TEXT')
+    c.execute('ALTER TABLE "transcripts" ADD COLUMN "start" INTEGER')
+    c.execute('ALTER TABLE "transcripts" ADD COLUMN "end" INTEGER')
+    c.execute('ALTER TABLE "transcripts" ADD COLUMN "strand" TEXT')
+    c.execute('ALTER TABLE "transcripts" ADD COLUMN "length" INTEGER')
+    c.execute('ALTER TABLE "transcripts" ADD COLUMN "exon_count" INTEGER')
+    c.execute('ALTER TABLE "transcripts" ADD COLUMN "exon_ids" TEXT')
+    c.execute('ALTER TABLE "transcripts" ADD COLUMN "annotated" INTEGER')
+    c.execute('ALTER TABLE "transcripts" ADD COLUMN "dataset_of_origin" TEXT')
+    c.execute('ALTER TABLE "transcripts" ADD COLUMN "datasets_containing" TEXT')
 
     conn.commit()
     conn.close()
@@ -160,6 +132,7 @@ def add_exon_table(database):
         - End
         - Strand
         - Length
+        - Gene ID
         - Transcript IDs (comma-delimited list)
         - Annotated (0/1)
         - Dataset of origin
@@ -170,30 +143,20 @@ def add_exon_table(database):
     conn = sqlite3.connect(database)
     c = conn.cursor()
 
-    # Add table and set primary key column, which will be the transcript ID
-    table_name = "exons"
-    c.execute('CREATE TABLE {tn} ({nf} {ft} PRIMARY KEY)'\
-        .format(tn=table_name, nf="identifier", ft="TEXT"))
+    # Add table and set primary key column, which will be the exon ID
+    c.execute('CREATE TABLE "exons" ("identifier" TEXT PRIMARY KEY)')
 
     # Add more columns (empty)
-    c.execute("ALTER TABLE {tn} ADD COLUMN '{cn}' {ct}"\
-        .format(tn=table_name, cn="chromosome", ct="TEXT"))
-    c.execute("ALTER TABLE {tn} ADD COLUMN '{cn}' {ct}"\
-        .format(tn=table_name, cn="start", ct="INTEGER"))
-    c.execute("ALTER TABLE {tn} ADD COLUMN '{cn}' {ct}"\
-        .format(tn=table_name, cn="end", ct="INTEGER"))
-    c.execute("ALTER TABLE {tn} ADD COLUMN '{cn}' {ct}"\
-        .format(tn=table_name, cn="strand", ct="TEXT"))
-    c.execute("ALTER TABLE {tn} ADD COLUMN '{cn}' {ct}"\
-        .format(tn=table_name, cn="transcript_ids", ct="TEXT"))
-    c.execute("ALTER TABLE {tn} ADD COLUMN '{cn}' {ct}"\
-        .format(tn=table_name, cn="length", ct="INTEGER"))
-    c.execute("ALTER TABLE {tn} ADD COLUMN '{cn}' {ct}"\
-        .format(tn=table_name, cn="annotated", ct="INTEGER"))
-    c.execute("ALTER TABLE {tn} ADD COLUMN '{cn}' {ct}"\
-        .format(tn=table_name, cn="dataset_of_origin", ct="TEXT"))
-    c.execute("ALTER TABLE {tn} ADD COLUMN '{cn}' {ct}"\
-        .format(tn=table_name, cn="datasets_containing_gene", ct="TEXT"))
+    c.execute('ALTER TABLE "exons" ADD COLUMN "chromosome" TEXT')
+    c.execute('ALTER TABLE "exons" ADD COLUMN "start" INTEGER')
+    c.execute('ALTER TABLE "exons" ADD COLUMN "end" INTEGER')
+    c.execute('ALTER TABLE "exons" ADD COLUMN "strand" TEXT')
+    c.execute('ALTER TABLE "exons" ADD COLUMN "length" INTEGER')
+    c.execute('ALTER TABLE "exons" ADD COLUMN "gene_id" TEXT')
+    c.execute('ALTER TABLE "exons" ADD COLUMN "transcript_ids" TEXT')
+    c.execute('ALTER TABLE "exons" ADD COLUMN "annotated" INTEGER')
+    c.execute('ALTER TABLE "exons" ADD COLUMN "dataset_of_origin" TEXT')
+    c.execute('ALTER TABLE "exons" ADD COLUMN "datasets_containing" TEXT')
 
     conn.commit()
     conn.close()
@@ -209,10 +172,9 @@ def add_counter_table(database):
     conn = sqlite3.connect(database)
     c = conn.cursor()
 
-    # Add table and set primary key column, which will be the transcript ID
+    # Add table and set primary key column
     table_name = "counters"
-    c.execute('CREATE TABLE {tn} ({nf} {ft} PRIMARY KEY)'\
-        .format(tn=table_name, nf="category", ft="TEXT"))
+    c.execute('CREATE TABLE "counters" ("category" TEXT PRIMARY KEY)')
 
     # Add novel column
     default_val = 0
@@ -321,7 +283,10 @@ def populate_db(database, genes, transcripts, exons):
     for transcript_id in transcripts:
         transcript = transcripts[transcript_id]
         add_transcript(c, transcript)
-    
+    for exon_id in exons:
+        exon = exons[exon_id]
+        add_exon(c, exon)
+
     conn.commit()
     conn.close()
     
@@ -330,23 +295,23 @@ def populate_db(database, genes, transcripts, exons):
 def add_gene(c, gene):
     """ Given a conn.curser (c) to a database and a gene object,
         this function adds an entry to the database's gene table """
-    gene_id = str_wrap(gene.identifier)
-    gene_name = str_wrap(gene.name)
-    chrom = str_wrap(gene.chromosome)
-    start = str(gene.start)
-    end = str(gene.end)
-    strand = str_wrap(gene.strand)
-    annot = "1"
+
+    gene_id = gene.identifier
+    gene_name = gene.name
+    chrom = gene.chromosome
+    start = gene.start
+    end = gene.end
+    strand = gene.strand
+    length = end - start + 1
+    annot = 1
     
-    table_name = "genes"
-    cols = ", ".join(['{idf}','{nm}','{chrom}','{st}','{ed}','{std}','{an}'])
-    cols = " (" + cols + ") "
-    vals = ", ".join([gene_id, gene_name, chrom, start, end, strand, annot])
-    vals = " (" + vals + ") " 
-    command = "INSERT OR IGNORE INTO {tn}" + cols + "VALUES" + vals   
-    c.execute(command.format(tn=table_name, idf="identifier", nm="name", \
-              chrom="chromosome", st="start", ed="end", std="strand", \
-              an="annotated"))
+    cols = " (" + ", ".join([str_wrap_double(x) for x in ["identifier", "name",
+           "chromosome", "start","end","strand","length","annotated"]]) + ") "
+    vals = [gene_id, gene_name, chrom, start, end, strand, length, annot]
+
+    command = 'INSERT OR IGNORE INTO "genes"' + cols + "VALUES " + \
+              '(?,?,?,?,?,?,?,?)'
+    c.execute(command,vals)
     return
 
 def add_transcript(c, transcript):
@@ -354,136 +319,76 @@ def add_transcript(c, transcript):
         this function adds an entry to the database's transcript table.
         It also updates the gene table as appropriate.
      """
-    # Information we can get from the transcript object
+
     t_id = transcript.identifier
-    t_name = str_wrap(transcript.name)
+    t_name = transcript.name
     g_id = transcript.gene_id
-    chrom = str_wrap(transcript.chromosome)
-    start = str(transcript.start)
-    end = str(transcript.end)
-    strand = str_wrap(transcript.strand)
+    chrom = transcript.chromosome
+    start = transcript.start
+    end = transcript.end
+    strand = transcript.strand
     length = transcript.get_length()
     n_exons = len(transcript.exons)
-    exon_ids = str_wrap(",".join([x.identifier for x in transcript.exons]))
-    exon_coords = str_wrap(",".join(str(x) for x in 
-                               transcript.get_exon_coords()))
-    annot = "1"
+    exon_ids = ",".join([x.identifier for x in transcript.exons])
+    annot = 1
 
     # Get gene name and add the transcript ID to the gene
-    gene_id = transcript.gene_id
-    get_gene = 'SELECT "name","transcript_ids" FROM "genes" ' + \
-               'WHERE "identifier" = ?'
-    c.execute(get_gene,[g_id])
-    gene_name, gene_transcripts = c.fetchone()
-    gene_name = str(gene_name)
-    if gene_transcripts == None:
-        gene_transcripts = t_id
-    else:
-        if t_id not in gene_transcripts:
-            gene_transcripts = str(gene_transcripts) + "," + t_id
-    update_gene = 'UPDATE "genes" SET "transcript_ids" = ' + \
-              str_wrap(gene_transcripts) + ' WHERE "identifier" = ?'
-    c.execute(update_gene,[g_id])
+    #gene_id = transcript.gene_id
+    #get_gene = 'SELECT "name","transcript_ids" FROM "genes" ' + \
+    #           'WHERE "identifier" = ?'
+    #c.execute(get_gene,[g_id])
+    #gene_name, gene_transcripts = c.fetchone()
+    #gene_name = str(gene_name)
+    #if gene_transcripts == None:
+    #    gene_transcripts = t_id
+    #else:
+    #    if t_id not in gene_transcripts:
+    #        gene_transcripts = str(gene_transcripts) + "," + t_id
+    #update_gene = 'UPDATE "genes" SET "transcript_ids" = ' + \
+    #          str_wrap(gene_transcripts) + ' WHERE "identifier" = ?'
+    #c.execute(update_gene,[g_id])
 
     cols = " (" + ", ".join([str_wrap_double(x) for x in ["identifier", "name", 
-                     "gene_id", "gene_name", "chromosome", "start","end",
-                     "strand","length","exon_count","exon_ids","exon_coords", 
+                     "gene_id", "chromosome", "start","end",
+                     "strand","length","exon_count","exon_ids", 
                      "annotated"]]) + ") "
-    vals = [t_id, t_name, gene_id, gene_name, chrom, start, end, strand, 
-            length, n_exons, exon_ids, exon_coords, annot]
+    vals = [t_id, t_name, g_id, chrom, start, end, strand, 
+            length, n_exons, exon_ids, annot]
     
     command = 'INSERT OR IGNORE INTO "transcripts"' + cols + "VALUES " + \
-              '(?,?,?,?,?,?,?,?,?,?,?,?,?)'
+              '(?,?,?,?,?,?,?,?,?,?,?)'
     c.execute(command,vals)
     return
-    
-def str_wrap(string):
-    """ Adds single quotes around the input string """
-    return "'" + string + "'"
+
+def add_exon(c, exon):
+    """ Given a curser (c) to a database and an exon object,
+        this function adds an entry to the database's exon table.
+    """
+    # Information we can get from the transcript object
+    exon_id = exon.identifier
+    chrom = exon.chromosome
+    start = exon.start
+    end = exon.end
+    strand = exon.strand
+    length = exon.length
+    gene_id = exon.gene_id
+    transcript_ids = ",".join(list(exon.transcript_ids))
+    annot = 1    
+
+    cols = " (" + ", ".join([str_wrap_double(x) for x in ["identifier", 
+                     "chromosome", "start","end","strand","length","gene_id",
+                     "transcript_ids", "annotated"]]) + ") "
+    vals = [exon_id, chrom, start, end, strand, length, gene_id, transcript_ids, 
+            annot]
+
+    command = 'INSERT OR IGNORE INTO "exons"' + cols + "VALUES " + \
+              '(?,?,?,?,?,?,?,?,?)'
+    c.execute(command,vals)
+    return
 
 def str_wrap_double(string):
     """ Adds double quotes around the input string """
     return '"' + string + '"'
-
-def make_tracker(genes, transcripts, exons, outprefix, annot_name):
-    """ Iterates over GTF-derived transcripts and extracts the following 
-        information in order to create an annotation tracker entry:
-            - Transcript ID
-            - Transcript Name
-            - Gene ID
-            - Gene Name
-            - Chromosome
-            - Start
-            - End
-            - Strand 
-            - Exon IDs
-            - Exon starts (delimited list)
-            - Exon ends (delimited list)
-
-            These fields will have predetermined values
-            - Annotated (0/1)
-            - Dataset of origin
-            - Datasets in which transcript was found so far (delimited list)
-            
-            Args:
-                transcripts: a dictionary of Transcript objects obtained from
-                the provided GTF file     
-    """ 
-    #genes_seen = {}
-
-    o_transcript = open(outprefix + "_talon_transcript.annot", 'w')
-    #o_gene = open(outprefix + "_talon_gene.annot")
-
-    o_transcript.write("# version=1\n") # Annotation version
-    o_transcript.write("# novel_genes=0\n") # Gene naming counter
-    o_transcript.write("# novel_transcripts=0\n") # Transcript naming counter
-    o_transcript.write("# novel_exons=0\n") # Exon naming counter
-    o_transcript.write("\t".join(["transcript_id", "transcript_name", 
-                                  "gene_id", "gene_name", "chromosome", 
-                                  "transcript_start", "transcript_end", 
-                                  "strand", "exon_ids", "exon_coords", 
-                                  "annotated", "dataset_of_origin", 
-                                  "datasets_containing_transcript"]) + "\n")
-    transcript_entries = []
-    for transcript_id in transcripts:
-        # Filter out transcripts that are smaller than 200 bp
-        # As a rule, we're mostly concerned with filtering out single-exon
-        # transcripts such as miRNAs here, so we can just look at the start
-        # and end.
-        transcript = transcripts[transcript_id]
-        if transcript.end - transcript.start < 200:
-            continue
-        transcript_name = transcript.name
-        gene_id = transcript.gene_id
-        gene_name = genes[gene_id].name
-        chromosome = transcript.chromosome
-        transcript_start = str(transcript.start)
-        transcript_end = str(transcript.end)
-        strand = transcript.strand
-
-        # Fetch exon IDs
-        exon_ids = []
-        for i in range(0, len(transcript.exons), 2):
-            exon_start = transcript.exons[i]
-            exon_end = transcript.exons[i+1]
-            exon = get_loose_exon_matches(chromosome, exon_start, exon_end, \
-                                                strand, exons, 0, 0)[0][0]
-            exon_ids.append(exon.identifier)
-             
-        exon_ids = ",".join(exon_ids)
-        exon_coords = ",".join([ str(x) for x in transcript.exons])
-        annotated = "1"
-        dataset_of_origin = annot_name
-        datasets_containing_transcript = "."
-
-        outstr = "\t".join([ transcript_id, transcript_name, gene_id, \
-                           gene_name, chromosome, transcript_start, \
-                           transcript_end, strand, exon_ids, exon_coords, \
-                           annotated, dataset_of_origin, \
-                           datasets_containing_transcript ]) 
-        o_transcript.write(outstr + "\n")
-    o_transcript.close()
-    return
 
 def main():
     options = getOptions()
@@ -493,16 +398,15 @@ def main():
 
     # Make database
     db_name = outprefix + ".db"
-    #create_database(db_name)
-    #add_transcript_table(db_name)
-    #add_gene_table(db_name)
-    #add_exon_table(db_name)
-    #add_counter_table(db_name)
+    create_database(db_name)
+    add_transcript_table(db_name)
+    add_gene_table(db_name)
+    add_exon_table(db_name)
+    add_counter_table(db_name)
 
     # Process the GTF annotations
     genes, transcripts, exons = read_gtf_file(gtf_file)
     populate_db(db_name, genes, transcripts, exons)
-    #make_tracker(genes, transcripts, exons, outprefix, annot_name)
 
 if __name__ == '__main__':
     main()
