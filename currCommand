@@ -1,4 +1,4 @@
 # Useful test command
 python talon.py --f test_files/sorted.GM12878_chr1_canonicalOnly.sam -g test_files/gencode.v24.annotation.chr1.gtf --d test --o deltest
 
-python build_talon_annotation.py --f test_files/gencode.v24.annotation.chr1.gtf --o test
+python build_talon_annotation.py --f test_files/gencode.v24.annotation.chr1.gtf --a gencode_v24 --o test

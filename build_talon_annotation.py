@@ -21,6 +21,9 @@ def getOptions():
     parser.add_option("--f", dest = "gtf",
         help = "GTF annotation containing genes, transcripts, and exons.",
         metavar = "FILE", type = "string")
+    parser.add_option("--a", dest = "annot_name",
+        help = "Name of supplied annotation (will be used to label data)",
+        type = "string")
     parser.add_option("--o", dest = "outprefix",
         help = "Outprefix for the annotation files",
         metavar = "FILE", type = "string")
@@ -270,7 +273,7 @@ def read_gtf_file(gtf_file):
 
     return genes, transcripts, exons
 
-def populate_db(database, genes, transcripts, exons):
+def populate_db(database, annot_name, genes, transcripts, exons):
     """ Iterate over GTF-derived gene, transcript, and exon entries in order
         to add a record for each in the database
     """
@@ -279,20 +282,20 @@ def populate_db(database, genes, transcripts, exons):
     c = conn.cursor()
     for gene_id in genes:
         gene = genes[gene_id]
-        add_gene(c, gene)
+        add_gene(c, annot_name, gene)
     for transcript_id in transcripts:
         transcript = transcripts[transcript_id]
-        add_transcript(c, transcript)
+        add_transcript(c, annot_name, transcript)
     for exon_id in exons:
         exon = exons[exon_id]
-        add_exon(c, exon)
+        add_exon(c, annot_name, exon)
 
     conn.commit()
     conn.close()
     
     return
 
-def add_gene(c, gene):
+def add_gene(c, annot_name, gene):
     """ Given a conn.curser (c) to a database and a gene object,
         this function adds an entry to the database's gene table """
 
@@ -306,15 +309,17 @@ def add_gene(c, gene):
     annot = 1
     
     cols = " (" + ", ".join([str_wrap_double(x) for x in ["identifier", "name",
-           "chromosome", "start","end","strand","length","annotated"]]) + ") "
-    vals = [gene_id, gene_name, chrom, start, end, strand, length, annot]
+           "chromosome", "start","end","strand","length","annotated",
+           "dataset_of_origin"]]) + ") "
+    vals = [gene_id, gene_name, chrom, start, end, strand, length, annot,
+            annot_name]
 
     command = 'INSERT OR IGNORE INTO "genes"' + cols + "VALUES " + \
-              '(?,?,?,?,?,?,?,?)'
+              '(?,?,?,?,?,?,?,?,?)'
     c.execute(command,vals)
     return
 
-def add_transcript(c, transcript):
+def add_transcript(c, annot_name, transcript):
     """ Given a curser (c) to a database and a transcript object,
         this function adds an entry to the database's transcript table.
         It also updates the gene table as appropriate.
@@ -351,16 +356,16 @@ def add_transcript(c, transcript):
     cols = " (" + ", ".join([str_wrap_double(x) for x in ["identifier", "name", 
                      "gene_id", "chromosome", "start","end",
                      "strand","length","exon_count","exon_ids", 
-                     "annotated"]]) + ") "
+                     "annotated", "dataset_of_origin"]]) + ") "
     vals = [t_id, t_name, g_id, chrom, start, end, strand, 
-            length, n_exons, exon_ids, annot]
+            length, n_exons, exon_ids, annot, annot_name]
     
     command = 'INSERT OR IGNORE INTO "transcripts"' + cols + "VALUES " + \
-              '(?,?,?,?,?,?,?,?,?,?,?)'
+              '(?,?,?,?,?,?,?,?,?,?,?,?)'
     c.execute(command,vals)
     return
 
-def add_exon(c, exon):
+def add_exon(c, annot_name, exon):
     """ Given a curser (c) to a database and an exon object,
         this function adds an entry to the database's exon table.
     """
@@ -376,13 +381,13 @@ def add_exon(c, exon):
     annot = 1    
 
     cols = " (" + ", ".join([str_wrap_double(x) for x in ["identifier", 
-                     "chromosome", "start","end","strand","length","gene_id",
-                     "transcript_ids", "annotated"]]) + ") "
+                    "chromosome", "start","end","strand","length","gene_id",
+                    "transcript_ids", "annotated", "dataset_of_origin"]]) + ") "
     vals = [exon_id, chrom, start, end, strand, length, gene_id, transcript_ids, 
-            annot]
+            annot, annot_name]
 
     command = 'INSERT OR IGNORE INTO "exons"' + cols + "VALUES " + \
-              '(?,?,?,?,?,?,?,?,?)'
+              '(?,?,?,?,?,?,?,?,?,?)'
     c.execute(command,vals)
     return
 
@@ -394,7 +399,7 @@ def main():
     options = getOptions()
     gtf_file = options.gtf
     outprefix = options.outprefix
-    annot_name = (gtf_file.split("/")[-1]).split(".gtf")[0]
+    annot_name = options.annot_name
 
     # Make database
     db_name = outprefix + ".db"
@@ -406,7 +411,7 @@ def main():
 
     # Process the GTF annotations
     genes, transcripts, exons = read_gtf_file(gtf_file)
-    populate_db(db_name, genes, transcripts, exons)
+    populate_db(db_name, annot_name, genes, transcripts, exons)
 
 if __name__ == '__main__':
     main()
