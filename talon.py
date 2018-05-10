@@ -11,6 +11,7 @@ from optparse import OptionParser
 from sam_transcript import *
 from transcript import *
 from transcript_match_tracker import *
+import sqlite3
 import warnings
 
 def getOptions():
@@ -21,8 +22,8 @@ def getOptions():
     parser.add_option("--d", dest = "dataset_label_list",
         help = "Comma-delimited list of dataset names (same order as sam)",
         type = "string")
-    parser.add_option("--gtf", "-g", dest = "gtf_file",
-        help = "GTF annotation containing genes, transcripts, and exons.",
+    parser.add_option("--annot", "-a", dest = "annot",
+        help = "TALON database. Created using build_talon_annotation.py",
         metavar = "FILE", type = "string")
     parser.add_option("--o", dest = "outfile",
         help = "Outfile name",
@@ -30,6 +31,64 @@ def getOptions():
     
     (options, args) = parser.parse_args()
     return options
+
+def read_annotation(annot):
+    """ Imports data from the provided TALON database into gene, transcript, and
+        exon objects. Also imports the number of novel discoveries from the 
+        database so as to properly name discoveries in this run.
+
+        Args:
+            annot 
+
+    """
+    counter = {}
+    genes = {}
+    transcripts = {}
+    exons = {}
+
+    conn = sqlite3.connect(annot)
+    conn.row_factory = sqlite3.Row
+    #conn = sqlite3.connect(annot)
+    c = conn.cursor()
+
+    # Get novel counters
+    c.execute('SELECT * FROM counters')
+    c.execute('SELECT "novel" FROM "counters" WHERE "category" = "genes"')
+    counter["genes"] = int(c.fetchone()[0])
+    c.execute('SELECT "novel" FROM "counters" WHERE "category" = "transcripts"')
+    counter["transcripts"] = int(c.fetchone()[0])
+    c.execute('SELECT "novel" FROM "counters" WHERE "category" = "exons"')
+    counter["exons"] = int(c.fetchone()[0])
+
+    # Add transcripts. In the process, add genes and exons that are linked
+    # to them
+    # Require transcripts to be 200+ bp or contain more than one exon
+    genes_to_add = set()
+    exons_to_add = set()
+
+    c.execute('SELECT * FROM transcripts WHERE "length" >= 200 OR "exon_count" > 1')
+    for transcript_row in c:
+        transcript = get_transcript_from_db(transcript_row)
+        transcripts[transcript.identifier] = transcript
+        
+        genes_to_add.add(transcript_row['gene_id'])
+        for exon_id in transcript_row['exon_ids']:
+            exons_to_add.add(exon_id)
+        
+    c.execute('SELECT * FROM genes')
+    for gene_row in c:
+        if gene_row['identifier'] in genes_to_add:
+            gene = get_gene_from_db(gene_row)
+            print gene.identifier
+    #c.execute('SELECT * FROM exons')
+    #for exon_row in c:
+    #    if exon_row['identifier'] in exons_to_add:
+    #        exon = get_exon_from_db(exon_row)
+
+    conn.close()
+    
+    return
+
 
 def read_gtf_file(gtf_file):
     """ Reads gene, transcript, and exon information from a GTF file.
@@ -322,11 +381,14 @@ def main():
     options = getOptions()
     infile_list = options.infile_list
     dataset_list = options.dataset_label_list
-    gtf_file = options.gtf_file
+    annot = options.annot
+    #gtf_file = options.gtf_file
     out = options.outfile
 
-    # Process the GTF annotations
-    genes, transcripts, exons = read_gtf_file(gtf_file)
+    # Process the annotations
+    read_annotation(annot)
+    exit()
+    #genes, transcripts, exons = read_gtf_file(gtf_file)
 
     # Process the SAM files
     o = open(out, 'w')

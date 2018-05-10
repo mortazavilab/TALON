@@ -32,16 +32,19 @@ class Transcript(object):
     """
 
     def __init__(self, identifier, name, chromosome, \
-                 start, end, strand, gene_id):
-        self.chromosome = chromosome
-        self.start = int(start)
-        self.end = int(end)
-        self.strand = strand
-        self.exons = []
+                 start, end, strand, gene_id, n_exons):
 
         self.identifier = identifier
         self.name = name
         self.gene_id = gene_id
+
+        self.chromosome = chromosome
+        self.start = int(start)
+        self.end = int(end)
+        self.strand = strand
+        self.n_exons = n_exons
+        self.exons = []
+
 
     def get_length(self):
         """ Computes the length of the transcript by summing the lengths of
@@ -121,6 +124,29 @@ class Transcript(object):
         # Print exons
         #print "\tExon: " + "_".join([str(x) for x in self.exons])
         return 
+
+def get_transcript_from_db(transcript_row):
+    """ Uses information from a database transcript entry to create a
+    Transcript object.
+
+        Args:
+            transcript_row: Tuple-formatted row from transcripts table of a 
+            TALON database
+    """
+    transcript_id = transcript_row['identifier']
+    name = transcript_row['name']
+    chromosome = transcript_row['chromosome']
+    start = transcript_row['start']
+    end = transcript_row['end']
+    strand = transcript_row['strand']
+     
+    gene_id = transcript_row['gene_id']
+    n_exons = transcript_row['exon_count']
+
+    transcript = Transcript(transcript_id, name, chromosome, start, end, \
+                            strand, gene_id, n_exons)
+    return transcript
+    
 
 def get_transcript_from_gtf(transcript_info):
     """ Uses information from a GTF-formatted transcript entry to create a

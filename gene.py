@@ -34,7 +34,8 @@ class Gene(object):
 
     """
 
-    def __init__(self, identifier, name, chromosome, start, end, strand):
+    def __init__(self, identifier, name, chromosome, start, end, strand, 
+                 transcripts):
         start = int(start)
         end = int(end)
 
@@ -44,8 +45,8 @@ class Gene(object):
         self.start = start
         self.end = end
         self.strand = strand
-        self.transcripts = {}
-        self.novel = 0        
+        self.transcripts = transcripts
+        #self.novel = 0        
 
         if start > end:
             raise ValueError('Gene start must be less than or equal to end.')
@@ -203,6 +204,26 @@ class Gene(object):
             print "\t Transcript: " + transcript
 
         return
+
+def get_gene_from_db(gene_row):
+    """ Uses information from a database gene entry to create a
+    Gene object.
+
+        Args:
+            gene_row: Tuple-formatted row from 'genes' table of a
+            TALON database
+    """
+    gene_id = gene_row['identifier']
+    name = gene_row['name']
+    chromosome = gene_row['chromosome']
+    start = gene_row['start']
+    end = gene_row['end']
+    strand = gene_row['strand']
+
+    transcripts = {} #gene_row['transcript_ids'].split(",")
+
+    gene = Gene(gene_id, name, chromosome, start, end, strand, transcripts)
+    return gene
 
 def get_gene_from_gtf(gene_info):
     """ Creates a Gene object from a GTF file entry
