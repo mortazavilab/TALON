@@ -7,6 +7,7 @@
 
 from gene import *
 from exontree import *
+from genetree import *
 from optparse import OptionParser
 from sam_transcript import *
 from transcript import *
@@ -38,17 +39,18 @@ def read_annotation(annot):
         database so as to properly name discoveries in this run.
 
         Args:
-            annot 
+            annot
+
+        Returns: 
 
     """
     counter = {}
-    genes = {}
+    gene_tree = GeneTree()
     transcripts = {}
-    exons = {}
+    exon_tree = ExonTree()
 
     conn = sqlite3.connect(annot)
     conn.row_factory = sqlite3.Row
-    #conn = sqlite3.connect(annot)
     c = conn.cursor()
 
     # Get novel counters
@@ -60,114 +62,38 @@ def read_annotation(annot):
     c.execute('SELECT "novel" FROM "counters" WHERE "category" = "exons"')
     counter["exons"] = int(c.fetchone()[0])
 
-    # Add transcripts. In the process, add genes and exons that are linked
-    # to them
-    # Require transcripts to be 200+ bp or contain more than one exon
-    genes_to_add = set()
-    exons_to_add = set()
-
-    c.execute('SELECT * FROM transcripts WHERE "length" >= 200 OR "exon_count" > 1')
-    for transcript_row in c:
-        transcript = get_transcript_from_db(transcript_row)
-        transcripts[transcript.identifier] = transcript
-        
-        genes_to_add.add(transcript_row['gene_id'])
-        for exon_id in transcript_row['exon_ids']:
-            exons_to_add.add(exon_id)
-        
-    c.execute('SELECT * FROM genes')
+    # Require genes to be >= 200 bp in total length 
+    c.execute('SELECT * FROM genes WHERE "length" >= 200')
     for gene_row in c:
-        if gene_row['identifier'] in genes_to_add:
-            gene = get_gene_from_db(gene_row)
-            print gene.identifier
-    #c.execute('SELECT * FROM exons')
-    #for exon_row in c:
-    #    if exon_row['identifier'] in exons_to_add:
-    #        exon = get_exon_from_db(exon_row)
+        gene = get_gene_from_db(gene_row)
+        gene_tree.add_gene(gene)
+
+    c.execute('SELECT * FROM transcripts')
+    exons_to_add = set()
+    for transcript_row in c:
+        # Only accept a transcript if we included the gene it belongs to
+        if transcript_row['gene_id'] in gene_tree.genes:
+            transcript = get_transcript_from_db(transcript_row)
+            transcripts[transcript.identifier] = transcript
+
+            # Add transcript to gene
+            curr_gene_id = transcript_row['gene_id']
+            curr_gene = gene_tree.genes[curr_gene_id]
+            curr_gene.add_transcript(transcript)
+        
+            for exon_id in transcript_row['exon_ids']:
+                exons_to_add.add(exon_id)
+    
+    # Add exons that belong to transcripts that we added    
+    c.execute('SELECT * FROM exons')
+    for exon_row in c:
+        if exon_row['identifier'] in exons_to_add:
+            exon = get_exon_from_db(exon_row)
+            exon_tree.add_exon(exon) 
 
     conn.close()
     
-    return
-
-
-def read_gtf_file(gtf_file):
-    """ Reads gene, transcript, and exon information from a GTF file.
-
-        Args:
-            gtf_file: Path to the GTF file
-
-        Returns:
-            genes: A GeneTree object, which consists of a dictionary mapping 
-            each chromosome to an interval tree data structure. Each interval 
-            tree contains intervals corresponding to gene class objects. 
-    """
-    genes = {}
-    transcripts = {}
-    exons = ExonTree()
-    #currGene = None
-    #currTranscript = None
-
-    with open(gtf_file) as gtf:
-        for line in gtf:
-            line = line.strip()
-            
-            # Ignore header
-            if line.startswith("#"):
-                continue
-
-            # Split into constitutive fields on tab
-            tab_fields = line.split("\t")
-            chrom = tab_fields[0]
-            entry_type = tab_fields[2]            
-
-            if entry_type == "gene": 
-                # Create a new gene object
-                gene = get_gene_from_gtf(tab_fields)
-                genes[gene.identifier] = gene
-            elif entry_type == "transcript":
-                # Create a new transcript object and add transcript to its
-                # corresponding gene object after performing sanity checks
-                transcript = get_transcript_from_gtf(tab_fields)
-                gene_id = transcript.gene_id
-                if gene_id not in genes:
-                    warnings.warn("Tried to add transcript " + \
-                    transcript.identifier + " to a gene that doesn't " + \
-                    "exist in dict (" + gene_id + "). " + \
-                    "Check order of GTF file.", RuntimeWarning)
-                else:
-                    genes[gene_id].add_transcript(transcript)
-                    transcripts[transcript.identifier] = transcript
-            elif entry_type == "exon":
-                # Create a new exon object and add exon to its corresponding 
-                # transcript object after performing sanity checks. Also,
-                # add the exon to the ExonTree data structure 
-                info = tab_fields[-1]
-                transcript_id = (info.split("transcript_id ")[1]).split('"')[1]
-                gene_id = (info.split("gene_id ")[1]).split('"')[1]
-
-                if gene_id not in genes:
-                    warnings.warn("Tried to add exon to a gene that doesn't"+ \
-                    " exist in dict (" + gene_id + "). " + \
-                    "Check order of GTF file.", RuntimeWarning)
-                elif transcript_id not in genes[gene_id].transcripts:
-                    warnings.warn("Tried to add exon to a transcript (" + \
-                    transcript_id + ") that isn't in "+ \
-                    " gene transcript set (" + gene_id + "). " + \
-                    "Check order of GTF file.", RuntimeWarning) 
-                else:
-                    currTranscript = genes[gene_id].transcripts[transcript_id]
-                    #currTranscript.add_exon_from_gtf(tab_fields)
-                    exon = create_exon_from_gtf(tab_fields)
-                    exons.add_exon(exon, exon.identifier)
-                    currTranscript.add_exon(exon)
-
-    # Now create the GeneTree structure
-    #gt = GeneTree()
-    #for gene_id in genes:
-    #    gene = genes[gene_id]
-    #    gt.add_gene(gene)
-
-    return genes, transcripts, exons
+    return gene_tree, transcripts, exon_tree, counter
 
 def process_sam_file(sam_file, dataset, genes, transcripts, exon_tree, o):
     """ Reads transcripts from a SAM file

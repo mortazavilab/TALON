@@ -17,16 +17,13 @@ class GeneTree(object):
             chromosomes: A dictionary mapping chromosome name to an interval 
             tree containing genes that are located on that chromosome.
  
-            gene_ids: A dictionary containing the ID of every gene in the
-            structure. Used to detect collisions.
+            gene_ids: A dictionary mapping the ID of every gene to its gene
+            object. Also useful for detectingcollisions.
 
-            novelGenes: A counter that keeps track of the number of un-annotated
-            genes in the GeneTree. Useful for naming novel genes.
     """
     def __init__(self):
         self.chromosomes = {}
-        self.gene_ids = {}
-        novelGenes = 0
+        self.genes = {}
 
     def add_chromosome(self, chrom_name):
         """ Add a chromosome (with empty interval tree) to the GeneTree
@@ -57,12 +54,12 @@ class GeneTree(object):
         if chromosome not in self.chromosomes:
             self.add_chromosome(chromosome)
 
-        if gene_id in self.gene_ids:
+        if gene_id in self.genes:
             raise KeyError('Gene IDs must be unique. ' + gene_id + \
                            " is duplicated.")       
  
-        self.chromosomes[chromosome][start:end] = gene
-        self.gene_ids[gene_id] = 1
+        self.chromosomes[chromosome][start:end] = gene_id
+        self.genes[gene_id] = gene
 
         return
 
@@ -103,7 +100,8 @@ class GeneTree(object):
         # Only report genes on the same strand as the query
         overlapping_genes = []
         for interval in overlapping_gene_intervals:
-            gene = interval.data
+            gene_id = interval.data
+            gene = self.genes[gene_id]
             if gene.strand == strand:
                 overlapping_genes.append(gene)
 
@@ -111,7 +109,6 @@ class GeneTree(object):
 
     def print_tree(self):
         """ Print a rudimentary visual representation of the GeneTree. """
-        # TODO: It would be nice if it printed the chromosomes in order 
         for chrom in self.chromosomes:
             print chrom + ":"
             for gene_interval in self.chromosomes[chrom]:

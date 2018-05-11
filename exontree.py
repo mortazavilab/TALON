@@ -123,7 +123,6 @@ class ExonTree(object):
 
         if chromosome not in self.chromosomes:
             return []
-            #raise KeyError('Chromosome not found among genes: ' + chromosome)
 
         # Add 1 to the query end because in the interval tree data structure,
         # ranges are inclusive of the lower limit, but non-inclusive of the 
