@@ -108,3 +108,29 @@ def get_gene_from_db(gene_row):
     gene = Gene(gene_id, name, chromosome, start, end, strand)
     return gene
 
+def get_gene_from_gtf(gene_info):
+    """ Creates a Gene object from a GTF file entry
+        Args:
+            gene_info: A list containing fields from a GTF file gene entry.
+            Example:
+            ['chr1', 'HAVANA', 'gene', '11869', '14409', '.', '+', '.',
+            'gene_id "ENSG00000223972.5";
+            gene_type "transcribed_unprocessed_pseudogene";
+            gene_status "KNOWN"; gene_name "DDX11L1"; level 2;
+            havana_gene "OTTHUMG00000000961.2";']
+    """
+    gene_name = None
+    chromosome = gene_info[0]
+    description = gene_info[-1]
+    if "gene_id" not in description:
+        raise ValueError('GTF entry lacks a gene_id field')
+    gene_id = (description.split("gene_id ")[1]).split('"')[1]
+
+    if "gene_name" in description:
+        gene_name = (description.split("gene_name ")[1]).split('"')[1]
+    start = int(gene_info[3])
+    end = int(gene_info[4])
+    strand = gene_info[6]
+
+    gene = Gene(gene_id, gene_name, chromosome, start, end, strand)
+    return gene

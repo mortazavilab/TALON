@@ -196,6 +196,22 @@ def add_counter_table(database):
     conn.close()
     return
 
+def add_abundance_table(database):
+    """ Adds a table that will store transcript counts for each tracked 
+        dataset. Primary key is transcript ID, and other columns represent
+        the datasets. """
+
+    # Connecting to the database file
+    conn = sqlite3.connect(database)
+    c = conn.cursor()
+ 
+    # Add table and set primary key column
+    c.execute('CREATE TABLE "abundance" ("transcript_id" TEXT PRIMARY KEY)')
+
+    conn.commit()
+    conn.close()
+    return
+
 def read_gtf_file(gtf_file):
     """ Reads gene, transcript, and exon information from a GTF file.
 
@@ -282,20 +298,20 @@ def populate_db(database, annot_name, genes, transcripts, exons):
     c = conn.cursor()
     for gene_id in genes:
         gene = genes[gene_id]
-        add_gene(c, annot_name, gene)
+        add_gene_entry(c, annot_name, gene)
     for transcript_id in transcripts:
         transcript = transcripts[transcript_id]
-        add_transcript(c, annot_name, transcript)
+        add_transcript_entry(c, annot_name, transcript)
     for exon_id in exons:
         exon = exons[exon_id]
-        add_exon(c, annot_name, exon)
+        add_exon_entry(c, annot_name, exon)
 
     conn.commit()
     conn.close()
     
     return
 
-def add_gene(c, annot_name, gene):
+def add_gene_entry(c, annot_name, gene):
     """ Given a conn.curser (c) to a database and a gene object,
         this function adds an entry to the database's gene table """
 
@@ -319,7 +335,7 @@ def add_gene(c, annot_name, gene):
     c.execute(command,vals)
     return
 
-def add_transcript(c, annot_name, transcript):
+def add_transcript_entry(c, annot_name, transcript):
     """ Given a curser (c) to a database and a transcript object,
         this function adds an entry to the database's transcript table.
         It also updates the gene table as appropriate.
@@ -363,9 +379,13 @@ def add_transcript(c, annot_name, transcript):
     command = 'INSERT OR IGNORE INTO "transcripts"' + cols + "VALUES " + \
               '(?,?,?,?,?,?,?,?,?,?,?,?)'
     c.execute(command,vals)
+
+    # Add transcript_id to abundance table
+    c.execute('INSERT OR IGNORE INTO "abundance" ("transcript_id") VALUES (?)',
+               [t_id])
     return
 
-def add_exon(c, annot_name, exon):
+def add_exon_entry(c, annot_name, exon):
     """ Given a curser (c) to a database and an exon object,
         this function adds an entry to the database's exon table.
     """
@@ -408,6 +428,7 @@ def main():
     add_gene_table(db_name)
     add_exon_table(db_name)
     add_counter_table(db_name)
+    add_abundance_table(db_name)
 
     # Process the GTF annotations
     genes, transcripts, exons = read_gtf_file(gtf_file)

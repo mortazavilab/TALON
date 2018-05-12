@@ -2,9 +2,11 @@
 # Author: Dana Wyman
 #------------------------------------------------------------------------------
 
+from exon import *
 from genetree import *
 import re
 from transcript import *
+
 
 class SamTranscript(Transcript):
     """ Stores information about a gene transcript that comes from a sam file, 
@@ -37,18 +39,51 @@ class SamTranscript(Transcript):
 
     """
 
-    def __init__(self, sam_id, identifier, name, chromosome, start, end, \
-                 strand, samFields, exons):
+    def __init__(self, sam_id, chromosome, start, end, strand, introns,
+                 samFields):
+        self.sam_id = sam_id
         self.chromosome = chromosome
         self.start = int(start)
         self.end = int(end)
         self.strand = strand
-        self.exons = exons
+        self.introns = introns
         self.samFields = samFields
 
-        self.sam_id = sam_id
-        self.identifier = identifier
-        self.name = name
+        self.identifier = None
+        self.gene_id = None
+        self.name = None
+        self.exons = self.create_sam_exons()
+
+    def create_sam_exons(self):
+        """ Uses intron coordinates and transcript start/end to create exon
+            objects for the transcript """
+        introns = self.introns
+        starts = [self.start]
+        ends = []
+
+        # First, compute exon coordinates and put starts and ends in lists
+        for i in range(0,len(introns)):
+            if i % 2 == 0:
+                # This is an intron start, i.e. an exon end. Subtract 1 to get 
+                # the exon base
+                starts.append(introns[i] - 1)
+            else:
+                # This is an intron end, i.e. an exon start. Add 1 to get the
+                # exon base
+                ends.append(introns[i] + 1)
+        ends.append(self.end)
+
+        # Now iterate over start and end pairs and create exon objects
+        exons = []
+        ct = 1
+        for s,e in zip(starts,ends):
+            exon_id = self.sam_id + "_" + str(ct)
+            exon = Exon(exon_id, self.chromosome, s, e, self.strand, 
+                        self.gene_id, self.identifier)
+            exons.append(exon)
+            ct += 1
+        return exons
+      
 
 def get_sam_transcript(samFields):
     """ Creates a SamTranscript object from a SAM entry.
@@ -70,32 +105,32 @@ def get_sam_transcript(samFields):
 
     end = compute_transcript_end(start, cigar)
     introns = get_introns(otherFields, start, cigar)
-    exons = get_exons(start, end, introns)
-    #exons = [exon_coords[i:i + 2] for i in xrange(0, len(exon_coords), 2)]
+
     if flag in [16, 272]:
         strand = "-"
     else:
         strand = "+" 
-    sam = SamTranscript(sam_id, None, None, chromosome, start, end, strand, \
-                         samFields, exons)
+    sam = SamTranscript(sam_id, chromosome, start, end, strand, introns, 
+                        samFields)
     return sam
 
-def get_exons(start, end, introns):
-    """ Transforms intron coordinates and adds in start and end to create
-        a list representing the exon starts and ends in the transcript."""
+
+#def get_exons(start, end, introns):
+#    """ Transforms intron coordinates and adds in start and end to create
+#        a list representing the exon starts and ends in the transcript."""
     
-    exons = [start]
-    for i in range(0,len(introns)):
-        if i % 2 == 0:
+#    exons = [start]
+#    for i in range(0,len(introns)):
+#        if i % 2 == 0:
             # This is an intron start, i.e. an exon end. Subtract 1 to get the
             # exon base
-            exons.append(introns[i] - 1)
-        else:
+#            exons.append(introns[i] - 1)
+#        else:
             # This is an intron end, i.e. an exon start. Add 1 to get the
             # exon base
-            exons.append(introns[i] + 1)
-    exons.append(end)
-    return exons
+#            exons.append(introns[i] + 1)
+#    exons.append(end)
+#    return exons
     
 
 def get_introns(fields, start, cigar):

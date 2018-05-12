@@ -95,20 +95,17 @@ def read_annotation(annot):
     
     return gene_tree, transcripts, exon_tree, counter
 
-def process_sam_file(sam_file, dataset, genes, transcripts, exon_tree, o):
+def process_sam_file(sam_file):
     """ Reads transcripts from a SAM file
 
         Args:
             sam_file: Path to the SAM file
 
         Returns:
+            sam_transcripts: List of sam_transcript objects
     """
 
-    detected_transcripts = {}
-    known_detected = 0
-    partial_detected = 0
-    novel_detected = 0
-    transcripts_processed = 0
+    sam_transcripts = []
 
     with open(sam_file) as sam:
         for line in sam:
@@ -129,37 +126,43 @@ def process_sam_file(sam_file, dataset, genes, transcripts, exon_tree, o):
                 continue
             
             sam_transcript = get_sam_transcript(sam)
-            #print sam_transcript.sam_id
-            match, diff, transcripts, genes, exon_tree = look_for_transcript_matches(sam_transcript, transcripts, genes, exon_tree)
 
-            if match != None:
-                #print sam_transcript.sam_id + " " +  match.identifier + " " + match.gene_id
-                gene_id = match.gene_id
-                gene_name = genes[match.gene_id].name
-                transcript_id = match.identifier
-                transcript_name = match.name
-                if "novel" in transcript_id:
-                    annotation = "novel"
-                else:
-                    annotation = "known"
-            else:
-                gene_id = "NA"
-                gene_name = "NA"
-                transcript_id = "NA"
-                transcript_name = "NA"
+    return sam_transcripts
+
+def identify_sam_transcripts(sam_transcripts, genes, transcripts, exon_tree):
+
+    for sam_transcript in sam_transcripts:
+        #print sam_transcript.sam_id
+        match, diff, transcripts, genes, exon_tree = look_for_transcript_matches(sam_transcript, transcripts, genes, exon_tree)
+
+        if match != None:
+            #print sam_transcript.sam_id + " " +  match.identifier + " " + match.gene_id
+            gene_id = match.gene_id
+            gene_name = genes[match.gene_id].name
+            transcript_id = match.identifier
+            transcript_name = match.name
+            if "novel" in transcript_id:
                 annotation = "novel"
-            if None not in diff:
-                diff_5 = str(diff[0])
-                diff_3 = str(diff[1])
             else:
-                diff_5 = "NA"
-                diff_3 = "NA"
-            transcripts_processed += 1
-            o.write("\t".join([dataset, sam_transcript.sam_id, \
-                     sam_transcript.chromosome, str(sam_transcript.start), \
-                     str(sam_transcript.end), sam_transcript.strand, 
-                     gene_id, gene_name, transcript_id, transcript_name, \
-                     annotation, diff_5, diff_3]) + "\n") 
+                annotation = "known"
+        else:
+            gene_id = "NA"
+            gene_name = "NA"
+            transcript_id = "NA"
+            transcript_name = "NA"
+            annotation = "novel"
+        if None not in diff:
+            diff_5 = str(diff[0])
+            diff_3 = str(diff[1])
+        else:
+            diff_5 = "NA"
+            diff_3 = "NA"
+        transcripts_processed += 1
+        #o.write("\t".join([dataset, sam_transcript.sam_id, \
+        #             sam_transcript.chromosome, str(sam_transcript.start), \
+        #             str(sam_transcript.end), sam_transcript.strand, 
+        #             gene_id, gene_name, transcript_id, transcript_name, \
+        #             annotation, diff_5, diff_3]) + "\n") 
     return genes, transcripts, exon_tree
 
 def look_for_transcript_matches(query_transcript, transcripts, genes, exon_tree):
@@ -308,25 +311,28 @@ def main():
     infile_list = options.infile_list
     dataset_list = options.dataset_label_list
     annot = options.annot
-    #gtf_file = options.gtf_file
     out = options.outfile
 
     # Process the annotations
-    read_annotation(annot)
-    exit()
-    #genes, transcripts, exons = read_gtf_file(gtf_file)
+    genes, transcripts, exons, counter = read_annotation(annot)
 
     # Process the SAM files
-    o = open(out, 'w')
-    o.write("\t".join(["dataset", "read_ID", "chromosome", "start", "end", \
-                       "strand", "gene_id", "gene_name", "transcript_id", \
-                       "transcript_name", "annotation_status", "diff_5", \
-                       "diff_3"]) + "\n")
     sam_files = infile_list.split(",")
     dataset_list = dataset_list.split(",")
-    for sam, dat in zip(sam_files, dataset_list):
-        genes, transcripts, exons = process_sam_file(sam, dat, genes, transcripts, exons, o)
-    o.close()
+    for sam, d_name in zip(sam_files, dataset_list):
+        sam_transcripts = process_sam_file(sam)
+
+
+    #o = open(out, 'w')
+    #o.write("\t".join(["dataset", "read_ID", "chromosome", "start", "end", \
+    #                   "strand", "gene_id", "gene_name", "transcript_id", \
+    #                   "transcript_name", "annotation_status", "diff_5", \
+    #                   "diff_3"]) + "\n")
+    #sam_files = infile_list.split(",")
+    #dataset_list = dataset_list.split(",")
+    #for sam, dat in zip(sam_files, dataset_list):
+    #    genes, transcripts, exons = process_sam_file(sam, dat, genes, transcripts, exons, o)
+    #o.close()
 
 if __name__ == '__main__':
     main()

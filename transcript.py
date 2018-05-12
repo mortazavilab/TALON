@@ -32,7 +32,7 @@ class Transcript(object):
     """
 
     def __init__(self, identifier, name, chromosome, \
-                 start, end, strand, gene_id, n_exons):
+                 start, end, strand, gene_id):
 
         self.identifier = identifier
         self.name = name
@@ -42,7 +42,7 @@ class Transcript(object):
         self.start = int(start)
         self.end = int(end)
         self.strand = strand
-        self.n_exons = n_exons
+        self.n_exons = 0
         self.exons = []
 
 
@@ -80,9 +80,11 @@ class Transcript(object):
             if exon.end < existing_exon.start:
                 self.exons = self.exons[0:i] + [exon] + self.exons[i:]
                 self.check_exon_validity()
+                self.n_exons += 1
                 return
         self.exons.append(exon)
         self.check_exon_validity()
+        self.n_exons += 1
         return
                     
     def check_exon_validity(self):
@@ -139,12 +141,10 @@ def get_transcript_from_db(transcript_row):
     start = transcript_row['start']
     end = transcript_row['end']
     strand = transcript_row['strand']
-     
     gene_id = transcript_row['gene_id']
-    n_exons = transcript_row['exon_count']
 
     transcript = Transcript(transcript_id, name, chromosome, start, end, \
-                            strand, gene_id, n_exons)
+                            strand, gene_id)
     return transcript
     
 
