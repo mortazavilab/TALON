@@ -52,7 +52,10 @@ class SamTranscript(Transcript):
         self.identifier = None
         self.gene_id = None
         self.name = None
-        self.exons = self.create_sam_exons()
+        self.exons = []
+        self.n_exons = 0
+ 
+        self.create_sam_exons()
 
     def create_sam_exons(self):
         """ Uses intron coordinates and transcript start/end to create exon
@@ -66,23 +69,23 @@ class SamTranscript(Transcript):
             if i % 2 == 0:
                 # This is an intron start, i.e. an exon end. Subtract 1 to get 
                 # the exon base
-                starts.append(introns[i] - 1)
+                ends.append(introns[i] - 1)
             else:
                 # This is an intron end, i.e. an exon start. Add 1 to get the
                 # exon base
-                ends.append(introns[i] + 1)
+                starts.append(introns[i] + 1)
         ends.append(self.end)
 
         # Now iterate over start and end pairs and create exon objects
-        exons = []
+        #exons = []
         ct = 1
         for s,e in zip(starts,ends):
             exon_id = self.sam_id + "_" + str(ct)
             exon = Exon(exon_id, self.chromosome, s, e, self.strand, 
                         self.gene_id, self.identifier)
-            exons.append(exon)
+            self.add_exon(exon)
             ct += 1
-        return exons
+        return
       
 
 def get_sam_transcript(samFields):
@@ -243,83 +246,5 @@ def split_cigar(cigar):
     counts = [int(i) for i in counts]
 
     return alignTypes, counts
-
-def get_loose_exon_matches(chromosome, start, end, strand, exons, cutoff_5, \
-                           cutoff_3):
-    """ Finds and returns all annotation exons that overlap the query location 
-        and which start and end within 10 basepairs of the query.
-
-        Args:
-            chromosome: Chromosome that the query is located on
-            (format "chr1")
-
-            start: The start position of the query with respect to the
-            forward strand
-
-            end: The end position of the query with respect to the
-            forward strand
-
-            strand: "+" if the query is on the forward strand, and "-" if
-            it is on the reverse strand
-
-            exons: An ExonTree object with genes organized by chromosome in an
-            interval tree data structure
-
-            cutoff_5: Permitted difference at 5' end
-     
-            cutoff_3: Permitted difference at 3' end
-    """
-    loose_matches = []
-    differences = []
-
-    # Get all exons that overlap the query location
-    exon_matches = exons.get_exons_in_range(chromosome, start, end, strand)
-    
-    # Compute the 5' and 3' differences
-    for match in exon_matches:
-        query_range = [start, end]
-        match_range = [match.start, match.end]
-         
-        diff_5, diff_3 = get_difference(query_range, match_range, strand)
-        
-        # Enforce similarity cutoff
-        if abs(diff_5) <= cutoff_5 and abs(diff_3) <= cutoff_3:
-            loose_matches.append(match)
-            differences.append([diff_5, diff_3])
-    return loose_matches, differences
-
-def get_difference(a, b, strand):
-    """ Computes the 5' and 3' difference between two exon intervals. 
-
-        Example: a = [ 0, 10]  b = [ 2, 8 ] on + strand
-            5' difference =  -2
-            3' difference =  +2
-
-        Args:
-            a: First interval, formattted as a list
-            b: Second interval, formatted as a list
-    """
-    if strand == "+":
-        diff_5 = a[0] - b[0] 
-        diff_3 = a[1] - b[1]
-
-    elif strand == "-":    
-        diff_5 = b[1] - a[1]
-        diff_3 = b[0] - a[0]
-
-    return diff_5, diff_3
-
-def get_overlap(a, b):
-    """ Computes the amount of overlap between two intervals.
-        Returns 0 if there is no overlap. The function treats the start and 
-        ends of each interval as inclusive, meaning that if a = b = [10, 20], 
-        the overlap reported would be 11, not 10.
-
-        Args: 
-            a: First interval, formattted as a list
-            b: Second interval, formatted as a list
-    """
-    overlap = max(0, min(a[1], b[1]) - max(a[0], b[0]) + 1)
-    return overlap
 
 

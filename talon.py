@@ -5,8 +5,9 @@
 # assigns them transcript and gene identifiers based on a GTF annotation.
 # Novel transcripts are assigned new identifiers.
 
-from gene import *
+from exon import *
 from exontree import *
+from gene import *
 from genetree import *
 from optparse import OptionParser
 from sam_transcript import *
@@ -29,6 +30,12 @@ def getOptions():
     parser.add_option("--o", dest = "outfile",
         help = "Outfile name",
         metavar = "FILE", type = "string")
+    parser.add_option("--bioRepMode", dest ="bioRepMode", action='store_true',
+        help="In this mode, two or more biological replicate "+ \
+        "sam files are run together. Novel transcripts discovered " + \
+        "in at least two replicates are given a special label in " + \
+        "the TALON database to allow for stricter filtering of "+ \
+        "novel events.")
     
     (options, args) = parser.parse_args()
     return options
@@ -81,9 +88,10 @@ def read_annotation(annot):
             curr_gene = gene_tree.genes[curr_gene_id]
             curr_gene.add_transcript(transcript)
         
-            for exon_id in transcript_row['exon_ids']:
+            # Add exons that belong to transcript
+            for exon_id in transcript_row['exon_ids'].split(","):
                 exons_to_add.add(exon_id)
-    
+
     # Add exons that belong to transcripts that we added    
     c.execute('SELECT * FROM exons')
     for exon_row in c:
@@ -91,6 +99,11 @@ def read_annotation(annot):
             exon = get_exon_from_db(exon_row)
             exon_tree.add_exon(exon) 
 
+            # Add exon to the transcripts it belongs to
+            for transcript_id in exon_row['transcript_ids'].split(","):
+                curr_transcript = transcripts[transcript_id]
+                curr_transcript.add_exon(exon)
+           
     conn.close()
     
     return gene_tree, transcripts, exon_tree, counter
@@ -126,46 +139,52 @@ def process_sam_file(sam_file):
                 continue
             
             sam_transcript = get_sam_transcript(sam)
+            sam_transcripts.append(sam_transcript)
 
     return sam_transcripts
 
-def identify_sam_transcripts(sam_transcripts, genes, transcripts, exon_tree):
+def identify_sam_transcripts(sam_transcripts, gene_tree, transcripts, 
+                             exon_tree, counter):
+    """ Assign each sam transcript an annotated or a novel transcript identity
+
+    """
 
     for sam_transcript in sam_transcripts:
-        #print sam_transcript.sam_id
-        match, diff, transcripts, genes, exon_tree = look_for_transcript_matches(sam_transcript, transcripts, genes, exon_tree)
+        print sam_transcript.sam_id
+        #match, diff, transcripts, gene_tree, exon_tree = 
+        find_transcript_matches(sam_transcript, transcripts, exon_tree)
 
-        if match != None:
+    #    if match != None:
             #print sam_transcript.sam_id + " " +  match.identifier + " " + match.gene_id
-            gene_id = match.gene_id
-            gene_name = genes[match.gene_id].name
-            transcript_id = match.identifier
-            transcript_name = match.name
-            if "novel" in transcript_id:
-                annotation = "novel"
-            else:
-                annotation = "known"
-        else:
-            gene_id = "NA"
-            gene_name = "NA"
-            transcript_id = "NA"
-            transcript_name = "NA"
-            annotation = "novel"
-        if None not in diff:
-            diff_5 = str(diff[0])
-            diff_3 = str(diff[1])
-        else:
-            diff_5 = "NA"
-            diff_3 = "NA"
-        transcripts_processed += 1
+    #        gene_id = match.gene_id
+    #        gene_name = genes[match.gene_id].name
+    #        transcript_id = match.identifier
+    #        transcript_name = match.name
+    #        if "novel" in transcript_id:
+    #            annotation = "novel"
+    #        else:
+    #            annotation = "known"
+    #    else:
+    #        gene_id = "NA"
+    #        gene_name = "NA"
+    #        transcript_id = "NA"
+    #        transcript_name = "NA"
+    #        annotation = "novel"
+    #    if None not in diff:
+    #        diff_5 = str(diff[0])
+    #        diff_3 = str(diff[1])
+    #    else:
+    #        diff_5 = "NA"
+    #        diff_3 = "NA"
+    #    transcripts_processed += 1
         #o.write("\t".join([dataset, sam_transcript.sam_id, \
         #             sam_transcript.chromosome, str(sam_transcript.start), \
         #             str(sam_transcript.end), sam_transcript.strand, 
         #             gene_id, gene_name, transcript_id, transcript_name, \
         #             annotation, diff_5, diff_3]) + "\n") 
-    return genes, transcripts, exon_tree
+    #return gene_tree, transcripts, exon_tree
 
-def look_for_transcript_matches(query_transcript, transcripts, genes, exon_tree):
+def find_transcript_matches(query_transcript, transcripts, exon_tree):
     """ Performs search for matches to the query transcript, one exon at a time.
 
         Args:
@@ -178,42 +197,45 @@ def look_for_transcript_matches(query_transcript, transcripts, genes, exon_tree)
             before.            
 
         Returns:
+            match: ___ if the query is matched to a known transcript
+                   None otherwise
 
     """
-    exons = query_transcript.exons
-    chromosome = query_transcript.chromosome
-    strand = query_transcript.strand
-    tracker = MatchTracker(len(exons)/2)   
- 
-    exon_num = 0
-    for i in range(0, len(exons), 2):
-        start = exons[i]
-        end = exons[i+1]
+    tracker = MatchTracker(query_transcript)   
+    tracker.match_all_exons(exon_tree) 
+    print tracker.exon_matches
+    exit()
 
-        cutoff_5, cutoff_3 = set_cutoffs_permissibleEnds(i, \
-                             len(exons), strand)
-        matches, diffs = get_loose_exon_matches(chromosome, start, end, \
-                                                strand, exon_tree, cutoff_5, \
-                                                cutoff_3)
+    #n_exons = query_transcript.n_exons
 
-        # Record exon matches and get transcripts that contain the exon  matches
-        t_matches = set()
-        for match, diff in zip(matches, diffs):
-            tracker.add_exon_match(exon_num, chromosome, start, end, strand, \
-                                   match, diff[0], diff[1])
-            t_matches = t_matches.union(match.transcript_ids)
-        tracker.transcript_matches.append(t_matches)
-        exon_num += 1
+    #for i in range(0, n_exons):
+    #    q_exon = query_transcript.exons[i]
+    #    start = q_exon.start
+    #    end = q_exon.end
 
-    tracker.compute_match_sets(transcripts)
-    if len(tracker.full_matches) > 0:
-        transcript_match, diff = tracker.get_best_full_match(query_transcript, transcripts)
-    else:
+    #    cutoff_5, cutoff_3 = set_cutoffs_permissibleEnds(i, n_exons, strand)
+    #    matches, diffs = get_exon_matches(chromosome, start, end, \
+    #                                            strand, exon_tree, cutoff_5, \
+    #                                            cutoff_3)
+
+        # Record exon matches and get transcripts that contain the exon matches
+    #    t_matches = set()
+    #    for match, diff in zip(matches, diffs):
+    #        tracker.add_exon_match(exon_num, chromosome, start, end, strand, \
+    #                               match, diff[0], diff[1])
+    #        t_matches = t_matches.union(match.transcript_ids)
+    #    tracker.transcript_matches.append(t_matches)
+    #    exon_num += 1
+
+    #tracker.compute_match_sets(transcripts)
+    #if len(tracker.full_matches) > 0:
+    #    transcript_match, diff = tracker.get_best_full_match(query_transcript, transcripts)
+    #else:
         # Create a novel transcript. Before the object can be created, the 
         # transcript must be assigned to a gene, or a novel gene created.
-        diff = [None, None]
-        transcript_match, transcripts, genes, exon_tree = create_novel_transcript(query_transcript, tracker, transcripts, genes, exon_tree)    
-    return transcript_match, diff, transcripts, genes, exon_tree
+        #diff = [None, None]
+        #transcript_match, transcripts, genes, exon_tree = create_novel_transcript(query_transcript, tracker, transcripts, genes, exon_tree)    
+    #return transcript_match, diff, transcripts, genes, exon_tree
         
 def create_novel_transcript(sam_transcript, tracker, transcripts, genes, exon_tree):
     """ Creates a novel transcript from a sam_transcript object that can be
@@ -281,47 +303,50 @@ def create_novel_transcript(sam_transcript, tracker, transcripts, genes, exon_tr
     return novel_transcript, transcripts, genes, exon_tree
         
 
-def set_cutoffs_permissibleEnds(exon_index, n_exons, strand):
-    """ Selects 3' and 5' difference cutoffs depending on the exon index and 
-        strand. For internal exons, both cutoffs should be set to zero, but
-        more flexibility is allowed on the 3' and 5' ends.
 
-        Args:
-            exon_index: index we are at in the exon vector
-            tot_exons: total number of exons in the transcript
-            strand: strand that the exon is on. 
-    """
-    cutoff_5 = 0
-    cutoff_3 = 0
+def checkArgs(options):
+    """ Makes sure that the options specified by the user are compatible with 
+        each other """
+    infile_list = options.infile_list
+    dataset_list = options.dataset_label_list
+    annot = options.annot
+    bioRepMode = options.bioRepMode
+    out = options.outfile
 
-    if exon_index == 0:
-        if strand == "+":
-            cutoff_5 = 100000
-        else:
-            cutoff_3 = 100000
-    if exon_index == n_exons - 2:
-        if strand == "+":
-            cutoff_3 = 100000
-        else:
-            cutoff_5 = 100000
-    return cutoff_5, cutoff_3
+    # Number of data names must match number of datasets
+    if len(dataset_list.split(",")) != len(infile_list.split(",")):
+        raise ValueError('Number of provided data names must match number ' + \
+                         'of datasets')
+
+    # In Bio Rep Mode, more than one dataset is required
+    if bioRepMode == True:
+        if len(infile_list.split(",")) < 2:
+            raise ValueError('At least two biological replicate datasets ' + \
+                           'must be provided to run Biological Replicate Mode')  
+
+    return
 
 def main():
     options = getOptions()
     infile_list = options.infile_list
     dataset_list = options.dataset_label_list
     annot = options.annot
+    bioRepMode = options.bioRepMode
     out = options.outfile
 
+    # Check validity of input options
+    checkArgs(options)
+
     # Process the annotations
-    genes, transcripts, exons, counter = read_annotation(annot)
+    gene_tree, transcripts, exon_tree, counter = read_annotation(annot)
 
     # Process the SAM files
     sam_files = infile_list.split(",")
     dataset_list = dataset_list.split(",")
     for sam, d_name in zip(sam_files, dataset_list):
         sam_transcripts = process_sam_file(sam)
-
+        identify_sam_transcripts(sam_transcripts, gene_tree, transcripts, 
+                                 exon_tree, counter)
 
     #o = open(out, 'w')
     #o.write("\t".join(["dataset", "read_ID", "chromosome", "start", "end", \

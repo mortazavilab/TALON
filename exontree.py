@@ -40,7 +40,7 @@ class ExonTree(object):
         self.chromosomes[chrom_name] = IntervalTree()
         return
 
-    def add_exon(self, exon, exon_id):
+    def add_exon(self, exon):
         """ Adds an Exon object to the ExonTree. The exon's 
             start-end interval is added to the chromosome's interval tree, and 
             is used as a key to retrieve the exon. 
@@ -55,6 +55,7 @@ class ExonTree(object):
         chromosome = exon.chromosome
         start = exon.start
         end = exon.end
+        exon_id = exon.identifier
 
         if chromosome not in self.chromosomes:
             self.add_chromosome(chromosome)
@@ -122,7 +123,7 @@ class ExonTree(object):
             raise ValueError('Exon start must be less than or equal to end.')
 
         if chromosome not in self.chromosomes:
-            return []
+            raise ValueError("Query chromosome not found: " + chromosome)
 
         # Add 1 to the query end because in the interval tree data structure,
         # ranges are inclusive of the lower limit, but non-inclusive of the 

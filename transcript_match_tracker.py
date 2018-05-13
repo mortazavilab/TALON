@@ -3,6 +3,7 @@
 #------------------------------------------------------------------------------
 
 from exon import *
+from exontree import *
 from transcript import *
 from sam_transcript import *
 
@@ -27,27 +28,34 @@ class MatchTracker(object):
             matches to the query transcript (i.e. some exons match)
 
     """
-    def __init__(self, n_exons):
-        self.n_exons = n_exons
-        self.exon_matches = [[] for i in range(n_exons)]
+    def __init__(self, query_transcript):
+        self.query_transcript = query_transcript
+        self.n_exons = query_transcript.n_exons    
+        self.exon_matches = [[] for i in range(self.n_exons)]
         self.transcript_matches = []
 
         self.full_matches = []
         self.partial_matches = []
 
-    def add_exon_match(self, exon_index, chromosome, start, end, strand, \
-                       match, diff_5, diff_3):
-        """ Adds a record to the exon_match list that describes a match
-            between the exon at that index and an exon in the annotation
+    def match_all_exons(self, exon_tree):
+        """ Iterates over provided exons and finds exon matches for each of 
+            them where possible. These matches are stored in the Tracker object. 
         """
-
-        obj_id = match.identifier
-        
-        new_exon_match = Match(chromosome, start, end, strand, obj_id, \
-                                diff_5, diff_3)
-        (self.exon_matches[exon_index]).append(new_exon_match)
-        return
+        query_transcript = self.query_transcript
+        chromosome = query_transcript.chromosome
+        strand = query_transcript.strand
+        n_exons = query_transcript.n_exons 
          
+        for i in range(0, n_exons):
+            q_exon = query_transcript.exons[i]
+            cutoff_5, cutoff_3 = set_cutoffs_permissiveEnds(i, n_exons, strand)
+ 
+            matches = get_exon_matches(q_exon, exon_tree, cutoff_5, cutoff_3)
+
+            if len(matches) > 0:
+                self.exon_matches[i] = matches
+        return
+
 
     def compute_match_sets(self, transcript_dict):
         """ Use the exon_matches field of the MatchTracker to figure out which
@@ -135,14 +143,14 @@ class Match(object):
         such as an exon or transcript.
  
         Attributes:
-            chromosome:
-            start:
-            end: 
-            strand:
+            chromosome: Chromosome of query and match
+            start: start position of query
+            end: end position of query
+            strand: strand of query and match
             obj_id: identifier associated with the annotated object
-            diff_5:
-            diff_3:
-            tot_diff:
+            diff_5: 5' end difference between query and transcript
+            diff_3: 3' end difference between query and transcript
+            tot_diff: total difference between query and transcript
 
     """
     def __init__(self, chromosome, start, end, strand, obj_id, diff_5, diff_3):
@@ -154,4 +162,120 @@ class Match(object):
         self.diff_5 = diff_5
         self.diff_3 = diff_3
         self.tot_diff = abs(self.diff_3) + abs(self.diff_5)
+
+#--------------------- Functions ------------------------------------------
+
+def set_cutoffs_permissiveEnds(exon_index, n_exons, strand):
+    """ Selects 3' and 5' difference cutoffs depending on the exon index and
+        strand. For internal exons, both cutoffs should be set to zero, but
+        more flexibility is allowed on the 3' and 5' ends.
+
+        Args:
+            exon_index: index we are at in the exon vector
+            tot_exons: total number of exons in the transcript
+            strand: strand that the exon is on.
+    """
+    cutoff_5 = 0
+    cutoff_3 = 0
+
+    if exon_index == 0:
+        if strand == "+":
+            cutoff_5 = 100000
+        else:
+            cutoff_3 = 100000
+    if exon_index == n_exons-1:
+        if strand == "+":
+            cutoff_3 = 100000
+        else:
+            cutoff_5 = 100000
+    return cutoff_5, cutoff_3
+
+
+def get_exon_matches(query_exon, exon_tree, cutoff_5, cutoff_3):
+    """ Finds and returns all annotation exons that overlap the query location
+        and which start and end within the 3' and 5' cutoff of the query.
+
+        Args:
+            chromosome: Chromosome that the query is located on
+            (format "chr1")
+
+            start: The start position of the query with respect to the
+            forward strand
+
+            end: The end position of the query with respect to the
+            forward strand
+
+            strand: "+" if the query is on the forward strand, and "-" if
+            it is on the reverse strand
+
+            exons: An ExonTree object with exons organized by chromosome in an
+            interval tree data structure
+
+            cutoff_5: Permitted difference at 5' end
+
+            cutoff_3: Permitted difference at 3' end
+
+        Returns:
+            matches: list of exon Match objects to query
+    """
+    matches = []
+
+    # Get all annotation exons that overlap the query location
+    chromosome = query_exon.chromosome 
+    start = query_exon.start
+    end = query_exon.end
+    strand = query_exon.strand
+    exon_matches = exon_tree.get_exons_in_range(chromosome, start, end, strand)
+    
+    # Compute the 5' and 3' differences
+    for match in exon_matches:
+        query_range = [start, end]
+        match_range = [match.start, match.end]
+
+        diff_5, diff_3 = get_difference(query_range, match_range, strand)
+
+        # Enforce similarity cutoff
+        if abs(diff_5) <= cutoff_5 and abs(diff_3) <= cutoff_3:
+
+            # Create match object
+            match = Match(chromosome, start, end, strand, match.identifier, 
+                          diff_5, diff_3)
+            matches.append(match)
+
+    return matches
+    
+
+def get_difference(a, b, strand):
+    """ Computes the 5' and 3' difference between two exon intervals.
+
+        Example: a = [ 0, 10]  b = [ 2, 8 ] on + strand
+            5' difference =  -2
+            3' difference =  +2
+
+        Args:
+            a: First interval, formattted as a list
+            b: Second interval, formatted as a list
+    """
+    if strand == "+":
+        diff_5 = a[0] - b[0]
+        diff_3 = a[1] - b[1]
+
+    elif strand == "-":
+        diff_5 = b[1] - a[1]
+        diff_3 = b[0] - a[0]
+
+    return diff_5, diff_3
+
+def get_overlap(a, b):
+    """ Computes the amount of overlap between two intervals.
+        Returns 0 if there is no overlap. The function treats the start and
+        ends of each interval as inclusive, meaning that if a = b = [10, 20],
+        the overlap reported would be 11, not 10.
+
+        Args:
+            a: First interval, formattted as a list
+            b: Second interval, formatted as a list
+    """
+    overlap = max(0, min(a[1], b[1]) - max(a[0], b[0]) + 1)
+    return overlap
 

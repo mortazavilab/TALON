@@ -84,3 +84,22 @@ def create_exon_from_gtf(exon_info):
                 transcript_id)
     return exon
 
+def get_exon_from_db(exon_row):
+    """ Uses information from a database exon entry to create a
+    Gene object.
+
+        Args:
+            gene_row: Tuple-formatted row from 'exons' table of a
+            TALON database
+    """
+    exon_id = exon_row['identifier']
+    chromosome = exon_row['chromosome']
+    start = exon_row['start']
+    end = exon_row['end']
+    strand = exon_row['strand']
+    gene_id = exon_row['gene_id']
+
+    exon = Exon(exon_id, chromosome, start, end, strand, gene_id, None)
+    for transcript_id in exon_row['transcript_ids'].split(","):
+        exon.transcript_ids.add(transcript_id)
+    return exon

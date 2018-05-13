@@ -1,7 +1,7 @@
 import pytest
 import sys
 sys.path.append("..")
-from sam_transcript import *
+from transcript_match_tracker import *
 
 class TestGetDifference(object):
     def test_1(self):
