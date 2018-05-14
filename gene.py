@@ -58,7 +58,10 @@ class Gene(object):
             Args:
                 transcript: object of type Transcript. Must overlap with the 
                 location of the gene.
-        """ 
+        """
+        if transcript.start >= self.end or transcript.end <= self.start:
+            raise ValueError('Transcript must overlap the gene it is assigned to')
+ 
         if transcript.gene_id == self.identifier:
             # In order to belong to a gene, the transcript gene_id must
             # match

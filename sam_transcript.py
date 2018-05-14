@@ -14,7 +14,7 @@ class SamTranscript(Transcript):
         Transcript class.
   
         Attributes:
-           sam_id: Unique identifier for the transcript from the SAM file
+           identifier: Unique identifier for the transcript from the SAM file
 
            chromosome: Chromosome that the transcript is located on
            (format "chr1")
@@ -41,6 +41,7 @@ class SamTranscript(Transcript):
 
     def __init__(self, sam_id, chromosome, start, end, strand, introns,
                  samFields):
+        self.identifier = None
         self.sam_id = sam_id
         self.chromosome = chromosome
         self.start = int(start)
@@ -49,7 +50,6 @@ class SamTranscript(Transcript):
         self.introns = introns
         self.samFields = samFields
 
-        self.identifier = None
         self.gene_id = None
         self.name = None
         self.exons = []
@@ -80,7 +80,7 @@ class SamTranscript(Transcript):
         #exons = []
         ct = 1
         for s,e in zip(starts,ends):
-            exon_id = self.sam_id + "_" + str(ct)
+            exon_id = None#self.identifier + "_" + str(ct)
             exon = Exon(exon_id, self.chromosome, s, e, self.strand, 
                         self.gene_id, self.identifier)
             self.add_exon(exon)

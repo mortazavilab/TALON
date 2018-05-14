@@ -39,21 +39,33 @@ class MatchTracker(object):
 
     def match_all_exons(self, exon_tree):
         """ Iterates over provided exons and finds exon matches for each of 
-            them where possible. These matches are stored in the Tracker object. 
+            them where possible. These matches are stored in the Tracker object.
+            As we go, keep track of which transcripts could match each exon as
+            well. 
         """
         query_transcript = self.query_transcript
         chromosome = query_transcript.chromosome
         strand = query_transcript.strand
         n_exons = query_transcript.n_exons 
          
+        
         for i in range(0, n_exons):
             q_exon = query_transcript.exons[i]
             cutoff_5, cutoff_3 = set_cutoffs_permissiveEnds(i, n_exons, strand)
  
             matches = get_exon_matches(q_exon, exon_tree, cutoff_5, cutoff_3)
 
-            if len(matches) > 0:
-                self.exon_matches[i] = matches
+            # Iterate over matching exons we found and pull transcript ID set
+            # associated with each to add to the transcript match set
+            transcript_matches = set()
+            for match in matches:
+                match_exon_id = match.obj_id
+                transcript_ids = exon_tree.exons[match_exon_id].transcript_ids
+                transcript_matches = transcript_matches.union(transcript_ids)
+
+            self.exon_matches[i] = matches
+            self.transcript_matches.append(transcript_matches)
+
         return
 
 
@@ -75,7 +87,7 @@ class MatchTracker(object):
         # Screen the full matches to make sure they have the correct number of
         # exons
         for match in tmp_full_matches:
-            n_exons_match = len(transcript_dict[match].exons)/2
+            n_exons_match = len(transcript_dict[match].exons)
             if self.n_exons == n_exons_match:
                 full_matches.add(match) 
         partial_matches = set.union(*(self.transcript_matches))^full_matches
@@ -85,7 +97,7 @@ class MatchTracker(object):
 
         return
 
-    def get_best_full_match(self, query, transcripts):
+    def get_best_full_match(self, transcripts):
         """ Iterates over the full matches in the tracker and determines 
             which one is the best fit to the query transcript. This is done
             by computing the differences at the 3' and 5' ends for each.
@@ -103,6 +115,7 @@ class MatchTracker(object):
                 object. Necessary in order to get from the transcript ids
                 stored in the match tracker to the objects themselves. 
         """
+        query = self.query_transcript
         if len(self.full_matches) == 0:
             return None, ["NA", "NA"]
         best_match = None
@@ -137,6 +150,75 @@ class MatchTracker(object):
                 best_diff_5 = diff_5
                 best_tot_diff = tot_diff
         return best_match, [best_diff_5, best_diff_3]
+
+    def get_best_partial_match(self, transcripts):
+        """ Iterates over the partial matches in the tracker and determines
+            which one is the best fit to the query transcript. This is done
+            by first computing the number of matching exons, and using 
+            differences at the 3' and 5' ends as a tiebreaker. The purpose of
+            selecting a partial match is mainly to choose the best gene match 
+            for the query so that we know which gene to assign the novel 
+            transcript to. It is not intended to be the end all be all of 
+            transcript similarity since it doesn't consider the configuration
+            of the exon matches.
+
+            Best match: max number of matching exons
+            Tiebreaker Logic:
+                1) If diff_3 = diff_5 = 0, that is the best.
+                2) Next best is diff_3 = 0.
+                3) Next best is diff_5 = 0.
+                4) After that, just minimize tot_diff
+
+            If there are no partial matches, it returns None.
+
+            Args:
+                transcripts: dictionary mapping transcript_id -> transcript
+                object. Necessary in order to get from the transcript ids
+                stored in the match tracker to the objects themselves.
+        """
+        query = self.query_transcript
+        if len(self.partial_matches) == 0:
+            return None
+        best_match = None
+        best_diff_3 = 1000000
+        best_diff_5 = 1000000
+        best_tot_diff = 1000000
+        best_n_exons = 0
+        query_pos = [query.start, query.end]
+
+        strand = query.strand
+        for match_id in self.partial_matches:
+
+            # Count the number of exons that match between query & partial match
+            match = transcripts[match_id]
+            match_pos = [match.start, match.end]
+            diff_5, diff_3 = get_difference(query_pos, match_pos, strand)
+            tot_diff = abs(diff_3) + abs(diff_5)
+            shared_exons = 0
+            for i in range(0,self.n_exons):
+                if match_id in self.transcript_matches[i]:
+                    shared_exons += 1
+
+            if shared_exons > best_n_exons:
+                best_match = match
+                best_n_exons = shared_exons
+                best_diff_3 = diff_3
+                best_diff_5 = diff_5
+
+            elif shared_exons == best_n_exons:
+                # Apply tiebreaker rules
+                tiebreakers = [ shared_exons > best_n_exons,
+                    (diff_5 == diff_3 == 0),
+                    (diff_3 == 0 and best_diff_3 != 0),
+                    (diff_5 == 0 and best_diff_5 != 0 and best_diff_3 != 0),
+                    (best_diff_3 != 0 and best_diff_5 != 0 and tot_diff < best_tot_diff) ]
+                if any(tiebreakers):
+                    best_match = match
+                    best_n_exons = shared_exons
+                    best_diff_3 = diff_3
+                    best_diff_5 = diff_5
+
+        return best_match
 
 class Match(object):
     """ Describes the relationship of a query interval to an annotated object

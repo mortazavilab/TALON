@@ -70,10 +70,12 @@ def read_annotation(annot):
     counter["exons"] = int(c.fetchone()[0])
 
     # Require genes to be >= 200 bp in total length 
-    c.execute('SELECT * FROM genes WHERE "length" >= 200')
+    c.execute('SELECT * FROM genes')
     for gene_row in c:
-        gene = get_gene_from_db(gene_row)
-        gene_tree.add_gene(gene)
+        if int(gene_row["length"]) >= 200:
+            gene = get_gene_from_db(gene_row)
+            gene_tree.add_gene(gene)
+
 
     c.execute('SELECT * FROM transcripts')
     exons_to_add = set()
@@ -144,16 +146,44 @@ def process_sam_file(sam_file):
     return sam_transcripts
 
 def identify_sam_transcripts(sam_transcripts, gene_tree, transcripts, 
-                             exon_tree, counter):
+                             exon_tree, counter, outprefix):
     """ Assign each sam transcript an annotated or a novel transcript identity
 
+
+        Returns:
+            Modified versions of gene_tree, transcripts, exon_tree, counter to
+                which novel objects have been added
+            abundance_dict: dictionary mapping transcript IDs to the number of 
+                times each was observed in the sam data 
     """
+    abundance_dict = {}
+
+    # out_sam = open(outprefix + "_talon.sam", 'w')
+    # out_txt = open(outprefix + "_talon.tsv", 'w')
+    #o = open(out, 'w')
+    #o.write("\t".join(["dataset", "read_ID", "chromosome", "start", "end", \
+    #                   "strand", "gene_id", "gene_name", "transcript_id", \
+    #                   "transcript_name", "annotation_status", "diff_5", \
+    #                   "diff_3"]) + "\n")
+    #sam_files = infile_list.split(",")
+    #dataset_list = dataset_list.split(",")
+    #for sam, dat in zip(sam_files, dataset_list):
+    #    genes, transcripts, exons = process_sam_file(sam, dat, genes, transcripts, exons, o)
+    #o.close()
 
     for sam_transcript in sam_transcripts:
-        print sam_transcript.sam_id
-        #match, diff, transcripts, gene_tree, exon_tree = 
-        find_transcript_matches(sam_transcript, transcripts, exon_tree)
+        # Look for full and partial matches
+        match, diff, match_type = find_transcript_match(sam_transcript, 
+                                                        transcripts, exon_tree)
+        #if match_type == "full":
+            #sam_transcript.identifier
+            #sam_transcript.gene_id =  
+        
 
+        # if transcript_id in abundance_dict:
+            # abundance_dict[transcript_id] += 1
+       # else:
+            # abundance_dict[transcript_id] = 1
     #    if match != None:
             #print sam_transcript.sam_id + " " +  match.identifier + " " + match.gene_id
     #        gene_id = match.gene_id
@@ -184,7 +214,7 @@ def identify_sam_transcripts(sam_transcripts, gene_tree, transcripts,
         #             annotation, diff_5, diff_3]) + "\n") 
     #return gene_tree, transcripts, exon_tree
 
-def find_transcript_matches(query_transcript, transcripts, exon_tree):
+def find_transcript_match(query_transcript, transcripts, exon_tree):
     """ Performs search for matches to the query transcript, one exon at a time.
 
         Args:
@@ -197,39 +227,42 @@ def find_transcript_matches(query_transcript, transcripts, exon_tree):
             before.            
 
         Returns:
-            match: ___ if the query is matched to a known transcript
-                   None otherwise
+            transcript_match: ___ if the query is matched to a known transcript 
+                in full or in part. None otherwise.
+            diff: [5' diff, 3' diff] from full transcript match, [None, None]
+                  for partial or no match
+            match_type: "full", "partial", or None
 
     """
+
+    # Find annotation matches where possible for all exons
+    transcript_match = None
+    match_type = None
+    diff = [None, None]
     tracker = MatchTracker(query_transcript)   
     tracker.match_all_exons(exon_tree) 
-    print tracker.exon_matches
-    exit()
 
-    #n_exons = query_transcript.n_exons
+    # Find transcript matches
+    tracker.compute_match_sets(transcripts)
 
-    #for i in range(0, n_exons):
-    #    q_exon = query_transcript.exons[i]
-    #    start = q_exon.start
-    #    end = q_exon.end
+    # If there is more than one full transcript match, select and return the
+    # best one
+    if len(tracker.full_matches) > 0:
+        transcript_match, diff = tracker.get_best_full_match(transcripts)
+        query_transcript.gene_id = transcript_match.gene_id
+        query_transcript.identifier = transcript_match.identifier
+        match_type = "full"       
 
-    #    cutoff_5, cutoff_3 = set_cutoffs_permissibleEnds(i, n_exons, strand)
-    #    matches, diffs = get_exon_matches(chromosome, start, end, \
-    #                                            strand, exon_tree, cutoff_5, \
-    #                                            cutoff_3)
+    # If there are no full matches, look for partial matches
+    else:
+        if len(tracker.partial_matches) > 0:
+            transcript_match = tracker.get_best_partial_match(transcripts)
+            match_type = "partial"
+            
 
-        # Record exon matches and get transcripts that contain the exon matches
-    #    t_matches = set()
-    #    for match, diff in zip(matches, diffs):
-    #        tracker.add_exon_match(exon_num, chromosome, start, end, strand, \
-    #                               match, diff[0], diff[1])
-    #        t_matches = t_matches.union(match.transcript_ids)
-    #    tracker.transcript_matches.append(t_matches)
-    #    exon_num += 1
+    return transcript_match, diff, match_type
+        
 
-    #tracker.compute_match_sets(transcripts)
-    #if len(tracker.full_matches) > 0:
-    #    transcript_match, diff = tracker.get_best_full_match(query_transcript, transcripts)
     #else:
         # Create a novel transcript. Before the object can be created, the 
         # transcript must be assigned to a gene, or a novel gene created.
@@ -338,26 +371,18 @@ def main():
     checkArgs(options)
 
     # Process the annotations
-    gene_tree, transcripts, exon_tree, counter = read_annotation(annot)
+    gt, tscripts, et, ct = read_annotation(annot)
 
     # Process the SAM files
     sam_files = infile_list.split(",")
     dataset_list = dataset_list.split(",")
     for sam, d_name in zip(sam_files, dataset_list):
-        sam_transcripts = process_sam_file(sam)
-        identify_sam_transcripts(sam_transcripts, gene_tree, transcripts, 
-                                 exon_tree, counter)
+        sam_tscripts = process_sam_file(sam)
+        gt, tscripts, et, ct, abundance = identify_sam_transcripts(sam_tscripts, 
+                                           gt, tscripts, et, ct, outprefix)
+        # update_abundance_table(d_name, abundance)
 
-    #o = open(out, 'w')
-    #o.write("\t".join(["dataset", "read_ID", "chromosome", "start", "end", \
-    #                   "strand", "gene_id", "gene_name", "transcript_id", \
-    #                   "transcript_name", "annotation_status", "diff_5", \
-    #                   "diff_3"]) + "\n")
-    #sam_files = infile_list.split(",")
-    #dataset_list = dataset_list.split(",")
-    #for sam, dat in zip(sam_files, dataset_list):
-    #    genes, transcripts, exons = process_sam_file(sam, dat, genes, transcripts, exons, o)
-    #o.close()
+    # update_database(gt, tscripts, et, ct) 
 
 if __name__ == '__main__':
     main()

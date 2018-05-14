@@ -124,7 +124,7 @@ class Transcript(object):
               str(self.end) + "(" + self.strand + ")"
 
         # Print exons
-        #print "\tExon: " + "_".join([str(x) for x in self.exons])
+        print "\tExons: " + "\n".join([str(x.start) + "-" + str(x.end) for x in self.exons])
         return 
 
 def get_transcript_from_db(transcript_row):
