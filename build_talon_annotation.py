@@ -150,6 +150,7 @@ def add_exon_table(database):
     c.execute('CREATE TABLE "exons" ("identifier" TEXT PRIMARY KEY)')
 
     # Add more columns (empty)
+    c.execute('ALTER TABLE "exons" ADD COLUMN "name" TEXT')
     c.execute('ALTER TABLE "exons" ADD COLUMN "chromosome" TEXT')
     c.execute('ALTER TABLE "exons" ADD COLUMN "start" INTEGER')
     c.execute('ALTER TABLE "exons" ADD COLUMN "end" INTEGER')
@@ -275,10 +276,12 @@ def read_gtf_file(gtf_file):
                     " gene transcript set (" + gene_id + "). " + \
                     "Skipping this entry.", RuntimeWarning)
                 else:
-                    exon_id = (info.split("exon_id ")[1]).split('"')[1]
+                    #exon_id = (info.split("exon_id ")[1]).split('"')[1]
+                    #print gene_id + ":" + exon_id
+                    exon = create_exon_from_gtf(tab_fields)
+                    exon_id = exon.identifier
                     if exon_id not in exons:
                         # Create new exon entry
-                        exon = create_exon_from_gtf(tab_fields)
                         exons[exon_id] = exon
                     else:
                         # Update existing exon entry
@@ -391,6 +394,7 @@ def add_exon_entry(c, annot_name, exon):
     """
     # Information we can get from the transcript object
     exon_id = exon.identifier
+    exon_name = exon.name
     chrom = exon.chromosome
     start = exon.start
     end = exon.end
@@ -400,14 +404,14 @@ def add_exon_entry(c, annot_name, exon):
     transcript_ids = ",".join(list(exon.transcript_ids))
     annot = 1    
 
-    cols = " (" + ", ".join([str_wrap_double(x) for x in ["identifier", 
+    cols = " (" + ", ".join([str_wrap_double(x) for x in ["identifier", "name", 
                     "chromosome", "start","end","strand","length","gene_id",
                     "transcript_ids", "annotated", "dataset_of_origin"]]) + ") "
-    vals = [exon_id, chrom, start, end, strand, length, gene_id, transcript_ids, 
+    vals = [exon_id, exon_name, chrom, start, end, strand, length, gene_id, transcript_ids, 
             annot, annot_name]
 
     command = 'INSERT OR IGNORE INTO "exons"' + cols + "VALUES " + \
-              '(?,?,?,?,?,?,?,?,?,?)'
+              '(?,?,?,?,?,?,?,?,?,?,?)'
     c.execute(command,vals)
     return
 

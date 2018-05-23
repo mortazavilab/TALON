@@ -37,6 +37,7 @@ class Exon(object):
         self.end = int(end)
         self.strand = strand
         self.length = self.end - self.start + 1
+        self.name = None
 
         self.identifier = identifier
         self.gene_id = gene_id
@@ -76,12 +77,14 @@ def create_exon_from_gtf(exon_info):
 
     if "exon_id" not in description:
         raise ValueError('GTF exon entry lacks an exon_id field')
-    exon_id = (description.split("exon_id ")[1]).split('"')[1]
+    exon_id = "_".join([chromosome, str(start), str(end), strand])
+    exon_name = (description.split("exon_id ")[1]).split('"')[1]
     gene_id = (description.split("gene_id ")[1]).split('"')[1]
     transcript_id = (description.split("transcript_id ")[1]).split('"')[1]
      
     exon = Exon(exon_id, chromosome, start, end, strand, gene_id, \
                 transcript_id)
+    exon.name = exon_name
     return exon
 
 def get_exon_from_db(exon_row):
@@ -93,6 +96,7 @@ def get_exon_from_db(exon_row):
             TALON database
     """
     exon_id = exon_row['identifier']
+    exon_name = exon_row['name']
     chromosome = exon_row['chromosome']
     start = exon_row['start']
     end = exon_row['end']
@@ -100,6 +104,7 @@ def get_exon_from_db(exon_row):
     gene_id = exon_row['gene_id']
 
     exon = Exon(exon_id, chromosome, start, end, strand, gene_id, None)
+    exon.name = exon_name
     for transcript_id in exon_row['transcript_ids'].split(","):
         exon.transcript_ids.add(transcript_id)
     return exon
