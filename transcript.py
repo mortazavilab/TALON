@@ -7,6 +7,12 @@ class Transcript(object):
        and constitutive exons.
 
        Attributes:
+           identifier: Accession ID of transcript, i.e. an Ensembl ID. Must
+           be unique.
+
+           name: Human-readable name of the transcript. Does not have to be 
+           unique
+
            chromosome: Chromosome that the transcript is located on 
            (format "chr1")
 
@@ -19,23 +25,19 @@ class Transcript(object):
            strand: "+" if the transcript is on the forward strand, and "-" if
            it is on the reverse strand
 
-           exons: List containing start and end position of each exon in sorted
-           order
+           gene_id: unique ID of the gene that this transcript belongs to
 
-       Optional Attributes:
-           gene_id: ID of the gene that this transcript belongs to 
-
-           transcript_id: Accession ID of transcript, i.e. and Ensembl ID
-
-           transcript_name: Human-readable name of the transcript
+           exons: List of exon objects belonging to this transcript, in sorted
+           order.
 
     """
 
-    def __init__(self, identifier, name, chromosome, \
-                 start, end, strand, gene_id):
+    def __init__(self, identifier, name, transcript_type, chromosome, start, 
+                 end, strand, gene_id):
 
         self.identifier = identifier
         self.name = name
+        self.transcript_type = transcript_type
         self.gene_id = gene_id
 
         self.chromosome = chromosome
@@ -91,13 +93,18 @@ class Transcript(object):
         """ The transcript's exons are valid if:
             1) Exons are in sorted order (ascending)
             2) Exon bounds do not exceed transcript start and end
+            3) Exons are all on the appropriate chromosome
             If these conditions are violated, this function raises an error.
         """
         prev = 0
         for exon in self.exons:
+            if exon.chromosome != self.chromosome:
+                raise ValueError('Invalid exon in transcript ' + \
+                      self.identifier + ': wrong chromosome')
             if exon.start < self.start or exon.end > self.end:
                 raise ValueError('Invalid exon in transcript ' + \
-                      self.identifier + ': (' + exon.start + "-" + exon.end + \
+                      self.identifier + ': (' + str(exon.start) + "-" + \
+                      str(exon.end) + \
                       ') is located beyond start or end of transcript')
             if exon.start <= prev:
                 # This error would indicate a TALON bug rather than user error,
@@ -171,6 +178,7 @@ def get_transcript_from_gtf(transcript_info):
     start = int(transcript_info[3])
     end = int(transcript_info[4])
     strand = transcript_info[6]
+    transcript_type = None
 
     name = None
     gene_id = None
@@ -184,7 +192,26 @@ def get_transcript_from_gtf(transcript_info):
     if "gene_id" in description:
         gene_id = (description.split("gene_id ")[1]).split('"')[1]
 
-    transcript = Transcript(transcript_id, name, chromosome, start, end, \
+    if "transcript_type" in description:
+        transcript_type=(description.split("transcript_type ")[1]).split('"')[1]
+
+    transcript = Transcript(transcript_id, name, transcript_type, chromosome, 
+                            start, end, strand, gene_id)
+    return transcript
+
+def get_transcript_from_exon(exon, transcript_id):
+    """ In rare cases, GTF exons are listed with gene and transcript IDs that
+        do not have corresponding entries. In this case, we create a transcript
+        for this exon for bookkeeping purposes."""
+
+    gene_id = exon.gene_id
+    transcript_id = transcript_id
+    name = transcript_id
+    chromosome = exon.chromosome
+    start = exon.start
+    end = exon.end
+    strand = exon.strand
+    transcript = Transcript(transcript_id, name, None, chromosome, start, end,
                             strand, gene_id)
     return transcript
 

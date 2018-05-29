@@ -74,13 +74,19 @@ def create_exon_from_gtf(exon_info):
     end = int(exon_info[4])
     chromosome = exon_info[0]
     strand = exon_info[6]
+    exon_name = None
+    gene_id = None
+    transcript_id = None
 
-    if "exon_id" not in description:
-        raise ValueError('GTF exon entry lacks an exon_id field')
+    if "exon_id" in description:
+        exon_name = (description.split("exon_id ")[1]).split('"')[1]
+
     exon_id = "_".join([chromosome, str(start), str(end), strand])
-    exon_name = (description.split("exon_id ")[1]).split('"')[1]
-    gene_id = (description.split("gene_id ")[1]).split('"')[1]
-    transcript_id = (description.split("transcript_id ")[1]).split('"')[1]
+
+    if "gene_id" in description:
+        gene_id = (description.split("gene_id ")[1]).split('"')[1]
+    if "transcript_id" in description:
+        transcript_id = (description.split("transcript_id ")[1]).split('"')[1]
      
     exon = Exon(exon_id, chromosome, start, end, strand, gene_id, \
                 transcript_id)

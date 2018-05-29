@@ -30,7 +30,7 @@ class Gene(object):
 
     """
 
-    def __init__(self, identifier, name, chromosome, start, end, strand):
+    def __init__(self, identifier, name, gene_type, chromosome, start, end, strand):
         start = int(start)
         end = int(end)
 
@@ -41,6 +41,8 @@ class Gene(object):
         self.end = end
         self.strand = strand
         self.transcripts = {}
+        self.length = end - start + 1
+        self.gene_type = gene_type
 
         if start > end:
             raise ValueError('Gene start must be less than or equal to end.')
@@ -128,12 +130,32 @@ def get_gene_from_gtf(gene_info):
     if "gene_id" not in description:
         raise ValueError('GTF entry lacks a gene_id field')
     gene_id = (description.split("gene_id ")[1]).split('"')[1]
+    gene_type = None
 
     if "gene_name" in description:
         gene_name = (description.split("gene_name ")[1]).split('"')[1]
+    if "gene_type" in description:
+        gene_type = (description.split("gene_type ")[1]).split('"')[1]
     start = int(gene_info[3])
     end = int(gene_info[4])
     strand = gene_info[6]
 
-    gene = Gene(gene_id, gene_name, chromosome, start, end, strand)
+    gene = Gene(gene_id, gene_name, gene_type, chromosome, start, end, strand)
     return gene
+
+def get_gene_from_exon(exon):
+    """ In rare cases, GTF exons are listed with gene and transcript IDs that
+        do not have corresponding entries. In this case, we create a gene
+        for this exon for bookkeeping purposes."""
+
+    gene_id = exon.gene_id
+    gene_name = gene_id
+    chromosome = exon.chromosome
+    start = exon.start
+    end = exon.end
+    strand = exon.strand
+    gene = Gene(gene_id, gene_name, None, chromosome, start, end, strand)
+    return gene
+
+
+

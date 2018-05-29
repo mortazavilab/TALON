@@ -24,6 +24,9 @@ def getOptions():
     parser.add_option("--a", dest = "annot_name",
         help = "Name of supplied annotation (will be used to label data)",
         type = "string")
+    parser.add_option("--gl", dest = "min_gene_len",
+        help = "Optional: Minimum length requirement for genes (Default: None)",
+        default = None)
     parser.add_option("--o", dest = "outprefix",
         help = "Outprefix for the annotation files",
         metavar = "FILE", type = "string")
@@ -71,6 +74,7 @@ def add_gene_table(database):
 
     # Add more columns (no default values)
     c.execute('ALTER TABLE "genes" ADD COLUMN "name" TEXT')
+    c.execute('ALTER TABLE "genes" ADD COLUMN "gene_type" TEXT')
     c.execute('ALTER TABLE "genes" ADD COLUMN "chromosome" TEXT')
     c.execute('ALTER TABLE "genes" ADD COLUMN "start" INTEGER')
     c.execute('ALTER TABLE "genes" ADD COLUMN "end" INTEGER')
@@ -112,6 +116,7 @@ def add_transcript_table(database):
     # Add more columns (empty)
     c.execute('ALTER TABLE "transcripts" ADD COLUMN "name" TEXT')
     c.execute('ALTER TABLE "transcripts" ADD COLUMN "gene_id" TEXT')
+    c.execute('ALTER TABLE "transcripts" ADD COLUMN "transcript_type" TEXT')
     c.execute('ALTER TABLE "transcripts" ADD COLUMN "chromosome" TEXT')
     c.execute('ALTER TABLE "transcripts" ADD COLUMN "start" INTEGER')
     c.execute('ALTER TABLE "transcripts" ADD COLUMN "end" INTEGER')
@@ -251,63 +256,64 @@ def read_gtf_file(gtf_file):
             elif entry_type == "transcript":
                 transcript = get_transcript_from_gtf(tab_fields)
                 gene_id = transcript.gene_id
-                if gene_id not in genes:
-                    warnings.warn("Tried to add transcript " + \
-                    transcript.identifier + " to a gene that doesn't " + \
-                    "exist in dict (" + gene_id + "). " + \
-                    "Skipping this entry.", RuntimeWarning)
-                else:
+                if gene_id in genes:
                     genes[gene_id].add_transcript(transcript)
-                    transcripts[transcript.identifier] = transcript
+                transcripts[transcript.identifier] = transcript
 
             # Entry is an exon
             elif entry_type == "exon":
-                info = tab_fields[-1]
-                transcript_id = (info.split("transcript_id ")[1]).split('"')[1]
-                gene_id = (info.split("gene_id ")[1]).split('"')[1]
-
+                exon = create_exon_from_gtf(tab_fields)
+                exon_id = exon.identifier
+                transcript_id = list(exon.transcript_ids)[0]
+                gene_id = exon.gene_id
                 if gene_id not in genes:
-                    warnings.warn("Tried to add exon to a gene that doesn't"+ \
-                    " exist in dict (" + gene_id + "). " + \
-                    "Skipping this entry.", RuntimeWarning)
-                elif transcript_id not in genes[gene_id].transcripts:
-                    warnings.warn("Tried to add exon to a transcript (" + \
-                    transcript_id + ") that isn't in "+ \
-                    " gene transcript set (" + gene_id + "). " + \
-                    "Skipping this entry.", RuntimeWarning)
+                    # Create a gene
+                    gene = get_gene_from_exon(exon)
+                    genes[gene_id] = gene
+                if transcript_id not in transcripts:
+                    # Create a transcript
+                    transcript = get_transcript_from_exon(exon, transcript_id)
+                    transcripts[transcript_id] = transcript
+                    # Add the transcript to the gene 
+                    gene = genes[gene_id]
+                    gene.add_transcript(transcript)
+                if exon_id not in exons:
+                    # Add the new exon to the data structure
+                    exons[exon_id] = exon
                 else:
-                    #exon_id = (info.split("exon_id ")[1]).split('"')[1]
-                    #print gene_id + ":" + exon_id
-                    exon = create_exon_from_gtf(tab_fields)
-                    exon_id = exon.identifier
-                    if exon_id not in exons:
-                        # Create new exon entry
-                        exons[exon_id] = exon
-                    else:
-                        # Update existing exon entry
-                        exon = exons[exon_id]
-                        exon.transcript_ids.add(transcript_id)
-                    currTranscript = genes[gene_id].transcripts[transcript_id]
-                    currTranscript.add_exon(exon)
+                    # Update existing exon entry, including its transcript set
+                    exon = exons[exon_id]
+                    exon.transcript_ids.add(transcript_id)
+                    
+                currTranscript = transcripts[transcript_id]
+                currTranscript.add_exon(exon)
 
     return genes, transcripts, exons
 
-def populate_db(database, annot_name, genes, transcripts, exons):
+def populate_db(database, annot_name, genes, transcripts, exons, min_gene_len):
     """ Iterate over GTF-derived gene, transcript, and exon entries in order
-        to add a record for each in the database
+        to add a record for each in the database. If a minimum gene length is
+        provided, then the cutoff is applied at this time to prevent shorter
+        genes and their associated exons/transcripts from being added to the 
+        database.
     """
     # Connecting to the database file
     conn = sqlite3.connect(database)
     c = conn.cursor()
+    genes_added = {}
     for gene_id in genes:
         gene = genes[gene_id]
-        add_gene_entry(c, annot_name, gene)
+        if gene.length >= min_gene_len or min_gene_len == None:
+            add_gene_entry(c, annot_name, gene)
+            genes_added[gene_id] = 1
     for transcript_id in transcripts:
         transcript = transcripts[transcript_id]
-        add_transcript_entry(c, annot_name, transcript)
+        if transcript.gene_id in genes_added:
+            add_transcript_entry(c, annot_name, transcript)
     for exon_id in exons:
         exon = exons[exon_id]
-        add_exon_entry(c, annot_name, exon)
+        if exon.gene_id in genes_added:
+            add_exon_entry(c, annot_name, exon)
 
     conn.commit()
     conn.close()
@@ -320,6 +326,7 @@ def add_gene_entry(c, annot_name, gene):
 
     gene_id = gene.identifier
     gene_name = gene.name
+    gene_type = gene.gene_type
     chrom = gene.chromosome
     start = gene.start
     end = gene.end
@@ -328,13 +335,13 @@ def add_gene_entry(c, annot_name, gene):
     annot = 1
     
     cols = " (" + ", ".join([str_wrap_double(x) for x in ["identifier", "name",
-           "chromosome", "start","end","strand","length","annotated",
+           "gene_type", "chromosome", "start","end","strand","length","annotated",
            "dataset_of_origin"]]) + ") "
-    vals = [gene_id, gene_name, chrom, start, end, strand, length, annot,
-            annot_name]
+    vals = [gene_id, gene_name, gene_type, chrom, start, end, strand, length, 
+            annot, annot_name]
 
     command = 'INSERT OR IGNORE INTO "genes"' + cols + "VALUES " + \
-              '(?,?,?,?,?,?,?,?,?)'
+              '(?,?,?,?,?,?,?,?,?,?)'
     c.execute(command,vals)
     return
 
@@ -347,6 +354,7 @@ def add_transcript_entry(c, annot_name, transcript):
     t_id = transcript.identifier
     t_name = transcript.name
     g_id = transcript.gene_id
+    transcript_type = transcript.transcript_type
     chrom = transcript.chromosome
     start = transcript.start
     end = transcript.end
@@ -373,14 +381,14 @@ def add_transcript_entry(c, annot_name, transcript):
     #c.execute(update_gene,[g_id])
 
     cols = " (" + ", ".join([str_wrap_double(x) for x in ["identifier", "name", 
-                     "gene_id", "chromosome", "start","end",
-                     "strand","length","exon_count","exon_ids", 
+                     "gene_id", "transcript_type","chromosome", "start", "end",
+                     "strand", "length", "exon_count", "exon_ids", 
                      "annotated", "dataset_of_origin"]]) + ") "
-    vals = [t_id, t_name, g_id, chrom, start, end, strand, 
+    vals = [t_id, t_name, g_id, transcript_type, chrom, start, end, strand, 
             length, n_exons, exon_ids, annot, annot_name]
     
     command = 'INSERT OR IGNORE INTO "transcripts"' + cols + "VALUES " + \
-              '(?,?,?,?,?,?,?,?,?,?,?,?)'
+              '(?,?,?,?,?,?,?,?,?,?,?,?,?)'
     c.execute(command,vals)
 
     # Add transcript_id to abundance table
@@ -424,6 +432,9 @@ def main():
     gtf_file = options.gtf
     outprefix = options.outprefix
     annot_name = options.annot_name
+    min_gene_length = options.min_gene_len
+    if min_gene_length != None: 
+        min_gene_length = int(min_gene_length)
 
     # Make database
     db_name = outprefix + ".db"
@@ -436,7 +447,7 @@ def main():
 
     # Process the GTF annotations
     genes, transcripts, exons = read_gtf_file(gtf_file)
-    populate_db(db_name, annot_name, genes, transcripts, exons)
+    populate_db(db_name, annot_name, genes, transcripts, exons, min_gene_length)
 
 if __name__ == '__main__':
     main()
