@@ -44,12 +44,6 @@ def read_annotation(annot):
     """ Imports data from the provided TALON database into gene, transcript, and
         exon objects. Also imports the number of novel discoveries from the 
         database so as to properly name discoveries in this run.
-
-        Args:
-            annot
-
-        Returns: 
-
     """
     counter = {}
     gene_tree = GeneTree()
@@ -76,7 +70,6 @@ def read_annotation(annot):
             gene = get_gene_from_db(gene_row)
             gene_tree.add_gene(gene)
 
-
     c.execute('SELECT * FROM transcripts')
     exons_to_add = set()
     for transcript_row in c:
@@ -99,12 +92,19 @@ def read_annotation(annot):
     for exon_row in c:
         if exon_row['identifier'] in exons_to_add:
             exon = get_exon_from_db(exon_row)
-            exon_tree.add_exon(exon) 
 
             # Add exon to the transcripts it belongs to
+            updated_ids = set()
             for transcript_id in exon_row['transcript_ids'].split(","):
-                curr_transcript = transcripts[transcript_id]
-                curr_transcript.add_exon(exon)
+                if transcript_id in transcripts:
+                    curr_transcript = transcripts[transcript_id]
+                    curr_transcript.add_exon(exon)
+                    updated_ids.add(transcript_id)
+           
+            # Keep the exon if at least one transcript we're using has it
+            if len(updated_ids) > 0:
+                exon.transcript_ids = updated_ids
+                exon_tree.add_exon(exon)
            
     conn.close()
     
@@ -175,7 +175,8 @@ def identify_sam_transcripts(sam_transcripts, gene_tree, transcripts,
         # Look for full and partial matches
         match, diff, match_type = find_transcript_match(sam_transcript, 
                                                         transcripts, exon_tree)
-        #if match_type == "full":
+        if match_type == "full":
+            print sam_transcript.identifier
             #sam_transcript.identifier
             #sam_transcript.gene_id =  
         
@@ -371,15 +372,18 @@ def main():
     checkArgs(options)
 
     # Process the annotations
+    print "Processing annotation...................."
     gt, tscripts, et, ct = read_annotation(annot)
 
     # Process the SAM files
+    print "Processing SAM file......................"
     sam_files = infile_list.split(",")
     dataset_list = dataset_list.split(",")
     for sam, d_name in zip(sam_files, dataset_list):
+        print "Identifying transcripts in " + d_name + "..............."
         sam_tscripts = process_sam_file(sam)
         gt, tscripts, et, ct, abundance = identify_sam_transcripts(sam_tscripts, 
-                                           gt, tscripts, et, ct, outprefix)
+                                           gt, tscripts, et, ct, out)
         # update_abundance_table(d_name, abundance)
 
     # update_database(gt, tscripts, et, ct) 

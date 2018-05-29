@@ -103,6 +103,7 @@ def get_gene_from_db(gene_row):
     """
     gene_id = gene_row['identifier']
     name = gene_row['name']
+    gene_type = gene_row['gene_type']
     chromosome = gene_row['chromosome']
     start = gene_row['start']
     end = gene_row['end']
@@ -110,7 +111,7 @@ def get_gene_from_db(gene_row):
 
     #transcripts = {} #gene_row['transcript_ids'].split(",")
 
-    gene = Gene(gene_id, name, chromosome, start, end, strand)
+    gene = Gene(gene_id, name, gene_type, chromosome, start, end, strand)
     return gene
 
 def get_gene_from_gtf(gene_info):
@@ -143,12 +144,11 @@ def get_gene_from_gtf(gene_info):
     gene = Gene(gene_id, gene_name, gene_type, chromosome, start, end, strand)
     return gene
 
-def get_gene_from_exon(exon):
+def get_gene_from_exon(exon, gene_id):
     """ In rare cases, GTF exons are listed with gene and transcript IDs that
         do not have corresponding entries. In this case, we create a gene
         for this exon for bookkeeping purposes."""
 
-    gene_id = exon.gene_id
     gene_name = gene_id
     chromosome = exon.chromosome
     start = exon.start

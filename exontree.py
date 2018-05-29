@@ -62,13 +62,17 @@ class ExonTree(object):
         if exon.start == exon.end:
             return
 
-        # Check for collisions. If the input exon matches an existing exon ID,
-        # then merge their transcript sets.
+        # Check for collisions. There are two ways a collision can happen.
+        # By far the most common case is an exon that is in multiple 
+        # transcripts. For this case, merge the exon transcript sets. A more
+        # rare special case is when two exons have the same ID but belong to 
+        # different genes
         if exon_id in self.exons:
              oldExon = self.exons[exon_id]
              exon.transcript_ids = oldExon.transcript_ids | exon.transcript_ids
         else: 
             self.chromosomes[chromosome][start:end] = exon_id
+    
         self.exons[exon_id] = exon
         return
 

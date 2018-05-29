@@ -82,7 +82,7 @@ class SamTranscript(Transcript):
         for s,e in zip(starts,ends):
             exon_id = None#self.identifier + "_" + str(ct)
             exon = Exon(exon_id, self.chromosome, s, e, self.strand, 
-                        self.gene_id, self.identifier)
+                        self.identifier)
             self.add_exon(exon)
             ct += 1
         return

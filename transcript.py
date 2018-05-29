@@ -144,14 +144,15 @@ def get_transcript_from_db(transcript_row):
     """
     transcript_id = transcript_row['identifier']
     name = transcript_row['name']
+    transcript_type = transcript_row['transcript_type']
     chromosome = transcript_row['chromosome']
     start = transcript_row['start']
     end = transcript_row['end']
     strand = transcript_row['strand']
     gene_id = transcript_row['gene_id']
 
-    transcript = Transcript(transcript_id, name, chromosome, start, end, \
-                            strand, gene_id)
+    transcript = Transcript(transcript_id, name, transcript_type, chromosome, 
+                            start, end, strand, gene_id)
     return transcript
     
 
@@ -199,13 +200,11 @@ def get_transcript_from_gtf(transcript_info):
                             start, end, strand, gene_id)
     return transcript
 
-def get_transcript_from_exon(exon, transcript_id):
+def get_transcript_from_exon(exon, gene_id, transcript_id):
     """ In rare cases, GTF exons are listed with gene and transcript IDs that
         do not have corresponding entries. In this case, we create a transcript
         for this exon for bookkeeping purposes."""
 
-    gene_id = exon.gene_id
-    transcript_id = transcript_id
     name = transcript_id
     chromosome = exon.chromosome
     start = exon.start

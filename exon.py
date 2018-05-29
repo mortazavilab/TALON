@@ -30,8 +30,8 @@ class Exon(object):
 
     """
 
-    def __init__(self, identifier, chromosome, \
-                 start, end, strand, gene_id, transcript_id):
+    def __init__(self, identifier, chromosome, start, end, strand, 
+                 transcript_id):
         self.chromosome = chromosome
         self.start = int(start)
         self.end = int(end)
@@ -40,7 +40,6 @@ class Exon(object):
         self.name = None
 
         self.identifier = identifier
-        self.gene_id = gene_id
         self.transcript_ids = set()
         if transcript_id != None:
             self.transcript_ids.add(transcript_id)
@@ -87,18 +86,17 @@ def create_exon_from_gtf(exon_info):
         gene_id = (description.split("gene_id ")[1]).split('"')[1]
     if "transcript_id" in description:
         transcript_id = (description.split("transcript_id ")[1]).split('"')[1]
-     
-    exon = Exon(exon_id, chromosome, start, end, strand, gene_id, \
-                transcript_id)
+    
+    print transcript_id 
+    exon = Exon(exon_id, chromosome, start, end, strand, transcript_id)
     exon.name = exon_name
     return exon
 
 def get_exon_from_db(exon_row):
-    """ Uses information from a database exon entry to create a
-    Gene object.
+    """ Uses information from a database exon entry to create an exon object.
 
         Args:
-            gene_row: Tuple-formatted row from 'exons' table of a
+            exon_row: Tuple-formatted row from 'exons' table of a
             TALON database
     """
     exon_id = exon_row['identifier']
@@ -107,10 +105,10 @@ def get_exon_from_db(exon_row):
     start = exon_row['start']
     end = exon_row['end']
     strand = exon_row['strand']
-    gene_id = exon_row['gene_id']
 
-    exon = Exon(exon_id, chromosome, start, end, strand, gene_id, None)
+    exon = Exon(exon_id, chromosome, start, end, strand, None)
     exon.name = exon_name
     for transcript_id in exon_row['transcript_ids'].split(","):
         exon.transcript_ids.add(transcript_id)
+    
     return exon
