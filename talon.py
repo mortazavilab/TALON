@@ -173,13 +173,15 @@ def identify_sam_transcripts(sam_transcripts, gene_tree, transcripts,
 
     for sam_transcript in sam_transcripts:
         # Look for full and partial matches
-        match, diff, match_type = find_transcript_match(sam_transcript, 
-                                                        transcripts, exon_tree)
-        if match_type == "full":
-            print sam_transcript.identifier
+        #match, diff, match_type = find_transcript_match(sam_transcript, 
+        #                                                transcripts, exon_tree)
+        #if match_type == "full":
+        #    print sam_transcript.sam_id
             #sam_transcript.identifier
             #sam_transcript.gene_id =  
-        
+        tracker = find_transcript_match(sam_transcript, transcripts, exon_tree)
+        if len(tracker.full_matches) > 0:
+            print sam_transcript.sam_id
 
         # if transcript_id in abundance_dict:
             # abundance_dict[transcript_id] += 1
@@ -213,6 +215,7 @@ def identify_sam_transcripts(sam_transcripts, gene_tree, transcripts,
         #             str(sam_transcript.end), sam_transcript.strand, 
         #             gene_id, gene_name, transcript_id, transcript_name, \
         #             annotation, diff_5, diff_3]) + "\n") 
+    return None,None,None,None,None
     #return gene_tree, transcripts, exon_tree
 
 def find_transcript_match(query_transcript, transcripts, exon_tree):
@@ -245,23 +248,23 @@ def find_transcript_match(query_transcript, transcripts, exon_tree):
 
     # Find transcript matches
     tracker.compute_match_sets(transcripts)
-
+    return tracker
     # If there is more than one full transcript match, select and return the
     # best one
-    if len(tracker.full_matches) > 0:
-        transcript_match, diff = tracker.get_best_full_match(transcripts)
-        query_transcript.gene_id = transcript_match.gene_id
-        query_transcript.identifier = transcript_match.identifier
-        match_type = "full"       
+    #if len(tracker.full_matches) > 0:
+    #    transcript_match, diff = tracker.get_best_full_match(transcripts)
+    #    query_transcript.gene_id = transcript_match.gene_id
+    #    query_transcript.identifier = transcript_match.identifier
+    #    match_type = "full"       
 
     # If there are no full matches, look for partial matches
-    else:
-        if len(tracker.partial_matches) > 0:
-            transcript_match = tracker.get_best_partial_match(transcripts)
-            match_type = "partial"
+    #else:
+    #    if len(tracker.partial_matches) > 0:
+    #        transcript_match = tracker.get_best_partial_match(transcripts)
+    #        match_type = "partial"
             
 
-    return transcript_match, diff, match_type
+    #return transcript_match, diff, match_type
         
 
     #else:
@@ -382,8 +385,7 @@ def main():
     for sam, d_name in zip(sam_files, dataset_list):
         print "Identifying transcripts in " + d_name + "..............."
         sam_tscripts = process_sam_file(sam)
-        gt, tscripts, et, ct, abundance = identify_sam_transcripts(sam_tscripts, 
-                                           gt, tscripts, et, ct, out)
+        gt, tscripts, et, ct, abundance = identify_sam_transcripts(sam_tscripts, gt, tscripts, et, ct, out)
         # update_abundance_table(d_name, abundance)
 
     # update_database(gt, tscripts, et, ct) 
