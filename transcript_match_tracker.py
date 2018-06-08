@@ -66,8 +66,7 @@ class MatchTracker(object):
             self.exon_matches[i] = matches
             self.transcript_matches.append(transcript_matches)
 
-        return
-
+        return    
 
     def compute_match_sets(self, transcript_dict):
         """ Use the exon_matches field of the MatchTracker to figure out which
@@ -96,6 +95,65 @@ class MatchTracker(object):
         self.partial_matches = list(partial_matches)
 
         return
+
+    def get_best_exon_matches(self):
+        """ Iterates over each each exon and compares the exon matches in order
+            to fin the best one for each. This is done by computing the 
+            differences at the 3' and 5' ends. It isn't necessary to use
+            different rules by exon context at this point because the exon 
+            matches were already selected under those rules. 
+
+            Logic:
+                1) If diff_3 = diff_5 = 0, that is the best.
+                2) Next best is diff_3 = 0.
+                3) Next best is diff_5 = 0.
+                4) After that, just minimize tot_diff
+
+            This function returns a list, with each element consisting of an
+            exon object (the best match), or None if there was no match.
+            """
+        best_matches = []
+        
+        for i in range(0,self.n_exons):
+            curr_matches = self.exon_matches[i]
+            
+            best_match = None
+            best_diff_3 = 1000000
+            best_diff_5 = 1000000
+            best_tot_diff = 1000000
+
+            for match in curr_matches:
+                diff_5 = match.diff_5
+                diff_3 = match.diff_3
+                tot_diff = abs(diff_3) + abs(diff_5)
+
+                if diff_5 == diff_3 == 0:
+                    best_match = match.obj_id
+                    break
+
+                elif diff_3 == 0:
+                    best_match = match.obj_id
+                    best_diff_3 = diff_3
+                    best_diff_5 = diff_5
+                    best_tot_diff = tot_diff
+
+                elif diff_5 == 0:
+                    if best_diff_3 != 0:
+                        best_match = match.obj_id
+                        best_diff_3 = diff_3
+                        best_diff_5 = diff_5
+                        best_tot_diff = tot_diff
+
+                elif tot_diff < best_tot_diff:
+                    best_match = match.obj_id
+                    best_diff_3 = diff_3
+                    best_diff_5 = diff_5
+                    best_tot_diff = tot_diff
+
+            best_matches.append(best_match)
+        return best_matches     
+               
+
 
     def get_best_full_match(self, transcripts):
         """ Iterates over the full matches in the tracker and determines 

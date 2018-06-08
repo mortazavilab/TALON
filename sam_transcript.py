@@ -30,19 +30,12 @@ class SamTranscript(Transcript):
 
            exons: Data structure containing at least one exon
 
-       Optional Attributes:
-           gene:
-
-           transcript_id: Accession ID of transcript, i.e. and Ensembl ID
-
-           transcript_name: Human-readable name of the transcript
 
     """
 
     def __init__(self, sam_id, chromosome, start, end, strand, introns,
                  samFields):
-        self.identifier = None
-        self.sam_id = sam_id
+        self.identifier = sam_id
         self.chromosome = chromosome
         self.start = int(start)
         self.end = int(end)
@@ -50,7 +43,6 @@ class SamTranscript(Transcript):
         self.introns = introns
         self.samFields = samFields
 
-        self.gene_id = None
         self.name = None
         self.exons = []
         self.n_exons = 0
