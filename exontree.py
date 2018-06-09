@@ -49,7 +49,6 @@ class ExonTree(object):
 
             Args:
                 exon: Exon object to be added
-                exon_id: Accession ID to assign to the exon
                 
         """
         chromosome = exon.chromosome
@@ -76,31 +75,31 @@ class ExonTree(object):
         self.exons[exon_id] = exon
         return
 
-    def add_novel_exon(self, chromosome, start, end, strand, gene_id, transcript_id):
-        """ Creates an exon from the provided information and adds it to the
-            exon tree. It is assigned an ID based on the number of novel exons
-            that are in the tree already.
+    #def add_novel_exon(self, chromosome, start, end, strand, gene_id, transcript_id):
+    #    """ Creates an exon from the provided information and adds it to the
+    #        exon tree. It is assigned an ID based on the number of novel exons
+    #        that are in the tree already.
 
-            Args:
-                chromosome: Name of the chromosome of the exon
+    #        Args:
+    #            chromosome: Name of the chromosome of the exon
 
-                start: The start position of the exon with respect to the
-                forward strand (int). Should always be less than or equal to
-                end.
+    #            start: The start position of the exon with respect to the
+    #            forward strand (int). Should always be less than or equal to
+    #            end.
 
-                end: The end position of the exon with respect to the
-                forward strand (int). Should always be greater than or equal
-                to start.
+    #            end: The end position of the exon with respect to the
+    #            forward strand (int). Should always be greater than or equal
+    #            to start.
 
-                strand: "+" if the query interval is on the forward strand,
-                "-" if it is on the reverse strand
+    #            strand: "+" if the query interval is on the forward strand,
+    #            "-" if it is on the reverse strand
 
-        """
-        self.novel += 1
-        new_id = "novel_exon." + str(self.novel)
-        new_exon = Exon(new_id, chromosome, start, end, strand, gene_id, transcript_id)
-        self.add_exon(new_exon, new_id)
-        return
+    #    """
+    #    self.novel += 1
+    #    new_id = "novel_exon." + str(self.novel)
+    #    new_exon = Exon(new_id, chromosome, start, end, strand, gene_id, transcript_id)
+    #    self.add_exon(new_exon, new_id)
+    #    return
 
     def get_exons_in_range(self, chromosome, start, end, strand):
         """ Finds exons that overlap with the provided start-end interval.

@@ -170,13 +170,8 @@ def identify_sam_transcripts(sam_transcripts, gene_tree, transcripts,
                        "diff_5", "diff_3"]) + "\n")
 
     for sam_transcript in sam_transcripts:
-        # Look for full and partial matches
-        #match, diff, match_type = find_transcript_match(sam_transcript, 
-        #                                                transcripts, exon_tree)
-        #if match_type == "full":
-        #    print sam_transcript.sam_id
-            #sam_transcript.identifier
-            #sam_transcript.gene_id =  
+        print "------------------------------"
+        print sam_transcript.identifier
 
         # Initialize
         gene_id = "NA"
@@ -184,53 +179,86 @@ def identify_sam_transcripts(sam_transcripts, gene_tree, transcripts,
         transcript_id = "NA"
         transcript_name = "NA"
         annotation = "NA"
+        chromosome = sam_transcript.chromosome
+        start = sam_transcript.start
+        end = sam_transcript.end
+        strand = sam_transcript.strand
 
+        #print chromosome
+        #print start
+        #print end
+
+        # Look for full and partial matches
         best_match, match_type, exon_matches, diff = find_transcript_match(
                                                      sam_transcript, 
                                                      transcripts, exon_tree)
-
-        exit()
         # Full transcript match
         if match_type == "full":
             annot_transcript = best_match
             gene_id = annot_transcript.gene_id
-            annotation = "known"
+            gene_name = gene_tree.genes[gene_id].name
             diff_5 = str(diff[0])
             diff_3 = str(diff[1])
 
         # If there is no full match, a novel transcript must be created
         else:
-            # Find out which gene the novel transcript comes from. Create one
-            # if necessary
+            # Find out which gene the novel transcript comes from. 
             if match_type == "partial":
                 gene_id = best_match.gene_id
-            else:
-                gene_id = find_gene_in_range() # TODO: implement
-                if gene_id == None:
-                    pass
-                    #gene_id, counter = create_novel_gene()
-                    # TODO: add gene to data structure
+                gene_name = gene_tree.genes[gene_id].name
 
-            # Create the novel transcript
-            #annot_transcript, counter = create_novel_transcript() # TODO: implement (will be a simple fn)
-            # TODO: add transcript to data structure
+            # Search for gene using transcript coordinates                
+            else:
+                match_type = "none"
+                chromosome = sam_transcript.chromosome
+                start = sam_transcript.start
+                end = sam_transcript.end
+                strand = sam_transcript.strand
+                #gene_candidates = gene_tree.get_genes_in_range(chromosome, start,
+                #                                               end, strand)
+                gene_obj, counter = create_novel_gene(chromosome, start, end,
+                                                     strand, counter)
+                gene_id = gene_obj.identifier
+                novel_gene_ids[gene_id] = 1
+                gene_tree.add_gene(gene_obj)
+
+            # Create the novel transcript and add to transcript dict
+            # and novel tracker
+            annot_transcript, counter = create_novel_transcript(chromosome, 
+                                            start, end, strand, gene_id, counter) 
+
+            novel_transcript_ids[annot_transcript.identifier] = 1
 
             # Add exons to the novel transcript
             for sam_exon, exon_match in zip(sam_transcript.exons, exon_matches):
+                exon_start = sam_exon.start
+                exon_end = sam_exon.end               
+
                 if exon_match == None:
-                    #exon, counter = # create_novel_exon() TODO: implement
-                    # TODO: add to data structure
-                    pass
-                else:
-                    exon = exon_match
-                #annot_transcript.add_exon(exon_match)
-                #add annot_transcript to exon
+                    exon_obj, counter = create_novel_exon(chromosome, exon_start, 
+                                    exon_end, strand, counter)
+                    novel_exon_ids[exon_obj.identifier] = 1
+
+                else: 
+                    exon_obj = exon_tree.exons[exon_match]
+                    if exon_start != exon_obj.start or exon_end != exon_obj.end:
+                        exon_obj, counter = create_novel_exon(chromosome, 
+                                              exon_start, exon_end, strand, counter)
+                        novel_exon_ids[exon_obj.identifier] = 1
+ 
+                # Add exon to transcript and vice versa. Update data structure
+                annot_transcript.add_exon(exon_obj)
+                exon_obj.transcript_ids.add(annot_transcript.identifier)
+                exon_tree.add_exon(exon_obj)
 
             # Set null 3' and 5' differences, other attributes
             diff_5 = "NA"
             diff_3 = "NA"
-            annotation = "novel"
-            
+            #annotation = "novel"
+
+            # Add transcript to data structure
+            transcripts[annot_transcript.identifier] = annot_transcript
+             
         # Update abundance dict
         transcript_id = annot_transcript.identifier
   
@@ -239,6 +267,10 @@ def identify_sam_transcripts(sam_transcripts, gene_tree, transcripts,
         else:
             abundance_dict[transcript_id] = 1
 
+        if "talon" in gene_id or "talon" in transcript_id:
+            annotation = "novel"
+        else:
+            annotation = "known"
         # Output assignment to file
         gene_id = annot_transcript.gene_id
         transcript_id = annot_transcript.identifier
@@ -248,10 +280,12 @@ def identify_sam_transcripts(sam_transcripts, gene_tree, transcripts,
                      str(sam_transcript.end), sam_transcript.strand,
                      gene_id, gene_name, transcript_id, transcript_name, \
                      annotation, match_type, diff_5, diff_3]) + "\n")         
-       
-                    
+        
+    out_txt.close()
+    out_sam.close()   
                                 
-    return genes, transcripts, exon_tree, counter
+    return gene_tree, transcripts, exon_tree, counter, abundance_dict
+
 
 def find_transcript_match(query_transcript, transcripts, exon_tree):
     """ Performs search for matches to the query transcript, one exon at a time.
@@ -276,7 +310,7 @@ def find_transcript_match(query_transcript, transcripts, exon_tree):
 
     # Find annotation matches where possible for all exons
     transcript_match = "none"
-    match_type = None
+    match_type = "none"
     diff = [None, None]
     tracker = MatchTracker(query_transcript)   
     tracker.match_all_exons(exon_tree) 
@@ -288,8 +322,6 @@ def find_transcript_match(query_transcript, transcripts, exon_tree):
     # best one
     if len(tracker.full_matches) > 0:
         transcript_match, diff = tracker.get_best_full_match(transcripts)
-        query_transcript.gene_id = transcript_match.gene_id
-        query_transcript.identifier = transcript_match.identifier
         match_type = "full"  
         exon_matches = transcript_match.exons     
 
@@ -311,70 +343,70 @@ def find_transcript_match(query_transcript, transcripts, exon_tree):
         #transcript_match, transcripts, genes, exon_tree = create_novel_transcript(query_transcript, tracker, transcripts, genes, exon_tree)    
     #return transcript_match, diff, transcripts, genes, exon_tree
         
-def create_novel_transcript(sam_transcript, tracker, transcripts, genes, exon_tree):
-    """ Creates a novel transcript from a sam_transcript object that can be
-        added to the annotation. To do this, it first assigns the transcript to
-        a gene so that an appropriate ID can be assigned. 
+#def create_novel_transcript(sam_transcript, tracker, transcripts, genes, exon_tree):
+#    """ Creates a novel transcript from a sam_transcript object that can be
+#        added to the annotation. To do this, it first assigns the transcript to
+#        a gene so that an appropriate ID can be assigned. 
 
-        Args:
-            sam_transcript: sam_transcript object to be added
+#        Args:
+#            sam_transcript: sam_transcript object to be added
 
-            tracker: MatchTracker object pertaining to the sam_transcript. Used
-            to check whether the transcript has a partial match to any gene
+#            tracker: MatchTracker object pertaining to the sam_transcript. Used
+#            to check whether the transcript has a partial match to any gene
 
-            transcripts: a dictionary of transcript_id -> transcript object
+#            transcripts: a dictionary of transcript_id -> transcript object
 
-            genes: a dictionary of gene_id -> gene object
-    """
-    chromosome = sam_transcript.chromosome 
-    t_start = sam_transcript.start
-    t_end = sam_transcript.end
-    strand = sam_transcript.strand
-    novel_transcript = None
+#            genes: a dictionary of gene_id -> gene object
+#    """
+#    chromosome = sam_transcript.chromosome 
+#    t_start = sam_transcript.start
+#    t_end = sam_transcript.end
+#    strand = sam_transcript.strand
+#    novel_transcript = None
 
     # Assign to partial match gene if possible
-    if len(tracker.partial_matches) > 0:
-        part_match = transcripts[tracker.partial_matches[0]]
-        gene_match = genes[part_match.gene_id]
+#    if len(tracker.partial_matches) > 0:
+#        part_match = transcripts[tracker.partial_matches[0]]
+#        gene_match = genes[part_match.gene_id]
 
         # Create new IDs
-        gene_match.novel += 1
-        gene_id = gene_match.identifier
-        gene_name = gene_match.name
-        new_id = gene_id + "_novel_transcript." + str(gene_match.novel)
-        new_name = new_id
+#        gene_match.novel += 1
+#        gene_id = gene_match.identifier
+#        gene_name = gene_match.name
+#        new_id = gene_id + "_novel_transcript." + str(gene_match.novel)
+#        new_name = new_id
 
         # Create novel transcript:
-        novel_transcript = Transcript(new_id, new_name, chromosome, \
-                                      t_start, t_end, strand, gene_id)
-        transcripts[new_id] = novel_transcript       
+#        novel_transcript = Transcript(new_id, new_name, chromosome, \
+#                                      t_start, t_end, strand, gene_id)
+#        transcripts[new_id] = novel_transcript       
  
         # Deal with exons
-        exons = sam_transcript.exons
-        exon_num = 0
-        for i in range(0, len(exons), 2):
-            start = exons[i]
-            end = exons[i+1]
-            perfect_match = None
-            curr_exon_matches = tracker.exon_matches[exon_num]
-            for entry in curr_exon_matches:
-                if entry.tot_diff == 0:
+#        exons = sam_transcript.exons
+#        exon_num = 0
+#        for i in range(0, len(exons), 2):
+#            start = exons[i]
+#            end = exons[i+1]
+#            perfect_match = None
+#            curr_exon_matches = tracker.exon_matches[exon_num]
+#            for entry in curr_exon_matches:
+#                if entry.tot_diff == 0:
                     # The exon entry is an exact match to the sam exon
                     # Add the current transcript ID to the exon
-                    exon_id = entry.obj_id
-                    exon_obj = exon_tree.exons[exon_id]
-                    perfect_match = exon_obj
-                    exon_t_set = exon_obj.transcript_ids
-                    exon_t_set.add(new_id)
-                    break
-            if perfect_match == None:
+#                    exon_id = entry.obj_id
+#                    exon_obj = exon_tree.exons[exon_id]
+#                    perfect_match = exon_obj
+#                    exon_t_set = exon_obj.transcript_ids
+#                    exon_t_set.add(new_id)
+#                    break
+#            if perfect_match == None:
                 # Create a novel exon and add the transcript to it
-                exon_tree.add_novel_exon(chromosome, start, end, strand, gene_id, new_id)
-            transcripts[new_id].add_exon(start, end)
+#                exon_tree.add_novel_exon(chromosome, start, end, strand, gene_id, new_id)
+#            transcripts[new_id].add_exon(start, end)
         
-            exon_num += 1
+#            exon_num += 1
     
-    return novel_transcript, transcripts, genes, exon_tree
+#    return novel_transcript, transcripts, genes, exon_tree
         
 
 

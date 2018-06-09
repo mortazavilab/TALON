@@ -112,3 +112,15 @@ def get_exon_from_db(exon_row):
         exon.transcript_ids.add(transcript_id)
     
     return exon
+
+def create_novel_exon(chromosome, start, end, strand, counter):
+    """ Creates a novel exon with a unique identifier (obtained using
+        counter). Returns the exon object as well as the updated counter.
+    """
+    counter["exons"] += 1
+    curr_novel = counter["exons"]
+    exon_id = "_".join([chromosome, str(start), str(end), strand]) 
+    exon_name = "talon-exon_" + str(curr_novel)
+    exon = Exon(exon_id, chromosome, start, end, strand, None)
+    exon.name = exon_name
+    return exon, counter

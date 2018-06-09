@@ -157,5 +157,13 @@ def get_gene_from_exon(exon, gene_id):
     gene = Gene(gene_id, gene_name, None, chromosome, start, end, strand)
     return gene
 
-
+def create_novel_gene(chromosome, start, end, strand, counter):
+    """ Creates a novel gene with a unique identifier (obtained using
+        counter). Returns the gene object as well as the updated counter.
+    """
+    counter["genes"] += 1
+    curr_novel = counter["genes"]
+    gene_id = "talon-gene_" + str(curr_novel)
+    gene = Gene(gene_id, gene_id, None, chromosome, start, end, strand)
+    return gene, counter
 

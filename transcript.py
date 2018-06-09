@@ -214,3 +214,14 @@ def get_transcript_from_exon(exon, gene_id, transcript_id):
                             strand, gene_id)
     return transcript
 
+def create_novel_transcript(chromosome, start, end, strand, gene_id, counter):
+    """ Creates a novel transcript with a unique identifier (obtained using
+        counter). Returns the transcript object as well as the updated counter.
+    """
+    counter["transcripts"] += 1
+    curr_novel = counter["transcripts"]
+    transcript_id = "talon-transcript_" + str(curr_novel)
+    transcript = Transcript(transcript_id, transcript_id, None, chromosome, 
+                            start, end, strand, gene_id)
+    return transcript, counter
+
