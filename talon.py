@@ -13,6 +13,7 @@ from optparse import OptionParser
 from sam_transcript import *
 from transcript import *
 from transcript_match_tracker import *
+import build_talon_annotation as ba
 import sqlite3
 import warnings
 
@@ -170,8 +171,6 @@ def identify_sam_transcripts(sam_transcripts, gene_tree, transcripts,
                        "diff_5", "diff_3"]) + "\n")
 
     for sam_transcript in sam_transcripts:
-        print "------------------------------"
-        print sam_transcript.identifier
 
         # Initialize
         gene_id = "NA"
@@ -183,10 +182,6 @@ def identify_sam_transcripts(sam_transcripts, gene_tree, transcripts,
         start = sam_transcript.start
         end = sam_transcript.end
         strand = sam_transcript.strand
-
-        #print chromosome
-        #print start
-        #print end
 
         # Look for full and partial matches
         best_match, match_type, exon_matches, diff = find_transcript_match(
@@ -219,7 +214,7 @@ def identify_sam_transcripts(sam_transcripts, gene_tree, transcripts,
                 gene_obj, counter = create_novel_gene(chromosome, start, end,
                                                      strand, counter)
                 gene_id = gene_obj.identifier
-                novel_gene_ids[gene_id] = 1
+                novel_gene_ids[gene_id] = dataset
                 gene_tree.add_gene(gene_obj)
 
             # Create the novel transcript and add to transcript dict
@@ -227,7 +222,7 @@ def identify_sam_transcripts(sam_transcripts, gene_tree, transcripts,
             annot_transcript, counter = create_novel_transcript(chromosome, 
                                             start, end, strand, gene_id, counter) 
 
-            novel_transcript_ids[annot_transcript.identifier] = 1
+            novel_transcript_ids[annot_transcript.identifier] = dataset
 
             # Add exons to the novel transcript
             for sam_exon, exon_match in zip(sam_transcript.exons, exon_matches):
@@ -237,14 +232,14 @@ def identify_sam_transcripts(sam_transcripts, gene_tree, transcripts,
                 if exon_match == None:
                     exon_obj, counter = create_novel_exon(chromosome, exon_start, 
                                     exon_end, strand, counter)
-                    novel_exon_ids[exon_obj.identifier] = 1
+                    novel_exon_ids[exon_obj.identifier] = dataset
 
                 else: 
                     exon_obj = exon_tree.exons[exon_match]
                     if exon_start != exon_obj.start or exon_end != exon_obj.end:
                         exon_obj, counter = create_novel_exon(chromosome, 
                                               exon_start, exon_end, strand, counter)
-                        novel_exon_ids[exon_obj.identifier] = 1
+                        novel_exon_ids[exon_obj.identifier] = dataset
  
                 # Add exon to transcript and vice versa. Update data structure
                 annot_transcript.add_exon(exon_obj)
@@ -284,7 +279,8 @@ def identify_sam_transcripts(sam_transcripts, gene_tree, transcripts,
     out_txt.close()
     out_sam.close()   
                                 
-    return gene_tree, transcripts, exon_tree, counter, abundance_dict
+    return gene_tree, transcripts, exon_tree, counter, abundance_dict, \
+           novel_gene_ids, novel_transcript_ids, novel_exon_ids
 
 
 def find_transcript_match(query_transcript, transcripts, exon_tree):
@@ -336,79 +332,53 @@ def find_transcript_match(query_transcript, transcripts, exon_tree):
     return transcript_match, match_type, exon_matches, diff
         
 
-    #else:
-        # Create a novel transcript. Before the object can be created, the 
-        # transcript must be assigned to a gene, or a novel gene created.
-        #diff = [None, None]
-        #transcript_match, transcripts, genes, exon_tree = create_novel_transcript(query_transcript, tracker, transcripts, genes, exon_tree)    
-    #return transcript_match, diff, transcripts, genes, exon_tree
-        
-#def create_novel_transcript(sam_transcript, tracker, transcripts, genes, exon_tree):
-#    """ Creates a novel transcript from a sam_transcript object that can be
-#        added to the annotation. To do this, it first assigns the transcript to
-#        a gene so that an appropriate ID can be assigned. 
+def update_database(database, genetree, transcripts, exontree, counter, novel_gene_ids, 
+                    novel_transcript_ids, novel_exon_ids):
+    """ Add novel genes, transcripts, and exons to the supplied database. Also
+        update existing entries.
+    """
+    # Connecting to the database file
+    conn = sqlite3.connect(database)
+    c = conn.cursor()
 
-#        Args:
-#            sam_transcript: sam_transcript object to be added
+    n_genes = str(len(novel_gene_ids))
+    n_transcripts = str(len(novel_transcript_ids))
+    n_exons = str(len(novel_exon_ids))
 
-#            tracker: MatchTracker object pertaining to the sam_transcript. Used
-#            to check whether the transcript has a partial match to any gene
+    print "Adding " + n_genes + " novel genes to database..."
+    for gene_id in novel_gene_ids.keys():
+        dset = novel_gene_ids[gene_id]
+        ba.add_gene_entry(c, dset, genetree.genes[gene_id])
 
-#            transcripts: a dictionary of transcript_id -> transcript object
-
-#            genes: a dictionary of gene_id -> gene object
-#    """
-#    chromosome = sam_transcript.chromosome 
-#    t_start = sam_transcript.start
-#    t_end = sam_transcript.end
-#    strand = sam_transcript.strand
-#    novel_transcript = None
-
-    # Assign to partial match gene if possible
-#    if len(tracker.partial_matches) > 0:
-#        part_match = transcripts[tracker.partial_matches[0]]
-#        gene_match = genes[part_match.gene_id]
-
-        # Create new IDs
-#        gene_match.novel += 1
-#        gene_id = gene_match.identifier
-#        gene_name = gene_match.name
-#        new_id = gene_id + "_novel_transcript." + str(gene_match.novel)
-#        new_name = new_id
-
-        # Create novel transcript:
-#        novel_transcript = Transcript(new_id, new_name, chromosome, \
-#                                      t_start, t_end, strand, gene_id)
-#        transcripts[new_id] = novel_transcript       
+    print "Adding " + n_transcripts + " novel transcripts to database..."
+    for transcript_id in novel_transcript_ids.keys():
+        dset = novel_transcript_ids[transcript_id]
+        ba.add_transcript_entry(c, dset, transcripts[transcript_id])
  
-        # Deal with exons
-#        exons = sam_transcript.exons
-#        exon_num = 0
-#        for i in range(0, len(exons), 2):
-#            start = exons[i]
-#            end = exons[i+1]
-#            perfect_match = None
-#            curr_exon_matches = tracker.exon_matches[exon_num]
-#            for entry in curr_exon_matches:
-#                if entry.tot_diff == 0:
-                    # The exon entry is an exact match to the sam exon
-                    # Add the current transcript ID to the exon
-#                    exon_id = entry.obj_id
-#                    exon_obj = exon_tree.exons[exon_id]
-#                    perfect_match = exon_obj
-#                    exon_t_set = exon_obj.transcript_ids
-#                    exon_t_set.add(new_id)
-#                    break
-#            if perfect_match == None:
-                # Create a novel exon and add the transcript to it
-#                exon_tree.add_novel_exon(chromosome, start, end, strand, gene_id, new_id)
-#            transcripts[new_id].add_exon(start, end)
-        
-#            exon_num += 1
-    
-#    return novel_transcript, transcripts, genes, exon_tree
-        
+    print "Adding " + n_exons + " novel exons to database..."
+    for exon_id in novel_exon_ids.keys():
+        dset = novel_exon_ids[exon_id]
+        ba.add_exon_entry(c, dset, exontree.exons[exon_id])
 
+    # Update the database counter
+    update_g = 'UPDATE "counters" SET "novel" = ? WHERE "category" = "genes"'
+    c.execute(update_g,[counter['genes']])
+
+    update_t = 'UPDATE "counters" SET "novel" = ? WHERE "category" = "transcripts"'
+    c.execute(update_t,[counter['transcripts']])
+
+    update_e = 'UPDATE "counters" SET "novel" = ? WHERE "category" = "exons"'
+    c.execute(update_e,[counter['exons']])
+
+   
+    conn.commit()
+    conn.close() 
+    return
+
+def update_abundance_table(database, dset, abundance):
+    """ Adds a column to the provided database that contains the abundance
+        counts for each transcript observed in the dataset. """
+    pass
 
 def checkArgs(options):
     """ Makes sure that the options specified by the user are compatible with 
@@ -454,11 +424,14 @@ def main():
     for sam, d_name in zip(sam_files, dataset_list):
         print "Identifying transcripts in " + d_name + "..............."
         sam_tscripts = process_sam_file(sam)
-        gt, tscripts, et, ct, abundance = identify_sam_transcripts(sam_tscripts, 
+        # TODO: novel dicts get overwritten when more than one dataset provided
+        gt, tscripts, et, ct, abundance, novel_gene_ids, novel_transcript_ids, \
+            novel_exon_ids= identify_sam_transcripts(sam_tscripts, 
                                           gt, tscripts, et, ct, d_name, out)
-        # update_abundance_table(d_name, abundance)
+        update_abundance_table(d_name, abundance)
 
-    # update_database(gt, tscripts, et, ct) 
+    update_database(annot, gt, tscripts, et, ct, novel_gene_ids, novel_transcript_ids,
+                    novel_exon_ids) 
 
 if __name__ == '__main__':
     main()
