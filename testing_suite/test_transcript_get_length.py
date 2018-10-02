@@ -2,7 +2,7 @@ import pytest
 import sys
 sys.path.append("..")
 from transcript import *
-from exon import *
+from edge import *
 
 class TestAddExonToTranscript(object):
     def test1(self):
@@ -19,10 +19,10 @@ class TestAddExonToTranscript(object):
         e3_start = 45
         e3_end = 50
 
-        t = Transcript("t1", "transcript1", "chr1", start, end, "+", "gene1")
-        e1 = Exon("e1", "chr1", e1_start, e1_end, "+", "gene1", "t1")
-        e2 = Exon("e2", "chr1", e2_start, e2_end, "+", "gene1", "t1") 
-        e3 = Exon("e3", "chr1", e3_start, e3_end, "+", "gene1", "t1")
+        t = Transcript("t1", "chr1", start, end, "+", "gene1", None)
+        e1 = Edge("e1", "chr1", e1_start, e1_end, "+", "gene1", "t1", None)
+        e2 = Edge("e2", "chr1", e2_start, e2_end, "+", "gene1", "t1", None) 
+        e3 = Edge("e3", "chr1", e3_start, e3_end, "+", "gene1", "t1", None)
 
         t.add_exon(e1)
         t.add_exon(e2)
