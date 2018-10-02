@@ -5,48 +5,57 @@
 class Transcript(object):
     """Stores information about a gene transcript, including its location
        and constitutive exons.
-
        Attributes:
            identifier: Accession ID of transcript, i.e. an Ensembl ID. Must
            be unique.
-
            name: Human-readable name of the transcript. Does not have to be 
            unique
-
            chromosome: Chromosome that the transcript is located on 
            (format "chr1")
-
            start: The start position of the transcript with respect to the
            forward strand 
-
            end: The end position of the transcript with respect to the
            forward strand
-
            strand: "+" if the transcript is on the forward strand, and "-" if
            it is on the reverse strand
-
            gene_id: unique ID of the gene that this transcript belongs to
-
            exons: List of exon objects belonging to this transcript, in sorted
            order.
-
     """
 
-    def __init__(self, identifier, name, transcript_type, chromosome, start, 
-                 end, strand, gene_id):
+    def __init__(self, identifier, chromosome, start, end, strand, gene_id, 
+                 annotations):
 
-        self.identifier = identifier
-        self.name = name
-        self.transcript_type = transcript_type
-        self.gene_id = gene_id
+        self.identifier = str(identifier)
+        self.gene_id = str(gene_id)
 
-        self.chromosome = chromosome
+        self.chromosome = str(chromosome)
         self.start = int(start)
         self.end = int(end)
         self.strand = strand
         self.n_exons = 0
         self.exons = []
+        self.introns = []
+        self.annotations = annotations
 
+
+    def get_edge_path(self):
+        edges = self.get_all_edges()
+        if len(edges) == 0:
+            return None
+        path = [ x.identifier for x in edges]
+        return ",".join(path)
+
+    def get_all_edges(self):
+        all_edges = []
+        for i in range(0,self.n_exons):
+            all_edges.append(self.exons[i])
+            try:
+                all_edges.append(self.introns[i])
+            except:
+                pass
+            
+        return all_edges
 
     def get_length(self):
         """ Computes the length of the transcript by summing the lengths of
@@ -65,8 +74,8 @@ class Transcript(object):
         """ Returns a list of the exon coordinates in order """
         exon_coords = []
         for exon in self.exons:
-            exon_coords.append(exon.start)
-            exon_coords.append(exon.end)
+            exon_coords.append(int(exon.start))
+            exon_coords.append(int(exon.end))
         return exon_coords
 
     def add_exon(self, exon):
@@ -87,6 +96,22 @@ class Transcript(object):
         self.exons.append(exon)
         self.check_exon_validity()
         self.n_exons += 1
+        return
+
+    def add_intron(self, intron):
+        """Adds an edge object to the transcript."""
+
+        if intron.start > intron.end:
+            raise ValueError('Intron start (' + str(intron.start) + ')' + \
+                'is supposed to be before the intron end (' + str(intron.end) + ')')
+
+        # Check where in the list the intron should be added
+        for i in range(0,len(self.introns)):
+            existing_intron = self.introns[i]
+            if intron.end < existing_intron.start:
+                self.introns = self.introns[0:i] + [intron] + self.introns[i:]
+                return
+        self.introns.append(intron)
         return
                     
     def check_exon_validity(self):
@@ -114,6 +139,23 @@ class Transcript(object):
             prev = exon.end
         return
 
+    def get_introns(self):
+        """
+        Computes introns based on the exon list
+        """
+        exon_coords = self.get_exon_coords()
+        intron_list = []
+
+        i = 1
+        while (i < len(exon_coords) - 1):
+            j = i + 1
+
+            intron_list.append(exon_coords[i] + 1)
+            intron_list.append(exon_coords[j] - 1)
+            i += 2
+
+        return intron_list
+
 
     def print_transcript(self):
         """ Print a string representation of the Transcript. Good for debugging
@@ -121,11 +163,6 @@ class Transcript(object):
         transcript_id = self.identifier
         if transcript_id == None:
             transcript_id = "Transcript"
-        if self.name != None:
-            # Include name in output if there is one
-            print transcript_id + " (" + self.name + "):"
-        else:
-            print transcript_id + ":"
 
         print "\tLocation: " + self.chromosome + ":" + str(self.start) + "-" + \
               str(self.end) + "(" + self.strand + ")"
@@ -134,32 +171,70 @@ class Transcript(object):
         print "\tExons: " + "\n".join([str(x.start) + "-" + str(x.end) for x in self.exons])
         return 
 
-def get_transcript_from_db(transcript_row):
+def get_transcript_from_db(transcript_row, exon_tree, intron_tree):
     """ Uses information from a database transcript entry to create a
     Transcript object.
-
         Args:
             transcript_row: Tuple-formatted row from transcripts table of a 
             TALON database
     """
-    transcript_id = transcript_row['identifier']
-    name = transcript_row['name']
-    transcript_type = transcript_row['transcript_type']
-    chromosome = transcript_row['chromosome']
-    start = transcript_row['start']
-    end = transcript_row['end']
-    strand = transcript_row['strand']
-    gene_id = transcript_row['gene_id']
+    transcript_id = str(transcript_row['transcript_id'])
+    gene_id = str(transcript_row['gene_id'])
 
-    transcript = Transcript(transcript_id, name, transcript_type, chromosome, 
-                            start, end, strand, gene_id)
+    edges = transcript_row['path'].split(",")
+
+    # Check strand
+    sample_edge = str(edges[0])
+    strand = (exon_tree.edges[sample_edge]).strand
+
+    # Reverse the edge list if the transcript is on the - strand
+    if strand == "-":
+        edges = edges[::-1]    
+
+    # Get start and end of transcript
+    chromosome = (exon_tree.edges[edges[0]]).chromosome
+    start = (exon_tree.edges[edges[0]]).start
+    end = (exon_tree.edges[edges[-1]]).end
+
+    transcript = Transcript(transcript_id, chromosome, start, end, strand, 
+                            gene_id,{})
+
+    # Make sure that all of the exons and introns in this transcript have a 
+    # non-zero length. Otherwise, return None
+    for i in range(0,len(edges)):
+        # Even indices are exons
+        if i % 2 == 0:
+            curr_exon_id = str(edges[i])
+            if curr_exon_id not in exon_tree.edges:
+                print "Warning: Ignoring transcript with ID " + transcript_id +\
+                " because exon " + curr_exon_id + " not found in exon tree."
+                return None
+        else:
+            curr_intron_id = str(edges[i])
+            if curr_intron_id not in intron_tree.edges:
+                print "Warning: Ignoring transcript with ID " + transcript_id +\
+                " because intron " + curr_intron_id + " not found in intron tree."
+                return None
+
+    for i in range(0,len(edges)):
+        # Even indices are exons
+        if i % 2 == 0:
+            curr_exon_id = str(edges[i])
+            curr_exon = exon_tree.edges[curr_exon_id]
+            transcript.add_exon(curr_exon)
+            (curr_exon.transcript_ids).add(transcript_id)
+        else:
+            curr_intron_id = str(edges[i])
+            curr_intron = intron_tree.edges[curr_intron_id]
+            transcript.add_intron(curr_intron)
+            (curr_intron.transcript_ids).add(transcript_id)
+
     return transcript
     
 
 def get_transcript_from_gtf(transcript_info):
     """ Uses information from a GTF-formatted transcript entry to create a
     Transcript object.
-
         Args:
             transcript_info: A list containing fields from a GTF file gene 
             entry. Example:
@@ -175,30 +250,44 @@ def get_transcript_from_gtf(transcript_info):
             havana_transcript "OTTHUMT00000002844.2";
     """
     chromosome = transcript_info[0]
-    description = transcript_info[-1]
     start = int(transcript_info[3])
     end = int(transcript_info[4])
     strand = transcript_info[6]
-    transcript_type = None
 
-    name = None
-    gene_id = None
-    if "transcript_id" not in description:
+    if "transcript_id" not in transcript_info[-1]:
             raise ValueError('GTF entry lacks a transcript_id field')
-    transcript_id = (description.split("transcript_id ")[1]).split('"')[1]
+    annotations = extract_transcript_annotations_from_GTF(transcript_info)
+    gene_id = annotations['gene_id']
+    transcript_id = annotations['transcript_id']
 
-    if "transcript_name" in description:
-        name = (description.split("transcript_name ")[1]).split('"')[1]
+    transcript = Transcript(transcript_id, chromosome, start, end, strand, 
+                            gene_id, annotations)
 
-    if "gene_id" in description:
-        gene_id = (description.split("gene_id ")[1]).split('"')[1]
-
-    if "transcript_type" in description:
-        transcript_type=(description.split("transcript_type ")[1]).split('"')[1]
-
-    transcript = Transcript(transcript_id, name, transcript_type, chromosome, 
-                            start, end, strand, gene_id)
     return transcript
+
+def extract_transcript_annotations_from_GTF(tab_fields):
+    """ Extracts key-value annotations from the GTF description field
+    """
+    attributes = {}
+
+    description = tab_fields[-1].strip()
+    # Parse description
+    for pair in [x.strip() for x in description.split(";")]:
+        if pair == "": continue
+
+        pair = pair.replace('"', '')
+        key, val = pair.split()
+        attributes[key] = val
+
+    # Put in placeholders for important attributes (such as gene_id) if they
+    # are absent
+    if "gene_id" not in attributes:
+        attributes["gene_id"] = "NULL"
+
+    attributes["source"] = tab_fields[1]
+
+    return attributes    
+
 
 def get_transcript_from_exon(exon, gene_id, transcript_id):
     """ In rare cases, GTF exons are listed with gene and transcript IDs that
@@ -214,14 +303,20 @@ def get_transcript_from_exon(exon, gene_id, transcript_id):
                             strand, gene_id)
     return transcript
 
-def create_novel_transcript(chromosome, start, end, strand, gene_id, counter):
+def create_novel_transcript(chromosome, start, end, strand, gene_id, counter,
+                             exons, introns):
     """ Creates a novel transcript with a unique identifier (obtained using
         counter). Returns the transcript object as well as the updated counter.
     """
     counter["transcripts"] += 1
-    curr_novel = counter["transcripts"]
-    transcript_id = "talon-transcript_" + str(curr_novel)
-    transcript = Transcript(transcript_id, transcript_id, None, chromosome, 
-                            start, end, strand, gene_id)
-    return transcript, counter
+    transcript_id = str(counter["transcripts"])
+    
+    transcript = Transcript(transcript_id, chromosome, start, end, strand, 
+                            gene_id, None)
 
+    for exon in exons:
+        transcript.add_exon(exon)
+    for intron in introns:
+        transcript.add_intron(intron)
+
+    return transcript

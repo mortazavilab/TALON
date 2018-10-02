@@ -8,18 +8,15 @@ from gene import Gene
 class GeneTree(object):
     """ Stores locations of genes as intervals with the goal of querying them 
         for overlap.
-
         The structure is a dictionary of chromosome names, each mapped to an
         interval tree. Each interval tree is made up of intervals that map to 
         corresponding gene names.
-
         Attributes:
             chromosomes: A dictionary mapping chromosome name to an interval 
             tree containing genes that are located on that chromosome.
  
             gene_ids: A dictionary mapping the ID of every gene to its gene
             object. Also useful for detectingcollisions.
-
     """
     def __init__(self):
         self.chromosomes = {}
@@ -27,7 +24,6 @@ class GeneTree(object):
 
     def add_chromosome(self, chrom_name):
         """ Add a chromosome (with empty interval tree) to the GeneTree
-
             Args:
                 chrom_name: Name of the chromosome. This name will be used as 
                 a key to access the interval tree belonging to this chromosome.
@@ -39,14 +35,11 @@ class GeneTree(object):
         """ Adds a Gene object to the GeneTree. The gene's 
             start-end interval is added to the chromosome's interval tree, and 
             is used as a key to retrieve the gene. 
-
             All positions are 1-based.
-
             Args:
                 gene: Gene object to be added
         """
         gene_id = gene.identifier
-        gene_name = gene.name
         chromosome = gene.chromosome
         start = gene.start
         end = gene.end
@@ -72,14 +65,11 @@ class GeneTree(object):
                 start: The start position of the interval with respect to the
                 forward strand (int). Should always be less than or equal to
                 end.
-
                 end: The end position of the interval with respect to the 
                 forward strand (int). Should always be greater than or equal 
                 to start.
-
                 strand: "+" if the query interval is on the forward strand, 
                 "-" if it is on the reverse strand
-
             Returns:
                 List of genes (objects of class Gene) that overlap the query 
                 interval. 
@@ -113,6 +103,4 @@ class GeneTree(object):
             print chrom + ":"
             for gene_interval in self.chromosomes[chrom]:
                 print "\t" + str(gene_interval)
-        return               
-
-
+        return 

@@ -2,11 +2,10 @@
 # Author: Dana Wyman
 #------------------------------------------------------------------------------
 
-from exon import *
-from genetree import *
+import edge as Edge
+import genetree as GeneTree
 import re
 from transcript import *
-
 
 class SamTranscript(Transcript):
     """ Stores information about a gene transcript that comes from a sam file, 
@@ -15,44 +14,47 @@ class SamTranscript(Transcript):
   
         Attributes:
            identifier: Unique identifier for the transcript from the SAM file
-
            chromosome: Chromosome that the transcript is located on
            (format "chr1")
-
            start: The start position of the transcript with respect to the
            forward strand
-
            end: The end position of the transcript with respect to the
            forward strand
-
            strand: "+" if the transcript is on the forward strand, and "-" if
            it is on the reverse strand
-
            exons: Data structure containing at least one exon
-
-
     """
 
     def __init__(self, sam_id, chromosome, start, end, strand, introns,
-                 samFields):
-        self.identifier = sam_id
-        self.chromosome = chromosome
+                 samFields, dataset):
+        self.identifier = str(sam_id)
+        self.chromosome = str(chromosome)
         self.start = int(start)
         self.end = int(end)
         self.strand = strand
-        self.introns = introns
+        self.intron_coords = introns
         self.samFields = samFields
+        self.dataset = dataset
 
         self.name = None
         self.exons = []
+        self.introns = []
         self.n_exons = 0
  
         self.create_sam_exons()
+        self.create_sam_introns()
+
+        # Fields that will be set during TALON run
+        self.gene_ID = None
+        self.transcript_ID = None
+        self.diff_5 = None
+        self.diff_3 = None
+        novel = None
 
     def create_sam_exons(self):
         """ Uses intron coordinates and transcript start/end to create exon
             objects for the transcript """
-        introns = self.introns
+        introns = self.intron_coords
         starts = [self.start]
         ends = []
 
@@ -69,23 +71,35 @@ class SamTranscript(Transcript):
         ends.append(self.end)
 
         # Now iterate over start and end pairs and create exon objects
-        #exons = []
         ct = 1
         for s,e in zip(starts,ends):
             exon_id = None#self.identifier + "_" + str(ct)
-            exon = Exon(exon_id, self.chromosome, s, e, self.strand, 
-                        self.identifier)
+            exon = Edge.Edge(exon_id, self.chromosome, s, e, self.strand, 
+                        None, None, {})
             self.add_exon(exon)
             ct += 1
         return
-      
+     
+    def create_sam_introns(self):
+        introns = []
+        i = 0
+        while i < len(self.intron_coords):
+            s = self.intron_coords[i] - 1 # adjust to vertex-based system
+            e = self.intron_coords[i+1] + 1 # adjust to vertex-based system
+            intron = Edge.Edge(None, self.chromosome, s, e, self.strand,
+                        None, None, {})
+            introns.append(intron)
+            i += 2
+        self.introns = introns
+        return
+             
 
-def get_sam_transcript(samFields):
+def get_sam_transcript(samFields, dataset):
     """ Creates a SamTranscript object from a SAM entry.
         
         Args:
             samFields: List containing fields from a sam entry.
-
+            dataset: Name of the dataset that the sam entry comes from
         Returns:
             A SamTranscript object
     """
@@ -106,7 +120,7 @@ def get_sam_transcript(samFields):
     else:
         strand = "+" 
     sam = SamTranscript(sam_id, chromosome, start, end, strand, introns, 
-                        samFields)
+                        samFields, dataset)
     return sam
 
 
@@ -135,16 +149,12 @@ def get_introns(fields, start, cigar):
         Example jI strings:
             no introns: jI:B:i,-1
             two introns: jI:B:i,167936516,167951806,167951862,167966628
-
         Args:
             fields: List containing fields from a sam entry.
-
             start: The start position of the transcript with respect to the
             forward strand
-
             cigar: SAM CIGAR string describing match operations to the reference
             genome
-
         Returns:
             intron_list: intron starts and ends in a list (sorted order)
     """
@@ -168,13 +178,10 @@ def compute_jI(start, cigar):
         we need to compute it. This is done by stepping
             through the CIGAR string, where introns are represented by the N
             operation.
-
        start: The start position of the transcript with respect to the
             forward strand
-
        cigar: SAM CIGAR string describing match operations to the reference
        genome
-
        Returns: jI string representation of intron start and end positions.
            Example jI strings:
               no introns: jI:B:i,-1
@@ -208,7 +215,6 @@ def compute_jI(start, cigar):
 def compute_transcript_end(start, cigar):
     """ Given the start position and CIGAR string of a mapped SAM transcript,
         compute the end position in the reference genome. 
-
         Args:
             start: The start position of the transcript with respect to the
             forward strand
@@ -238,5 +244,3 @@ def split_cigar(cigar):
     counts = [int(i) for i in counts]
 
     return alignTypes, counts
-
-
