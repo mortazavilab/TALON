@@ -102,7 +102,7 @@ def try_vertex_update(edge, known_vertices, novel_ids, counter):
                     found = True
     if not found:
         counter["vertices"] += 1
-        curr_novel = counter["vertices"]
+        curr_novel = str(counter["vertices"])
         new_vertex = Vertex(curr_novel, chromosome, v1_pos, strand, gene_id)
         edge.v1 = new_vertex.identifier
         vertex_tuple = (new_vertex.identifier, gene_id, chromosome, v1_pos, 
@@ -129,7 +129,7 @@ def try_vertex_update(edge, known_vertices, novel_ids, counter):
                     found = True
     if not found:
         counter["vertices"] += 1
-        curr_novel = counter["vertices"]
+        curr_novel = str(counter["vertices"])
         new_vertex = Vertex(curr_novel, chromosome, v2_pos, strand, gene_id) 
         edge.v2 = new_vertex.identifier
         vertex_tuple = (new_vertex.identifier, gene_id, chromosome, v2_pos,
