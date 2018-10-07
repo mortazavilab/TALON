@@ -868,8 +868,6 @@ def filter_outputs_for_encode(abundances, novel_ids):
                edges = novel_ids['transcripts'][transcript_id][2]
                if gene in novel_ids['genes']:
                    verified_genes[gene] = 1
-                   print "gene_id: " + gene
-                   print "transcript_id: " + transcript_id
 
                # Whitelist the novel edges from this transcript
                for edge_id in edges.split(","):
@@ -892,12 +890,25 @@ def filter_outputs_for_encode(abundances, novel_ids):
         if vertex_id in verified_vertices:
             filtered_novel_ids['vertices'][vertex_id] = novel_ids['vertices'][vertex_id]
 
+    for start in novel_ids['observed_starts']:
+        transcript = novel_ids['observed_starts'][start][1]
+        if transcript in filtered_novel_ids['transcripts']:
+            filtered_novel_ids['observed_starts'][start] = novel_ids['observed_starts'][start]
+
+    for end in novel_ids['observed_ends']:
+        transcript = novel_ids['observed_ends'][end][1]
+        if transcript in filtered_novel_ids['transcripts']:
+            filtered_novel_ids['observed_ends'][end] = novel_ids['observed_ends'][end]
+
     pdb.set_trace()
 
     print len(filtered_novel_ids['genes'])
     print len(filtered_novel_ids['transcripts'])
     print len(filtered_novel_ids['edges'])
     print len(filtered_novel_ids['vertices'])
+    print len(filtered_novel_ids['observed_starts'])
+    print len(filtered_novel_ids['observed_ends'])
+    exit()
     return 
     
 
