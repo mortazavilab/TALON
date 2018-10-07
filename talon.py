@@ -877,7 +877,7 @@ def filter_outputs_for_encode(abundances, novel_ids):
         if transcript_is_known or len(abundances[transcript_id]) >= 2:
             filtered_abundances[transcript_id] = abundances[transcript_id]
 
-            if !(transcript_is_known):
+            if not transcript_is_known:
                filtered_novel_ids['transcripts'][transcript_id] = novel_ids['transcripts'][transcript_id]
                gene = novel_ids['transcripts'][transcript_id][1]
                edges = novel_ids['transcripts'][transcript_id][2]
