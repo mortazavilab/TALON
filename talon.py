@@ -773,7 +773,16 @@ def add_datasets(cursor, novel_ids, counter):
     return
         
 
-def batch_add_abundance(cursor, abundances, batch_size):
+def batch_add_abundance(cursor, abundance_dict, batch_size):
+
+    abundances = []   
+
+    for transcript_id in abundance_dict.keys():
+        dataset_abundances = abundance_dict[transcript_id]
+        for dataset in dataset_abundances.keys():
+            abundance_tuple = (transcript_id, dataset, dataset_abundances[dataset])
+            abundances.append(abundance_tuple)
+
     index = 0
     while index < len(abundances):
         try:
@@ -848,6 +857,8 @@ def filter_outputs_for_encode(abundances, novel_ids):
         so that only those belonging to novel transcripts observed in more
         than one biological replicate get added to the final database. """
 
+    filtered_abundances = {}
+
     filtered_novel_ids = {'datasets': {}, \
                           'genes': {}, \
                           'transcripts': {}, \
@@ -861,8 +872,12 @@ def filter_outputs_for_encode(abundances, novel_ids):
     verified_vertices = {}
 
     for transcript_id in abundances.keys():
-        if len(abundances[transcript_id]) >= 2:
-            if transcript_id in novel_ids['transcripts']:
+        transcript_is_known = transcript_id not in novel_ids['transcripts']
+
+        if transcript_is_known or len(abundances[transcript_id]) >= 2:
+            filtered_abundances[transcript_id] = abundances[transcript_id]
+
+            if !(transcript_is_known):
                filtered_novel_ids['transcripts'][transcript_id] = novel_ids['transcripts'][transcript_id]
                gene = novel_ids['transcripts'][transcript_id][1]
                edges = novel_ids['transcripts'][transcript_id][2]
@@ -892,24 +907,19 @@ def filter_outputs_for_encode(abundances, novel_ids):
 
     for start in novel_ids['observed_starts']:
         transcript = novel_ids['observed_starts'][start][1]
-        if transcript in filtered_novel_ids['transcripts']:
+        transcript_is_whitelisted = transcript in filtered_novel_ids['transcripts']
+        transcript_is_known = transcript not in novel_ids['transcripts']
+        if transcript_is_whitelisted or transcript_is_known:
             filtered_novel_ids['observed_starts'][start] = novel_ids['observed_starts'][start]
 
     for end in novel_ids['observed_ends']:
         transcript = novel_ids['observed_ends'][end][1]
-        if transcript in filtered_novel_ids['transcripts']:
+        transcript_is_whitelisted = transcript in filtered_novel_ids['transcripts']
+        transcript_is_known = transcript_id not in novel_ids['transcripts']
+        if transcript_is_whitelisted or transcript_is_known:
             filtered_novel_ids['observed_ends'][end] = novel_ids['observed_ends'][end]
 
-    pdb.set_trace()
-
-    print len(filtered_novel_ids['genes'])
-    print len(filtered_novel_ids['transcripts'])
-    print len(filtered_novel_ids['edges'])
-    print len(filtered_novel_ids['vertices'])
-    print len(filtered_novel_ids['observed_starts'])
-    print len(filtered_novel_ids['observed_ends'])
-    exit()
-    return 
+    return filtered_abundances, filtered_novel_ids 
     
 
 
@@ -1030,22 +1040,19 @@ def main():
                                  exon_tree, intron_tree, vertices, counter, 
                                  d_name, novel_ids, abundances)
         
-        #print "Computing transcript abundances for " + d_name + "..............."
-        #all_abundances += compute_abundances(sam_transcripts, d_name) 
         all_sam_transcripts += sam_transcripts 
 
     print "Writing SAM and summary file outputs..............."
 
     if options.encode_mode:
-        filter_outputs_for_encode(abundances, novel_ids)
-    else:
-        write_outputs(all_sam_transcripts, out)
+        abundances, novel_ids = filter_outputs_for_encode(abundances, novel_ids)
+    write_outputs(all_sam_transcripts, out)
 
-    # Update database and write outputs
-    #print "Updating TALON database.................."
-    #batch_size = 10000
-    #update_database(annot, dataset_list, annot_transcripts, counter,
-    #                novel_ids, all_abundances, batch_size, build)
+    # Update database
+    print "Updating TALON database.................."
+    batch_size = 10000
+    update_database(annot, dataset_list, annot_transcripts, counter,
+                    novel_ids, abundances, batch_size, build)
 
 if __name__ == '__main__':
     main()
