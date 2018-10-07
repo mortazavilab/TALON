@@ -33,6 +33,11 @@ def getOptions():
     parser.add_option("--o", dest = "outfile",
         help = "Outfile name",
         metavar = "FILE", type = "string")
+    parser.add_option("--encode", dest ="encode_mode", action='store_true',
+                      help = "If this option is set, TALON will require novel \
+                      transcripts to be corroborated by a biological replicate \
+                      in order to be added to the database.")
+
     
     (options, args) = parser.parse_args()
     return options
@@ -237,7 +242,8 @@ def process_sam_file(sam_file, dataset):
     return sam_transcripts
 
 def identify_sam_transcripts(sam_transcripts, gene_tree, transcripts, exon_tree, 
-                             intron_tree, vertices, counter, dataset, novel_ids):
+                             intron_tree, vertices, counter, dataset, 
+                             novel_ids, abundance):
     """ Assign each sam transcript an annotated or a novel transcript identity
         Returns:
             Modified versions of gene_tree, transcripts, exon_tree, counter to
@@ -247,9 +253,6 @@ def identify_sam_transcripts(sam_transcripts, gene_tree, transcripts, exon_tree,
     """
 
     for sam_transcript in sam_transcripts:
-        #if counter['genes'] > 47518:
-        #    print counter['genes']
-        #    exit()
         print sam_transcript.identifier
         chromosome = sam_transcript.chromosome
         start = sam_transcript.start
@@ -271,11 +274,7 @@ def identify_sam_transcripts(sam_transcripts, gene_tree, transcripts, exon_tree,
         # If there is no full match, a novel transcript must be created
         else:
             sam_transcript.novel = "Novel"
-            # Find out which gene the novel transcript comes from. 
-            #if match_type == "partial":
-            #    sam_transcript.gene_ID = best_match.gene_id
 
-            #else:
             # Search for gene using transcript coordinates
             gene_match_id = Vertex.search_for_gene(sam_transcript, vertices)     
 
@@ -310,6 +309,16 @@ def identify_sam_transcripts(sam_transcripts, gene_tree, transcripts, exon_tree,
         get_transcript_start_and_end_diffs(sam_transcript, annot_transcript,
                                        vertices, dataset, counter, novel_ids)    
 
+        # Add transcript observation to abundance dict
+        if annot_transcript.identifier in abundance:
+            try:
+                abundance[annot_transcript.identifier][dataset] += 1
+            except:
+                abundance[annot_transcript.identifier][dataset] = 1
+        else:
+            abundance[annot_transcript.identifier] = {}
+            abundance[annot_transcript.identifier][dataset] = 1
+            
     return
 
 def get_transcript_start_and_end_diffs(sam_transcript, annot_transcript, 
@@ -504,7 +513,7 @@ def update_database(database, datasets, transcripts, counter, novel_ids,
 
     # Before actually committing the changes to the database, perform a 
     # set of validity checks as a safeguard
-    check_database_integrity(cursor)
+    #check_database_integrity(cursor)
 
     conn.commit()
     conn.close() 
@@ -833,6 +842,66 @@ def write_outputs(sam_transcripts, outprefix):
     out_txt.close()
     return
 
+def filter_outputs_for_encode(abundances, novel_ids):
+    """ This function only gets run if 'encode' mode is enabled. It filters
+        novel genes, transcripts, edges, vertices, and observed starts/stops
+        so that only those belonging to novel transcripts observed in more
+        than one biological replicate get added to the final database. """
+
+    filtered_novel_ids = {'datasets': {}, \
+                          'genes': {}, \
+                          'transcripts': {}, \
+                          'edges': {}, \
+                          'vertices': {}, \
+                          'observed_starts': {}, \
+                          'observed_ends': {}}
+
+    verified_genes = {}
+    verified_edges = {}
+    verified_vertices = {}
+
+    for transcript_id in abundances.keys():
+        if len(abundances[transcript_id]) >= 2:
+            if transcript_id in novel_ids['transcripts']:
+               filtered_novel_ids['transcripts'][transcript_id] = novel_ids['transcripts'][transcript_id]
+               gene = novel_ids['transcripts'][transcript_id][1]
+               edges = novel_ids['transcripts'][transcript_id][2]
+               if gene in novel_ids['genes']:
+                   verified_genes[gene] = 1
+                   print "gene_id: " + gene
+                   print "transcript_id: " + transcript_id
+
+               # Whitelist the novel edges from this transcript
+               for edge_id in edges.split(","):
+                   if edge_id in novel_ids['edges']:
+                       verified_edges[edge_id] = 1
+                       v1 = novel_ids['edges'][edge_id][1]
+                       v2 = novel_ids['edges'][edge_id][2]
+                       verified_vertices[v1] = 1
+                       verified_vertices[v2] = 1
+
+    for gene_id in novel_ids['genes']:
+        if gene_id in verified_genes:
+            filtered_novel_ids['genes'][gene_id] = novel_ids['genes'][gene_id]
+
+    for edge_id in novel_ids['edges']:
+        if edge_id in verified_edges:
+            filtered_novel_ids['edges'][edge_id] = novel_ids['edges'][edge_id]
+        
+    for vertex_id in novel_ids['vertices']:
+        if vertex_id in verified_vertices:
+            filtered_novel_ids['vertices'][vertex_id] = novel_ids['vertices'][vertex_id]
+
+    pdb.set_trace()
+
+    print len(filtered_novel_ids['genes'])
+    print len(filtered_novel_ids['transcripts'])
+    print len(filtered_novel_ids['edges'])
+    print len(filtered_novel_ids['vertices'])
+    return 
+    
+
+
 def checkArgs(options):
     """ Makes sure that the options specified by the user are compatible with 
         each other """
@@ -889,6 +958,15 @@ def checkArgs(options):
                 sam_files.append(line[3])
 
     conn.close()
+
+    # If the 'encode' flag is set, then the config file is required to have
+    # at least two datasets in it (biological replicates)
+    if options.encode_mode:
+        if len(sam_files) < 2:
+            raise ValueError("When running TALON with 'encode' mode enabled,"+ \
+                             " you must provide two or more biological " + \
+                             "replicates in the config file.")
+
     return sam_files, dataset_metadata
 
 def main():
@@ -921,7 +999,7 @@ def main():
                  'observed_ends': {}}
                  
     all_sam_transcripts = []
-    all_abundances = []
+    abundances = {}
     
     # Identify input sam transcripts
     for sam, d_metadata in zip(sam_files, dataset_list):
@@ -939,20 +1017,24 @@ def main():
             print "Warning: no transcripts detected in file " + sam
         identify_sam_transcripts(sam_transcripts, gene_tree, annot_transcripts, 
                                  exon_tree, intron_tree, vertices, counter, 
-                                 d_name, novel_ids)
+                                 d_name, novel_ids, abundances)
         
-        print "Computing transcript abundances for " + d_name + "..............."
-        all_abundances += compute_abundances(sam_transcripts, d_name) 
+        #print "Computing transcript abundances for " + d_name + "..............."
+        #all_abundances += compute_abundances(sam_transcripts, d_name) 
         all_sam_transcripts += sam_transcripts 
 
-    # Update database and write outputs
-    print "Updating TALON database.................."
-    batch_size = 10000
-    update_database(annot, dataset_list, annot_transcripts, counter, 
-                    novel_ids, all_abundances, batch_size, build) 
-
     print "Writing SAM and summary file outputs..............."
-    write_outputs(all_sam_transcripts, out)
+
+    if options.encode_mode:
+        filter_outputs_for_encode(abundances, novel_ids)
+    else:
+        write_outputs(all_sam_transcripts, out)
+
+    # Update database and write outputs
+    #print "Updating TALON database.................."
+    #batch_size = 10000
+    #update_database(annot, dataset_list, annot_transcripts, counter,
+    #                novel_ids, all_abundances, batch_size, build)
 
 if __name__ == '__main__':
     main()
