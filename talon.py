@@ -35,8 +35,8 @@ def getOptions():
         metavar = "FILE", type = "string")
     parser.add_option("--encode", dest ="encode_mode", action='store_true',
                       help = "If this option is set, TALON will require novel \
-                      transcripts to be corroborated by a biological replicate \
-                      in order to be added to the database.")
+                      transcripts to be corroborated by at least one other dataset \
+                      in order to be included in the output file.")
 
     
     (options, args) = parser.parse_args()
@@ -396,7 +396,6 @@ def make_novel_transcript(sam_transcript, transcripts, edge_matches, exon_tree,
         # it is necessary to create a new edge if the match comes from a 
         # different gene
         match_gene_id = None        
-        #edge_obj = None
 
         if edge_match in edge_tree.edges:
             edge_obj = edge_tree.edges[edge_match]
@@ -411,7 +410,8 @@ def make_novel_transcript(sam_transcript, transcripts, edge_matches, exon_tree,
             novel_ids["edges"][edge_obj.identifier] = (edge_obj.identifier, 
                                                        edge_obj.v1,
                                                        edge_obj.v2,
-                                                       edge_type)
+                                                       edge_type, 
+                                                       dataset)
                                                               
             edge_obj.transcript_ids.add(novel_transcript_id)
             edge_tree.add_edge(edge_obj)
@@ -653,7 +653,15 @@ def batch_add_transcripts(cursor, novel_ids, batch_size):
 
 def batch_add_edges(cursor, novel_ids, batch_size):
 
-    edge_entries = novel_ids['edges'].values()
+    edge_tuples = novel_ids['edges'].values()
+    edge_entries = []
+    exon_annotations = []
+
+    for entry in edge_tuples:
+        edge_entries.append(entry[0:4])
+        if entry[-2] == "exon":
+            exon_annotations.append((entry[0], "talon_run", entry[-1],
+                                       "exon_status", "NOVEL"))
 
     index = 0
     while index < len(edge_entries):
@@ -670,7 +678,25 @@ def batch_add_edges(cursor, novel_ids, batch_size):
             cursor.executemany(command, batch)
 
         except Exception as e:
-            print(e)   
+            print(e)
+
+    index = 0
+    while index < len(exon_annotations):
+        try:
+            annot_batch = exon_annotations[index:index + batch_size]
+        except:
+            annot_batch = exon_annotations[index:]
+        index += batch_size
+
+        try:
+            cols = " (" + ", ".join([str_wrap_double(x) for x in
+                   ["ID", "annot_name", "source", "attribute", "value"]]) + ") "
+            command = 'INSERT INTO "exon_annotations"' + cols + \
+                      "VALUES " + '(?,?,?,?,?)'
+            cursor.executemany(command, annot_batch)
+
+        except Exception as e:
+            print(e)
 
     return
 
@@ -851,6 +877,170 @@ def write_outputs(sam_transcripts, outprefix):
     out_txt.close()
     return
 
+def write_abundance_file(transcripts, abundances, novel_ids, annot, datasets, 
+                         outprefix):
+    """ Create a tab-delimited summary file that lists the number of times
+        each transcript was observed in each dataset from the run"""
+
+    dataset_names = [ x[0] for x in datasets ]
+    out_txt = open(outprefix + "_talon_abundance.tsv", 'w')
+    columns = ["gene_ID", 
+               "transcript_ID",
+               "gene_name",
+               "transcript_name",
+               "gene_annotated",
+               "gene_discovery_dataset", 
+               "transcript_annotated",
+               "transcript_discovery_dataset",
+               "transcript_match_type",
+               "n_exons"] + dataset_names
+    out_txt.write("\t".join(columns) + "\n")
+
+    # Using the database, get the annotation status of each gene and transcript
+    gene_status = get_annotation_status_dict(annot, "gene")
+    transcript_status = get_annotation_status_dict(annot, "transcript")
+    exon_status = get_annotation_status_dict(annot, "exon")
+
+    # Using the database, get the human-readable name of each gene and transcript
+    gene_names = get_readable_name_dict(annot, "gene")
+    transcript_names = get_readable_name_dict(annot, "transcript")
+
+    for transcript_ID in abundances.keys():
+        gene_ID = transcripts[transcript_ID].gene_id
+        n_exons = str(len(transcripts[transcript_ID].exons))
+        gene_transcript_info = get_transcript_info(transcript_ID, gene_ID, 
+                                              gene_status, transcript_status)
+
+        # Unpack info
+        gene_annotated = gene_transcript_info[0]
+        gene_discovery_dataset = gene_transcript_info[1]
+        transcript_annotated = gene_transcript_info[2]
+        transcript_discovery_dataset = gene_transcript_info[3] 
+
+        # Get the type of transcript match
+        match_type = get_match_type(transcripts[transcript_ID], gene_annotated,
+                                    transcript_annotated, exon_status)
+
+        # Get the gene and transcript names
+        try:
+            gene_name = gene_names[gene_ID]
+        except:
+            gene_name = "NA"
+        try:
+            transcript_name = transcript_names[transcript_ID]
+        except:
+            transcript_name = "NA"
+
+        counts_by_dataset = abundances[transcript_ID]
+        all_counts = []
+        for dataset in dataset_names:
+            if dataset in counts_by_dataset:
+                count = counts_by_dataset[dataset]
+            else:
+                count = 0
+            all_counts.append(str(count))
+
+        output = [gene_ID, transcript_ID, gene_name, transcript_name] + \
+                  gene_transcript_info + [match_type, n_exons] + all_counts
+       
+        out_txt.write("\t".join(output) + "\n")
+
+    out_txt.close()
+    return         
+
+def get_match_type(transcript, gene_annotated, transcript_annotated, exon_status):
+
+    if transcript_annotated == "KNOWN":
+        match_type = "full_match"
+    else:
+        if gene_annotated == "KNOWN":
+            transcript_exons = transcript.exons
+            exon_known = [ exon_status[x.identifier][0] for x in transcript_exons]
+            if all([ x == "KNOWN" for x in exon_known]):
+                match_type = "known_exons"
+            else:
+                match_type = "novel_exons"
+        elif gene_annotated == "NOVEL":
+            match_type = "novel_gene"
+        else:
+            match_type = "NA"
+    return match_type
+
+def get_transcript_info(transcript_ID, gene_ID, gene_status, transcript_status):
+    """ Look up annotation info about the provided transcript and gene IDs. 
+        If not found, set values to NA """
+
+    try:
+        gene_annotated = gene_status[gene_ID][0]
+        gene_discovery_dataset = gene_status[gene_ID][1]
+    except:
+        gene_annotated = "NA"
+        gene_discovery_dataset = "NA"
+
+    try:
+        transcript_annotated = transcript_status[transcript_ID][0]
+        transcript_discovery_dataset = transcript_status[transcript_ID][1]
+    except:
+        transcript_annotated = "NA"
+        transcript_discovery_dataset = "NA"
+
+    return [gene_annotated, gene_discovery_dataset, transcript_annotated, 
+            transcript_discovery_dataset]
+
+def get_readable_name_dict(database, cat_type):
+    """ Query the provided database and return a dictionary as follows:
+            ID of gene or transcript -> [ KNOWN/NOVEL, SOURCE]
+        The 'cat_type' variable should be either 'gene' or 'transcript',
+        indicating which table to query. """
+
+    annotation_names = {}
+
+    conn = sqlite3.connect(database)
+    cursor = conn.cursor()
+
+    query = "SELECT * FROM " + cat_type + "_annotations WHERE attribute = '" + cat_type + "_name'"
+    cursor.execute(query)
+    annot_names = cursor.fetchall()
+
+    for result in annot_names:
+        ID = str(result[0])
+        name = result[-1]
+        annotation_names[ID] = name
+
+    conn.close()
+    return annotation_names
+
+def get_annotation_status_dict(database, cat_type):
+    """ Query the provided database and return a dictionary as follows:
+            ID of gene or transcript -> [ KNOWN/NOVEL, SOURCE]
+        The 'cat_type' variable should be either 'gene' or 'transcript',
+        indicating which table to query. """
+
+    annotation_status = {}
+
+    conn = sqlite3.connect(database)
+    cursor = conn.cursor()
+
+    query = "SELECT * FROM " + cat_type + "_annotations WHERE attribute = '" + cat_type + "_status'"
+    cursor.execute(query)
+    annot_status = cursor.fetchall()
+   
+    for result in annot_status:
+        ID = str(result[0])
+        annotation = result[-1]
+        source = result[2]
+
+        if ID not in annotation_status:
+            annotation_status[ID] = [annotation, source]
+        else:
+            if annotation_status[ID][0] == "KNOWN":
+                continue
+            else:
+                annotation_status[ID] = [annotation, source]
+
+    conn.close()
+    return annotation_status  
+
 def filter_outputs_for_encode(abundances, novel_ids):
     """ This function only gets run if 'encode' mode is enabled. It filters
         novel genes, transcripts, edges, vertices, and observed starts/stops
@@ -982,11 +1172,11 @@ def checkArgs(options):
 
     # If the 'encode' flag is set, then the config file is required to have
     # at least two datasets in it (biological replicates)
-    if options.encode_mode:
-        if len(sam_files) < 2:
-            raise ValueError("When running TALON with 'encode' mode enabled,"+ \
-                             " you must provide two or more biological " + \
-                             "replicates in the config file.")
+    #if options.encode_mode:
+    #    if len(sam_files) < 2:
+    #        raise ValueError("When running TALON with 'encode' mode enabled,"+ \
+    #                         " you must provide two or more biological " + \
+    #                         "replicates in the config file.")
 
     return sam_files, dataset_metadata
 
@@ -1042,17 +1232,20 @@ def main():
         
         all_sam_transcripts += sam_transcripts 
 
-    print "Writing SAM and summary file outputs..............."
-
-    if options.encode_mode:
-        abundances, novel_ids = filter_outputs_for_encode(abundances, novel_ids)
-    write_outputs(all_sam_transcripts, out)
-
     # Update database
     print "Updating TALON database.................."
     batch_size = 10000
     update_database(annot, dataset_list, annot_transcripts, counter,
                     novel_ids, abundances, batch_size, build)
+
+    print "Writing SAM and summary file outputs..............."
+    if options.encode_mode:
+        abundances, novel_ids = filter_outputs_for_encode(abundances, novel_ids)
+
+    write_outputs(all_sam_transcripts, out)
+    write_abundance_file(annot_transcripts, abundances, novel_ids, annot, 
+                         dataset_list, out)
+
 
 if __name__ == '__main__':
     main()
