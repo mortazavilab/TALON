@@ -513,7 +513,7 @@ def update_database(database, datasets, transcripts, counter, novel_ids,
 
     # Before actually committing the changes to the database, perform a 
     # set of validity checks as a safeguard
-    #check_database_integrity(cursor)
+    check_database_integrity(cursor)
 
     conn.commit()
     conn.close() 
