@@ -959,7 +959,7 @@ def get_match_type(transcript, gene_annotated, transcript_annotated, exon_status
                 if exon.identifier in exon_status:
                     exon_known.append(exon_status[exon.identifier][0])
                 else:
-                    exon_known.append(False)
+                    exon_known.append("AMBIGUOUS")
 
             if all([ x == "KNOWN" for x in exon_known]):
                 match_type = "known_exons"
@@ -1046,11 +1046,11 @@ def get_annotation_status_dict(database, cat_type):
     conn.close()
     return annotation_status  
 
-def filter_outputs_for_encode(abundances, novel_ids):
+def filter_outputs_for_encode(curr_run_abundances, novel_ids, database):
     """ This function only gets run if 'encode' mode is enabled. It filters
         novel genes, transcripts, edges, vertices, and observed starts/stops
         so that only those belonging to novel transcripts observed in more
-        than one biological replicate get added to the final database. """
+        than one dataset get added to the final database. """
 
     filtered_abundances = {}
 
@@ -1065,12 +1065,32 @@ def filter_outputs_for_encode(abundances, novel_ids):
     verified_genes = {}
     verified_edges = {}
     verified_vertices = {}
+    database_abundances = {}
 
-    for transcript_id in abundances.keys():
-        transcript_is_known = transcript_id not in novel_ids['transcripts']
+    # Find out how many datasets every transcript has been seen in
+    conn = sqlite3.connect(database)
+    cursor = conn.cursor()
+    query = "SELECT transcript_ID FROM abundance"
+    cursor.execute(query)
+    
+    for transcript_id in cursor.fetchall():
+        try:
+            database_abundances[transcript_id] += 1
+        except:
+            database_abundances[transcript_id] = 1
+    conn.close()
 
-        if transcript_is_known or len(abundances[transcript_id]) >= 2:
-            filtered_abundances[transcript_id] = abundances[transcript_id]
+    # Get novel/known status of transcripts
+    transcript_status = get_annotation_status_dict(database, "transcript")
+
+    for transcript_id in curr_run_abundances.keys():
+        try:
+            transcript_is_known = transcript_status[transcript_id][0] == "KNOWN"
+        except:
+            transcript_is_known = False
+
+        if transcript_is_known or database_abundances[transcript_id] >= 2:
+            filtered_abundances[transcript_id] = curr_run_abundances[transcript_id]
 
             if not transcript_is_known:
                filtered_novel_ids['transcripts'][transcript_id] = novel_ids['transcripts'][transcript_id]
