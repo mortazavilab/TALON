@@ -1093,7 +1093,7 @@ def filter_outputs_for_encode(curr_run_abundances, novel_ids, database):
         if transcript_is_known or database_abundances[transcript_id] >= 2:
             filtered_abundances[transcript_id] = curr_run_abundances[transcript_id]
 
-            if not transcript_is_known:
+            if not transcript_is_known and transcript_id in novel_ids['transcripts']:
                filtered_novel_ids['transcripts'][transcript_id] = novel_ids['transcripts'][transcript_id]
                gene = novel_ids['transcripts'][transcript_id][1]
                edges = novel_ids['transcripts'][transcript_id][2]
