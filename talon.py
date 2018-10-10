@@ -1074,6 +1074,7 @@ def filter_outputs_for_encode(curr_run_abundances, novel_ids, database):
     cursor.execute(query)
     
     for transcript_id in cursor.fetchall():
+        transcript_id = str(transcript_id[0])
         try:
             database_abundances[transcript_id] += 1
         except:
@@ -1265,7 +1266,8 @@ def main():
 
     print "Writing SAM and summary file outputs..............."
     if options.encode_mode:
-        abundances, novel_ids = filter_outputs_for_encode(abundances, novel_ids)
+        abundances, novel_ids = filter_outputs_for_encode(abundances, novel_ids, 
+                                                          annot)
 
     write_outputs(all_sam_transcripts, out)
     write_abundance_file(annot_transcripts, abundances, novel_ids, annot, 
