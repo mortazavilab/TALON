@@ -954,8 +954,13 @@ def get_match_type(transcript, gene_annotated, transcript_annotated, exon_status
         match_type = "full_match"
     else:
         if gene_annotated == "KNOWN":
-            transcript_exons = transcript.exons
-            exon_known = [ exon_status[x.identifier][0] for x in transcript_exons]
+            exon_known = []
+            for exon in transcript.exons:
+                if exon.identifier in exon_status:
+                    exon_known.append(exon_status[exon.identifier][0])
+                else:
+                    exon_known.append(False)
+
             if all([ x == "KNOWN" for x in exon_known]):
                 match_type = "known_exons"
             else:
