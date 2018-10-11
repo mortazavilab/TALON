@@ -241,7 +241,7 @@ def process_sam_file(sam_file, dataset):
                 sam_transcripts.append(sam_transcript)
             except:
                 print "An error occurred while processing sam transcript " + \
-                      sam[0] ". Will skip this transcript."
+                      sam[0] + ". Will skip this transcript."
         
     return sam_transcripts
 
