@@ -238,7 +238,7 @@ def process_sam_file(sam_file, dataset):
             
             sam_transcript = SamTranscript.get_sam_transcript(sam, dataset)
             sam_transcripts.append(sam_transcript)
-
+        
     return sam_transcripts
 
 def identify_sam_transcripts(sam_transcripts, gene_tree, transcripts, exon_tree, 

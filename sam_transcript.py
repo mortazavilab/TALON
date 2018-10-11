@@ -57,7 +57,7 @@ class SamTranscript(Transcript):
         introns = self.intron_coords
         starts = [self.start]
         ends = []
-
+     
         # First, compute exon coordinates and put starts and ends in lists
         for i in range(0,len(introns)):
             if i % 2 == 0:
@@ -72,9 +72,9 @@ class SamTranscript(Transcript):
 
         # Now iterate over start and end pairs and create exon objects
         ct = 1
-        for s,e in zip(starts,ends):
-            exon_id = None#self.identifier + "_" + str(ct)
-            exon = Edge.Edge(exon_id, self.chromosome, s, e, self.strand, 
+        for curr_start,curr_end in zip(starts,ends):
+            exon_id = None
+            exon = Edge.Edge(exon_id, self.chromosome, curr_start, curr_end, self.strand, 
                         None, None, {})
             self.add_exon(exon)
             ct += 1
@@ -229,7 +229,7 @@ def compute_transcript_end(start, cigar):
 
     ops, counts = split_cigar(cigar)
     for op,ct in zip(ops, counts):
-        if op in ["M", "N", "D"]:
+        if op in ["H", "M", "N", "D"]:
             end += ct
 
     return end - 1

@@ -82,8 +82,8 @@ class Transcript(object):
         """Adds an exon object to the transcript."""
 
         if exon.start > exon.end:
-            raise ValueError('Exon start (' + str(exon_start) + ')' + \
-                'is supposed to be before the exon end (' + str(exon_end) + ')')
+            raise ValueError('Exon start (' + str(exon.start) + ') ' + \
+                'is supposed to be before the exon end (' + str(exon.end) + ')')
 
         # Check where in the list the exon should be added
         for i in range(0,len(self.exons)):
