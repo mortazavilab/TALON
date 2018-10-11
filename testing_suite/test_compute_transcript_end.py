@@ -36,3 +36,13 @@ class TestComputeTranscriptEnd(object):
                 "1444N87M228N328M18393N139M1830N157M630N89M1892N106M6907N420M"
         
         assert compute_transcript_end(start, cigar) == 168075790
+
+    def test_softClipping_atEnd(self):
+        """ This example (from transcript m54284_180611_122744/21037936/24_2799_CCS in
+            /share/samdata/dwyman/D1/TC_v1.0.5/sorted_canonical.sam) is on the
+            minus strand and contains soft clipping at the end"""
+
+        start = 152673671
+        cigar = "36M2698N375M671N25M1580N54M242N121M1753N111M9625N6M45I3581N81M21372N133M1810S"
+
+        assert compute_transcript_end(start, cigar) == 152716134 
