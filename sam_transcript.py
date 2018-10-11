@@ -33,6 +33,7 @@ class SamTranscript(Transcript):
         self.end = int(end)
         self.strand = strand
         self.intron_coords = introns
+
         self.samFields = samFields
         self.dataset = dataset
 
@@ -123,24 +124,6 @@ def get_sam_transcript(samFields, dataset):
                         samFields, dataset)
     return sam
 
-
-#def get_exons(start, end, introns):
-#    """ Transforms intron coordinates and adds in start and end to create
-#        a list representing the exon starts and ends in the transcript."""
-    
-#    exons = [start]
-#    for i in range(0,len(introns)):
-#        if i % 2 == 0:
-            # This is an intron start, i.e. an exon end. Subtract 1 to get the
-            # exon base
-#            exons.append(introns[i] - 1)
-#        else:
-            # This is an intron end, i.e. an exon start. Add 1 to get the
-            # exon base
-#            exons.append(introns[i] + 1)
-#    exons.append(end)
-#    return exons
-    
 
 def get_introns(fields, start, cigar):
     """ Locates the jI field in a list of SAM fields or computes

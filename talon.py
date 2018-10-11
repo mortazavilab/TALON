@@ -236,8 +236,12 @@ def process_sam_file(sam_file, dataset):
             if len(sam[9]) < 300:
                 continue
             
-            sam_transcript = SamTranscript.get_sam_transcript(sam, dataset)
-            sam_transcripts.append(sam_transcript)
+            try: 
+                sam_transcript = SamTranscript.get_sam_transcript(sam, dataset)
+                sam_transcripts.append(sam_transcript)
+            except:
+                print "An error occurred while processing sam transcript " + \
+                      sam[0] ". Will skip this transcript."
         
     return sam_transcripts
 
