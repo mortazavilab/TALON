@@ -1267,7 +1267,7 @@ def main():
         all_sam_transcripts += sam_transcripts 
 
     # Update database
-    if options.noUpdate == False:
+    if options.noUpdate == None:
         print "Updating TALON database.................."
         batch_size = 10000
         update_database(annot, dataset_list, annot_transcripts, counter,
