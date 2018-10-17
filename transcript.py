@@ -44,6 +44,10 @@ class Transcript(object):
         if len(edges) == 0:
             return None
         path = [ x.identifier for x in edges]
+
+        # Must reverse the path if the transcript is on the '-' strand
+        if self.strand == "-":
+            path = path[::-1]
         return ",".join(path)
 
     def get_all_edges(self):
@@ -127,6 +131,10 @@ class Transcript(object):
                 raise ValueError('Invalid exon in transcript ' + \
                       self.identifier + ': wrong chromosome')
             if exon.start < self.start or exon.end > self.end:
+                print "self.start: " + str(self.start)
+                print "self.end: " + str(self.end)
+                print "exon.start: " + str(exon.start)
+                print "exon.end: " + str(exon.end)
                 raise ValueError('Invalid exon in transcript ' + \
                       self.identifier + ': (' + str(exon.start) + "-" + \
                       str(exon.end) + \

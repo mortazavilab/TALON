@@ -37,6 +37,9 @@ def getOptions():
                       help = "If this option is set, TALON will require novel \
                       transcripts to be corroborated by at least one other dataset \
                       in order to be included in the output file.")
+    parser.add_option("--noUpdate", dest ="noUpdate", action='store_true',
+                      help = "If this option is set, the database will not be updated.\
+                             Typically this is not used.")
 
     
     (options, args) = parser.parse_args()
@@ -867,6 +870,7 @@ def write_outputs(sam_transcripts, outprefix):
         start = str(transcript.start)
         end = str(transcript.end)
         strand = transcript.strand
+        length = str(transcript.get_length()) 
         diff_5 = str(transcript.diff_5)
         diff_3 = str(transcript.diff_3)
         dataset = str(transcript.dataset)
@@ -874,7 +878,7 @@ def write_outputs(sam_transcripts, outprefix):
         try:
             out_txt.write("\t".join([dataset, transcript.identifier, \
                      chromosome, start, end, strand, gene_id, transcript_id, \
-                     annotation, diff_5, diff_3]) + "\n") 
+                     annotation, length, diff_5, diff_3]) + "\n") 
         except Exception as e: 
             print(e)
             
@@ -1189,7 +1193,7 @@ def checkArgs(options):
 
             metadata = (line[0], line[1], line[2])
             dataname = metadata[0]
-            if dataname in existing_datasets:
+            if dataname in existing_datasets and options.noUpdate == False:
                 print "Ignoring dataset with name '" + dataname + "' because"+\
                       " it is already in the database."
             else:
@@ -1263,10 +1267,11 @@ def main():
         all_sam_transcripts += sam_transcripts 
 
     # Update database
-    print "Updating TALON database.................."
-    batch_size = 10000
-    update_database(annot, dataset_list, annot_transcripts, counter,
-                    novel_ids, abundances, batch_size, build)
+    if options.noUpdate == False:
+        print "Updating TALON database.................."
+        batch_size = 10000
+        update_database(annot, dataset_list, annot_transcripts, counter,
+                        novel_ids, abundances, batch_size, build)
 
     print "Writing SAM and summary file outputs..............."
     if options.encode_mode:
