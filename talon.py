@@ -859,7 +859,7 @@ def write_outputs(sam_transcripts, outprefix):
 
     out_txt.write("\t".join(["dataset", "read_ID", "chromosome", "start", "end",
                        "strand", "gene_id", "transcript_id",
-                       "annotation_status", "diff_5", "diff_3"]) + "\n") 
+                       "annotation_status", "length", "diff_5", "diff_3"]) + "\n") 
 
     for transcript in sam_transcripts:
         gene_id = transcript.gene_ID

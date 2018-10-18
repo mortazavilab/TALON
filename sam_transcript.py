@@ -75,6 +75,9 @@ class SamTranscript(Transcript):
         ct = 1
         for curr_start,curr_end in zip(starts,ends):
             exon_id = None
+            if curr_start == curr_end:
+                raise ValueError("Transcript " + self.identifier + \
+                                 "has exon of length zero.")
             exon = Edge.Edge(exon_id, self.chromosome, curr_start, curr_end, self.strand, 
                         None, None, {})
             self.add_exon(exon)
