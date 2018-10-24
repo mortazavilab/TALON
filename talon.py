@@ -283,7 +283,16 @@ def identify_sam_transcripts(sam_transcripts, gene_tree, transcripts, exon_tree,
             sam_transcript.novel = "Novel"
 
             # Search for gene using transcript coordinates
-            gene_match_id = Vertex.search_for_gene(sam_transcript, vertices)     
+            if sam_transcript.n_exons == 1:
+                # For single-exon transcripts, assign to the gene of the 
+                # best partial match
+                try:
+                    gene_match_id = best_match.gene_id
+                except: gene_match_id = None
+
+            else:
+                gene_match_id = Vertex.search_for_gene(sam_transcript, vertices)     
+            
 
             if gene_match_id == None:
                 match_type = "None"
