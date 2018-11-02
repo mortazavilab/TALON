@@ -10,6 +10,23 @@ Requires:
 
 ## How to run
 
+### Initializing a TALON database
+The first step in using TALON is to initialize a database from the GTF annotation of your choice (i.e. GENCODE). This step is done using initialize_talon_database.py, and only needs to be performed once.  
+
+```
+Usage: initialize_talon_database.py [options]
+
+Options:
+  -h, --help           Show help message and exit
+  --f                  GTF annotation file
+  --a                  The name of the annotation (for metadata purposes)
+  --g                  The name of the reference genome build that the annotation describes. Use a short and memorable name since you will need to specify the genome build when you run TALON later.
+  --o                  Output prefix for the database
+```
+
+### Running TALON
+Now that you've initilialized your database, you're ready to annotate long read datasets using TALON. 
+
 ```
 Usage: talon.py [options]
 
