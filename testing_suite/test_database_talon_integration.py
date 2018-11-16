@@ -21,11 +21,11 @@ class TestDatabaseTalonIntegration(object):
         except Exception as e:
             pytest.fail("Database initialization failed on KRT17 test")
 
+    @pytest.mark.incremental
     def test_TALON_simple_run(self):
         """ Once the database has been initialized, try running TALON on a 
             single SAM transcript (that we know matches KRT17-001). First,
-            establish that TALON ran without crashing, then test the correctness
-            of the database update and transcript annotation. """
+            establish that TALON runs without crashing."""
 
         try:
              subprocess.check_output(
@@ -37,4 +37,10 @@ class TestDatabaseTalonIntegration(object):
         except:
             pytest.fail("TALON trial 1 failed on KRT17 test")
 
+    @pytest.mark.incremental
+    def test_TALON_simple_run_correctness(self):
+        """ Once we've established that TALON ran on the KRT17 example without
+            a crash, we need to check that the correct identity was assigned
+            to the transcript. """
 
+        assert 1 == 1
