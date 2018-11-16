@@ -2,6 +2,7 @@ import pytest
 import sys
 sys.path.append("..")
 from sam_transcript import *
+@pytest.mark.unit
 
 class TestGetIntrons(object):
     def test_noIntrons(self):

@@ -3,6 +3,7 @@ import sys
 sys.path.append("..")
 from transcript import *
 from edge import *
+@pytest.mark.unit
 
 class TestAddExonToTranscript(object):
     def test1(self):

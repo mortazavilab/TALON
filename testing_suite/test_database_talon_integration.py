@@ -1,9 +1,10 @@
+# Compared to a lot of the other tests in the suite, this one is intended
+# to make sure that the major parts of TALON (database init, dataset
+# addition over time) are working correctly.
+
 import pytest
 import subprocess
-
-""" Compared to a lot of the other tests in the suite, this one is intended
-        to make sure that the major parts of TALON (database init, dataset
-        addition over time) are working correctly. """
+@pytest.mark.integration
 
 class TestDatabaseTalonIntegration(object):
     def test_db_initialization(self):

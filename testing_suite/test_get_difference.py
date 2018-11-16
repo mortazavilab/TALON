@@ -2,6 +2,7 @@ import pytest
 import sys
 sys.path.append("..")
 from transcript_match_tracker import *
+@pytest.mark.unit
 
 class TestGetDifference(object):
     def test_1(self):

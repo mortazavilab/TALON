@@ -2,6 +2,7 @@ import pytest
 import sys
 sys.path.append("..")
 from sam_transcript import *
+@pytest.mark.unit
 
 class TestComputeTranscriptEnd(object):
     def test_MN_Only(self):
