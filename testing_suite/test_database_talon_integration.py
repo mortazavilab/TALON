@@ -43,4 +43,26 @@ class TestDatabaseTalonIntegration(object):
             a crash, we need to check that the correct identity was assigned
             to the transcript. """
 
-        assert 1 == 1
+        infile = "scratch/trial1_talon.tsv"
+
+        line_num = 0
+        gene_id_col_index = None
+        transcript_id_col_index = None
+        with open(infile, 'r') as f:
+            for line in f:
+                line = line.strip().split("\t")
+
+                # From the header, figure out which columns contain the assigned 
+                # gene and transcript IDs, as well as 3' and 5' end differences
+                if line_num == 0:
+                    gene_id_col_index = line.index("gene_id")
+                    transcript_id_col_index = line.index("transcript_id")
+
+                # Check that the transcript got assigned to gene 1 and 
+                # transcript 1
+                else:
+                    assert line[gene_id_col_index] == "1"
+                    assert line[transcript_id_col_index] == "1"
+
+                line_num += 1
+                
