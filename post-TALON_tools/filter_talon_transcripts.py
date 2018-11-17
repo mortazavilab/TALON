@@ -8,6 +8,7 @@
 
 from optparse import OptionParser
 import sqlite3
+import warnings
 
 def filter_talon_transcripts(database, annot, dataset_pairings = None,
                                               known_filtered = False, 
@@ -21,33 +22,73 @@ def filter_talon_transcripts(database, annot, dataset_pairings = None,
     conn = sqlite3.connect(database)
     cursor = conn.cursor()
 
-    # Query that joins transcript table to gene and transcript status
-    query = """SELECT 
+    # If dataset pairings are not provided, simply make the pairing set
+    # a list of every dataset in the database
+    if dataset_pairings == None:
+        cursor.execute("SELECT dataset_name FROM dataset")
+        datasets = ['"' + str(x[0]) + '"' for x in cursor.fetchall()]
+        pairing_list = [datasets]
+    else:
+        #TODO: implement processing of pairing file
+        pass
+
+    for pairing in pairing_list:  
+
+        if len(pairing) <= 1 and novel_filtered == True:
+            print "Warning: Only one dataset in group. This means that no " + \
+                   "novel transcripts will pass the filter for this group." 
+
+        # Query that joins transcript table to gene/transcript status, and also 
+        # counts the number of datasets each transcript was detected in
+        query = """
+                SELECT 
                    t.gene_ID,
                    t.transcript_ID,
                    t.path,
                    ga.value,
-                   ta.value
+                   ta.value,
+                   COUNT(*)
                FROM transcripts t
                LEFT JOIN gene_annotations ga ON t.gene_ID = ga.ID
                LEFT JOIN transcript_annotations ta ON t.transcript_ID = ta.ID 
+               INNER JOIN abundance ON t.transcript_ID = abundance.transcript_ID
                WHERE (ga.annot_name = %s OR ga.annot_name = "talon_run")
                    AND ga.attribute = "gene_status" 
                    AND (ta.annot_name = %s  OR ta.annot_name = "talon_run") 
-                   AND ta.attribute = "transcript_status";
+                   AND ta.attribute = "transcript_status"
+                   AND abundance.dataset IN %s
+               GROUP BY t.transcript_ID;
             """
-   
-    annot_str = '"' + annot + '"'
-    cursor.execute(query % (annot_str, annot_str))
-    transcripts = cursor.fetchall()
-    #print transcripts
+        pairing_string = "(" + ','.join(pairing) + ")"
+        annot_str = '"' + annot + '"'
+        cursor.execute(query % (annot_str, annot_str, pairing_string))
+        transcripts = cursor.fetchall()
 
-    # Iterate over transcripts
+        # Iterate over transcripts
+        for transcript in transcripts:
+            gene_ID = transcript[0]
+            transcript_ID = transcript[1] 
+            path = transcript[2] 
+            gene_status = transcript[3] 
+            transcript_status = transcript[4]
+            n_datasets = transcript[5]
+           
+            # Decide whether to add transcript to whitelist or not 
+            if transcript_status == "KNOWN" or novel_filtered == False:
+                transcript_whitelist.add(transcript_ID)
+            else:
+                n_exons = (len(path.split(",")) + 1)/2
+                if n_datasets >= 2:
+                    if novel_multiexon_reqmt == False:
+                        transcript_whitelist.add(transcript_ID)
+                    elif n_exons > 1:
+                        transcript_whitelist.add(transcript_ID)
+                
 
     # Disconnect from database
     conn.close()
 
-    return
+    return list(transcript_whitelist)
 
 def getOptions():
     parser = OptionParser()
@@ -64,8 +105,8 @@ def getOptions():
 
 def main():
     options = getOptions()
-    filter_talon_transcripts(options.database, options.annot)
-
+    whitelist = filter_talon_transcripts(options.database, options.annot)
+    print whitelist
 
 if __name__ == '__main__':
     main()
