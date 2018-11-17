@@ -9,7 +9,7 @@
 from optparse import OptionParser
 import sqlite3
 
-def filter_talon_transcripts(database, annot, dataset_pairings = None
+def filter_talon_transcripts(database, annot, dataset_pairings = None,
                                               known_filtered = False, 
                                               novel_filtered = True,
                                               novel_multiexon_reqmt = True):
@@ -18,22 +18,31 @@ def filter_talon_transcripts(database, annot, dataset_pairings = None
     transcript_whitelist = set()
 
     # Connect to the database
-    conn = sqlite3.connect(annot)
+    conn = sqlite3.connect(database)
     cursor = conn.cursor()
 
-    # Get known/novel status of transcripts
+    # Query that joins transcript table to gene and transcript status
+    query = """SELECT 
+                   t.gene_ID,
+                   t.transcript_ID,
+                   t.path,
+                   ga.value,
+                   ta.value
+               FROM transcripts t
+               LEFT JOIN gene_annotations ga ON t.gene_ID = ga.ID
+               LEFT JOIN transcript_annotations ta ON t.transcript_ID = ta.ID 
+               WHERE (ga.annot_name = %s OR ga.annot_name = "talon_run")
+                   AND ga.attribute = "gene_status" 
+                   AND (ta.annot_name = %s  OR ta.annot_name = "talon_run") 
+                   AND ta.attribute = "transcript_status";
+            """
+   
+    annot_str = '"' + annot + '"'
+    cursor.execute(query % (annot_str, annot_str))
+    transcripts = cursor.fetchall()
+    #print transcripts
 
-    # query that joins transcript table to transcript status
-    #SELECT 
-    #	transcripts.gene_ID,
-    #	transcripts.transcript_ID,
-    #	transcripts.path,
-    #	transcript_annotations.ID,
-    #	transcript_annotations.value
-    #FROM transcripts
-    #LEFT JOIN transcript_annotations ON transcripts.transcript_ID = transcript_annotations.ID 
-    #WHERE transcript_annotations.annot_name = "KRT17_test" AND transcript_annotations.attribute = "transcript_status";
-
+    # Iterate over transcripts
 
     # Disconnect from database
     conn.close()
@@ -53,7 +62,7 @@ def getOptions():
     (options, args) = parser.parse_args()
     return options
 
-def main()
+def main():
     options = getOptions()
     filter_talon_transcripts(options.database, options.annot)
 
