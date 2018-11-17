@@ -12,18 +12,26 @@ import talon as TALON
 
 class TestDatabaseTalonIntegration(object):
     def test_db_initialization(self):
-        """ Initializes a TALON database from a very minimal GTF file (KRT17
-            example). Outfiles are written to the scratch area of the testing
-            suite. 
+        """ Initializes a TALON database from a very minimal GTF file. 
+            Outfiles are written to the scratch area of the testing suite. 
         """
         try:
             subprocess.check_output(
-                     ["python", "../initialize_talon_database.py", 
-                         "--f", "input_files/KRT17_test_case/KRT17.gtf",  
-                         "--a",  "KRT17_test",  
-                         "--g",  "hg38", "--o", "scratch/KRT17"])
+                ["python", "../initialize_talon_database.py", 
+                 "--f", "input_files/KRT17_test_case/KRT17.gtf",  
+                 "--a",  "KRT17_test",  
+                 "--g",  "hg38", "--o", "scratch/KRT17"])
         except Exception as e:
             pytest.fail("Database initialization failed on KRT17 test")
+
+        try:
+            subprocess.check_output(
+                ["python", "../initialize_talon_database.py",
+                 "--f", "input_files/known_and_novel_test_case/known_and_novel_test_case.gtf",
+                 "--a",  "test",
+                 "--g",  "hg38", "--o", "scratch/known_and_novel_test_case"])
+        except Exception as e:
+            pytest.fail("Database initialization failed on known_and_novel test case")
 
     @pytest.mark.incremental
     def test_TALON_simple_run(self):
@@ -103,4 +111,54 @@ class TestDatabaseTalonIntegration(object):
         assert counter["observed_starts"] == 2
         assert counter["observed_ends"] == 2
 
- 
+    @pytest.mark.incremental
+    def test_TALON_known_novel_run(self):
+        """ This is a more complex test of TALON functionality. Four transcripts
+            must be annotated. Two of them are known, and two are the same novel
+            transcript (of a known gene). This function is mostly looking for
+            whether there is a crash or not."""
+
+        try:
+             subprocess.check_output(
+                     ["python", "../talon.py",
+                      "--f", "input_files/known_and_novel_test_case/config.csv",
+                      "-a", "scratch/known_and_novel_test_case.db",
+                      "-b", "hg38",
+                      "--o", "scratch/known_and_novel"])
+        except:
+            pytest.fail("TALON failed on known_novel test case") 
+
+    @pytest.mark.incremental
+    def test_TALON_known_novel_correctness(self):
+        """ Once we've established that TALON ran on the known-novel example without
+            a crash, we need to check that the correct identities were assigned
+            to the transcript. """
+
+        infile = "scratch/known_and_novel_talon.tsv"
+
+        line_num = 0
+        gene_id_col_index = None
+        transcript_id_col_index = None
+        with open(infile, 'r') as f:
+            for line in f:
+                line = line.strip().split("\t")
+
+                # From the header, figure out which columns contain the assigned
+                # gene and transcript IDs
+                if line_num == 0:
+                    gene_id_col_index = line.index("gene_id")
+                    transcript_id_col_index = line.index("transcript_id")
+
+                # Check that the transcript got assigned to gene 1 and
+                # transcript 1
+                else:
+                    if line_num == 1:
+                        assert line[gene_id_col_index] == "1"
+                        assert line[transcript_id_col_index] == "18"
+                    if line_num == 2 or line_num == 3:
+                        assert line[gene_id_col_index] == "2"
+                        assert line[transcript_id_col_index] == "41"
+                    if line_num == 4:
+                        assert line[gene_id_col_index] == "3"
+                        assert line[transcript_id_col_index] == "13"
+                line_num += 1

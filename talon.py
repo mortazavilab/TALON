@@ -260,7 +260,6 @@ def identify_sam_transcripts(sam_transcripts, gene_tree, transcripts, exon_tree,
     """
 
     for sam_transcript in sam_transcripts:
-        print sam_transcript.identifier
         chromosome = sam_transcript.chromosome
         start = sam_transcript.start
         end = sam_transcript.end
@@ -1067,7 +1066,7 @@ def filter_outputs_for_encode(curr_run_abundances, novel_ids, database):
     """ This function only gets run if 'encode' mode is enabled. It filters
         novel genes, transcripts, edges, vertices, and observed starts/stops
         so that only those belonging to novel transcripts observed in more
-        than one dataset get added to the final database. """
+        than one dataset get added to the final abundance output file. """
 
     filtered_abundances = {}
 
@@ -1283,13 +1282,13 @@ def main():
                         novel_ids, abundances, batch_size, build)
 
     print "Writing SAM and summary file outputs..............."
-    if options.encode_mode:
-        abundances, novel_ids = filter_outputs_for_encode(abundances, novel_ids, 
-                                                          annot)
+    #if options.encode_mode:
+    #    abundances, novel_ids = filter_outputs_for_encode(abundances, novel_ids, 
+    #                                                      annot)
 
     write_outputs(all_sam_transcripts, out)
-    write_abundance_file(annot_transcripts, abundances, novel_ids, annot, 
-                         dataset_list, out)
+    #write_abundance_file(annot_transcripts, abundances, novel_ids, annot, 
+    #                     dataset_list, out)
 
 
 if __name__ == '__main__':
