@@ -8,6 +8,8 @@ import sqlite3
 import sys
 sys.path.append("..")
 import talon as TALON
+sys.path.append("../post-TALON_tools")
+import filter_talon_transcripts as filt
 @pytest.mark.integration
 
 class TestDatabaseTalonIntegration(object):
@@ -162,3 +164,33 @@ class TestDatabaseTalonIntegration(object):
                         assert line[gene_id_col_index] == "3"
                         assert line[transcript_id_col_index] == "13"
                 line_num += 1
+
+    @pytest.mark.incremental
+    def test_TALON_second_known_novel_run(self):
+        """ After running TALON on the known_novel  example, run two more novel
+            transcripts through under a different dataset name. """
+
+        try:
+             subprocess.check_output(
+                     ["python", "../talon.py",
+                      "--f", "input_files/known_and_novel_test_case/config2.csv",
+                      "-a", "scratch/known_and_novel_test_case.db",
+                      "-b", "hg38",
+                      "--o", "scratch/known_and_novel_2"])
+        except:
+            pytest.fail("TALON failed on phase 2 of known_novel test")
+
+    @pytest.mark.incremental
+    def test_post_TALON_filter(self):
+        """ Take the known_novel database and attempt to filter the transcripts.
+            Known transcripts should be accepted, as should novel transcripts
+            appearing in more than one dataset. Reject otherwise. """
+
+        database = "scratch/known_and_novel_test_case.db"
+        annot = "test"
+        expected_transcripts = [ 18, 41, 13]
+        transcripts = filt.filter_talon_transcripts(database, annot)
+
+        assert sorted(transcripts) == sorted(expected_transcripts)
+
+
