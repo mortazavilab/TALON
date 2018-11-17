@@ -26,14 +26,16 @@ def filter_talon_transcripts(database, annot, dataset_pairings = None,
     # a list of every dataset in the database
     if dataset_pairings == None:
         cursor.execute("SELECT dataset_name FROM dataset")
-        datasets = ['"' + str(x[0]) + '"' for x in cursor.fetchall()]
+        datasets = [str(x[0]) for x in cursor.fetchall()]
         pairing_list = [datasets]
     else:
-        #TODO: implement processing of pairing file
-        pass
+        pairing_list = dataset_pairings
 
+    # Filter transcripts separately for each dataset group
     for pairing in pairing_list:  
-
+        pairing_string = "(" + ','.join(['"' + x + '"' for x in pairing]) + ")"
+        print "Processing group: " + pairing_string + "..."
+        
         if len(pairing) <= 1 and novel_filtered == True:
             print "Warning: Only one dataset in group. This means that no " + \
                    "novel transcripts will pass the filter for this group." 
@@ -59,7 +61,6 @@ def filter_talon_transcripts(database, annot, dataset_pairings = None,
                    AND abundance.dataset IN %s
                GROUP BY t.transcript_ID;
             """
-        pairing_string = "(" + ','.join(pairing) + ")"
         annot_str = '"' + annot + '"'
         cursor.execute(query % (annot_str, annot_str, pairing_string))
         transcripts = cursor.fetchall()
@@ -90,12 +91,37 @@ def filter_talon_transcripts(database, annot, dataset_pairings = None,
 
     return list(transcript_whitelist)
 
+
+def process_pairings(pairings_file):
+    """ Reads in pairings from the comma-delimited pairings file and creates 
+        a list of lists """
+
+    pairings = []
+    with open(pairings_file, 'r') as f:
+        for group in f:
+            group = group.strip().split(',')
+            pairings.append(group)
+    return pairings
+
 def getOptions():
     parser = OptionParser()
     parser.add_option("--db", dest = "database",
         help = "TALON database", metavar = "FILE", type = "string")
     parser.add_option("--annot", "-a", dest = "annot",
-        help = "Which annotation version to use. Will determine which annotation transcripts are considered known or novel relative to. Note: must be in the TALON database.", type = "string")
+        help = """Which annotation version to use. Will determine which 
+                  annotation transcripts are considered known or novel 
+                  relative to. Note: must be in the TALON database.""", 
+        type = "string")
+    parser.add_option("--pairings", "-p",  dest = "pairings_file",
+        help = """Optional: A file indicating which datasets should be 
+                  considered together when filtering novel transcripts 
+                  (i.e. biological replicates). 
+                  Format: Each line of the file constitutes a group, with 
+                  member datasets separated by commas. 
+                  If no file is provided, then novel transcripts appearing in 
+                  any two datasets will be accepted.""", 
+        metavar = "FILE", type = "string", default = None)
+
     parser.add_option("--o", dest = "outfile", help = "Outfile name",
         metavar = "FILE", type = "string")
 
@@ -105,8 +131,21 @@ def getOptions():
 
 def main():
     options = getOptions()
-    whitelist = filter_talon_transcripts(options.database, options.annot)
-    print whitelist
+
+    if options.pairings_file != None:
+        pairings = process_pairings(options.pairings_file)
+        whitelist = filter_talon_transcripts(options.database, options.annot,
+                                             dataset_pairings = pairings)
+    else:
+        whitelist = filter_talon_transcripts(options.database, options.annot)
+
+    # Write transcript IDs to file
+    o = open(options.outfile, 'w')
+    print "Writing whitelisted transcripts to " + options.outfile + "..."
+    for transcript in whitelist:
+        o.write(str(transcript) + "\n")
+    o.close()
+    
 
 if __name__ == '__main__':
     main()
