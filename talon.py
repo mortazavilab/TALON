@@ -40,6 +40,12 @@ def getOptions():
     parser.add_option("--noUpdate", dest ="noUpdate", action='store_true',
                       help = "If this option is set, the database will not be updated.\
                              Typically this is not used.")
+    parser.add_option("--cov", "-c", dest = "min_coverage",
+        help = "Minimum alignment coverage in order to use a SAM entry. Default = 0.9",
+        type = "string", default = 0.9)
+    parser.add_option("--identity", "-i", dest = "min_identity",
+        help = "Minimum alignment identity in order to use a SAM entry. Default = 0.85",
+        type = "string", default = 0.85)
 
     
     (options, args) = parser.parse_args()
@@ -211,7 +217,7 @@ def str_wrap_double(string):
     """ Adds double quotes around the input string """
     return '"' + string + '"'
 
-def process_sam_file(sam_file, dataset):
+def process_sam_file(sam_file, dataset, min_coverage, min_identity):
     """ Reads transcripts from a SAM file
         Args:
             sam_file: Path to the SAM file
@@ -238,7 +244,22 @@ def process_sam_file(sam_file, dataset):
             # Only use reads that are >= 300 bp long
             if len(sam[9]) < 300:
                 continue
-            
+
+            # Only use reads where alignment coverage and identity exceed 
+            # cutoffs
+            coverage = compute_alignment_coverage(sam[5])
+            identity = compute_alignment_identity(sam[5])
+
+            if coverage < min_coverage:
+                print "Skipping transcript with id " + sam[0] + \
+                      " (fraction read aligned = " + str(coverage) + ")"
+                continue
+
+            if identity < min_identity:
+                print "Skipping transcript with id " + sam[0] + \
+                      " (alignment identity = " + str(identity) + ")"
+                continue 
+           
             try: 
                 sam_transcript = SamTranscript.get_sam_transcript(sam, dataset)
                 sam_transcripts.append(sam_transcript)
@@ -247,6 +268,26 @@ def process_sam_file(sam_file, dataset):
                       sam[0] + ". Will skip this transcript."
         
     return sam_transcripts
+
+def compute_alignment_coverage(CIGAR):
+    """ This function computes what fraction of the read is actually aligned to
+        the genome by excluding hard or soft-clipped bases."""
+
+    total_bases = 0.0
+    unaligned_bases = 0.0   
+    ops, counts = SamTranscript.split_cigar(CIGAR)
+    for op,ct in zip(ops, counts):
+        if op == "H" or op == "S":
+            unaligned_bases += ct
+        total_bases += ct
+
+    return (total_bases - unaligned_bases)/total_bases
+   
+def compute_alignment_identity(CIGAR):
+    """ This function computes what fraction of the read matches the reference
+        genome."""
+    # TODO
+    pass
 
 def identify_sam_transcripts(sam_transcripts, gene_tree, transcripts, exon_tree, 
                              intron_tree, vertices, counter, dataset, 
@@ -1211,15 +1252,6 @@ def checkArgs(options):
                 sam_files.append(line[3])
 
     conn.close()
-
-    # If the 'encode' flag is set, then the config file is required to have
-    # at least two datasets in it (biological replicates)
-    #if options.encode_mode:
-    #    if len(sam_files) < 2:
-    #        raise ValueError("When running TALON with 'encode' mode enabled,"+ \
-    #                         " you must provide two or more biological " + \
-    #                         "replicates in the config file.")
-
     return sam_files, dataset_metadata
 
 def main():
@@ -1234,6 +1266,8 @@ def main():
 
     annot = options.annot
     build = options.build
+    min_coverage = options.min_coverage
+    min_identity = options.min_identity
     out = options.outfile
 
     # Process the annotations
@@ -1265,7 +1299,7 @@ def main():
         counter['datasets'] += 1
 
         print "Identifying transcripts in " + d_name + "..............."
-        sam_transcripts = process_sam_file(sam, d_name)
+        sam_transcripts = process_sam_file(sam, d_name, min_coverage, min_identity)
         if len(sam_transcripts) == 0:
             print "Warning: no transcripts detected in file " + sam
         identify_sam_transcripts(sam_transcripts, gene_tree, annot_transcripts, 
