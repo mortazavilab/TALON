@@ -4,6 +4,7 @@
 
 import edge as Edge
 import genetree as GeneTree
+import itertools
 import re
 from transcript import *
 
@@ -230,3 +231,33 @@ def split_cigar(cigar):
     counts = [int(i) for i in counts]
 
     return alignTypes, counts
+
+def splitMD(MD_tag):
+        """ Takes MD tag and splits into two lists:
+            one with capital letters (match operators), and one with
+            the number of bases that each operation applies to. """
+
+        MD = str(MD_tag).split(":")[2]
+        operations = []
+
+        # Split MD string where type changes.
+        # Digits are separated from base changes.
+        # Deletions (with ^) are captured together.
+        counts = ["".join(x) for _, x in itertools.groupby(MD, key=str.isdigit)]
+
+        # Get operations
+        for i in range(0,len(counts)):
+            curr = counts[i]
+            try:
+                counts[i] = int(curr)
+                operations.append("M")
+            except ValueError:
+                # Handle deletion
+                if curr.startswith("^"):
+                    operations.append("D")
+                    counts[i] = len(counts[i]) - 1
+                else:
+                    operations.append("X")
+                    counts[i] = len(counts[i])
+
+        return operations, counts

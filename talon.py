@@ -245,10 +245,16 @@ def process_sam_file(sam_file, dataset, min_coverage, min_identity):
             if len(sam[9]) < 300:
                 continue
 
+            # Locate the MD field of the sam transcript
+            try:
+                md_index = [i for i, s in enumerate(sam) if s.startswith('MD:Z:')][0]
+            except:
+                raise ValueError("SAM transcript " + sam[0] + " lacks the MD flag")
+
             # Only use reads where alignment coverage and identity exceed 
             # cutoffs
             coverage = compute_alignment_coverage(sam[5])
-            identity = compute_alignment_identity(sam[5])
+            identity = compute_alignment_identity(sam[md_index], sam[9])
 
             if coverage < min_coverage:
                 print "Skipping transcript with id " + sam[0] + \
@@ -283,11 +289,21 @@ def compute_alignment_coverage(CIGAR):
 
     return (total_bases - unaligned_bases)/total_bases
    
-def compute_alignment_identity(CIGAR):
+def compute_alignment_identity(MD_tag, SEQ):
     """ This function computes what fraction of the read matches the reference
         genome."""
-    # TODO
-    pass
+    
+    total_bases = len(SEQ)
+    matches = 0.0
+    ops, counts = SamTranscript.splitMD(MD_tag)
+    for op,ct in zip(ops, counts):
+        if op == "M":
+            matches += ct
+        if op == "D":
+            total_bases += ct
+
+    return matches/total_bases 
+    
 
 def identify_sam_transcripts(sam_transcripts, gene_tree, transcripts, exon_tree, 
                              intron_tree, vertices, counter, dataset, 
