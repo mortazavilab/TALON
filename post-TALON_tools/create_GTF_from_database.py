@@ -129,21 +129,59 @@ def create_outname(options):
     outname += ".gtf"
     return outname
 
+def get_annotations(database, feat_type, annot):
+    """ Extracts annotations from the gene/transcript/exon annotation table of
+        the database (depending on choice of feat_type). Limited to rows where
+        the annot_name column matches the value of annot.
+
+        Returns:
+            annotation_dict: dictionary data structure in which the keys are
+                             gene/transcript/exon TALON IDs (depending on 
+                             choice of feat_type) and the value is a list of 
+                             annotation tuples.
+    """
+    # Fetch the annotations
+    conn = sqlite3.connect(database)
+    cursor = conn.cursor()
+
+    table_name = feat_type + "_annotations"
+    query = "SELECT * FROM " + table_name + " WHERE annot_name = '" + annot + "'"
+    cursor.execute(query)
+    annotation_tuples = cursor.fetchall()
+
+    # Sort based on ID
+    sorted_annotations = sorted(annotation_tuples, key=lambda x: x[0]) 
+
+    # Group by ID and store in a dictionary
+    ID_groups = {}
+    for key,group in itertools.groupby(sorted_annotations,operator.itemgetter(0)):
+        ID_groups[str(key)] = list(group)
+
+    return ID_groups
+
 def create_gtf(database, annot, genome_build, whitelist):
 
-    # Divide tuples into separate sublists based on gene
+    # Divide transcript tuples into separate sublists based on gene
     gene_groups = []
     for key,group in itertools.groupby(whitelist,operator.itemgetter(0)):
         gene_groups.append(list(group))
 
+    # Get gene, transcript, and exon annotations
+    gene_annotations = get_annotations(database, "gene", annot)  
+    transcript_annotations = get_annotations(database, "transcript", annot) 
+    exon_annotations = get_annotations(database, "exon", annot)
+
+    # Get transcript data from the database
     conn = sqlite3.connect(database)
     cursor = conn.cursor()
     
-    exon_tree = read_edges(cursor, genome_build, "exon")
-    intron_tree = read_edges(cursor, genome_build, "intron")
-    transcripts = read_transcripts(cursor, exon_tree, intron_tree)
+    exon_tree = TALON.read_edges(cursor, genome_build, "exon")
+    intron_tree = TALON.read_edges(cursor, genome_build, "intron")
+    transcripts = TALON.read_transcripts(cursor, exon_tree, intron_tree)
  
+    conn.close()
 
+    # TODO: iterate over gene groups
 
 
 def main():
