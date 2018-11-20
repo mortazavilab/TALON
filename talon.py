@@ -69,7 +69,7 @@ def read_annotation(annot, genome_build):
 
     vertices = read_vertices(cursor, genome_build)
  
-    # Read in all exons and introns; add them to inteval tree data structures
+    # Read in all exons and introns; add them to interval tree data structures
     exon_tree = read_edges(cursor, genome_build, "exon")
     intron_tree = read_edges(cursor, genome_build, "intron")
      

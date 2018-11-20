@@ -4,6 +4,8 @@
 # create_GTF_from_database.py is a utility that outputs the genes, transcripts,
 # and exons stored a TALON database into a GTF annotation file. 
 
+import itertools
+import operator
 from optparse import OptionParser
 import sqlite3
 import warnings
@@ -15,8 +17,13 @@ import os
 
 def getOptions():
     parser = OptionParser()
+
     parser.add_option("--db", dest = "database",
         help = "TALON database", metavar = "FILE", type = "string")
+
+    parser.add_option("--build", "-b", dest = "build",
+        help = "Genome build to use. Note: must be in the TALON database.",
+        type = "string")
 
     parser.add_option("--annot", "-a", dest = "annot",
         help = """Which annotation version to use. Will determine which
@@ -74,13 +81,14 @@ def handle_filtering(options):
             whitelist = filt.filter_talon_transcripts(database, annot)
         print "--------------------------------------"
 
-    # All observed transcripts included
+    # If "observed" option is on, all observed transcripts are included
     elif options.observed == True:
 
         conn = sqlite3.connect(database)
         cursor = conn.cursor()
         query = """ 
                 SELECT
+                    t.gene_ID,
                     t.transcript_ID,
                     COUNT(*)
                 FROM transcripts t
@@ -88,7 +96,7 @@ def handle_filtering(options):
                 GROUP BY t.transcript_ID;
                 """ 
         cursor.execute(query)
-        whitelist = [str(x[0]) for x in cursor.fetchall()]
+        whitelist = [(str(x[0]),str(x[1])) for x in cursor.fetchall()]
 
         conn.close()
 
@@ -98,20 +106,58 @@ def handle_filtering(options):
         conn = sqlite3.connect(database)
         cursor = conn.cursor()
 
-        cursor.execute("SELECT transcript_ID FROM transcripts")
-        whitelist = [str(x[0]) for x in cursor.fetchall()]
+        cursor.execute("SELECT gene_ID,transcript_ID FROM transcripts")
+        whitelist = [(str(x[0]),str(x[1])) for x in cursor.fetchall()]
 
         conn.close()
 
-    return whitelist
+    # Sort the whitelist tuples on gene ID
+    sorted_whitelist = sorted(whitelist, key=lambda x: x[0])
+
+    return sorted_whitelist
+
+def create_outname(options):
+    """ Creates filename for the output GTF that reflects the input options that
+        were used. """
+    
+    outname = options.outprefix + "_talon"
+    if options.filtering == True:
+        outname = "_".join([ outname, "filtered" ])
+    elif options.observed == True: 
+        outname = "_".join([ outname, "observedOnly" ])
+    
+    outname += ".gtf"
+    return outname
+
+def create_gtf(database, annot, genome_build, whitelist):
+
+    # Divide tuples into separate sublists based on gene
+    gene_groups = []
+    for key,group in itertools.groupby(whitelist,operator.itemgetter(0)):
+        gene_groups.append(list(group))
+
+    conn = sqlite3.connect(database)
+    cursor = conn.cursor()
+    
+    exon_tree = read_edges(cursor, genome_build, "exon")
+    intron_tree = read_edges(cursor, genome_build, "intron")
+    transcripts = read_transcripts(cursor, exon_tree, intron_tree)
+ 
+
+
 
 def main():
     options = getOptions()
     database = options.database
     annot = options.annot
+    build = options.build
+    outfile = create_outname(options)
 
+    # Determine which transcripts to include
     transcript_whitelist = handle_filtering(options)
-    print len(transcript_whitelist)
+
+    create_gtf(database, annot, build, transcript_whitelist)    
+    
 
 if __name__ == '__main__':
     main()
