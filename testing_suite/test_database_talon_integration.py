@@ -188,8 +188,9 @@ class TestDatabaseTalonIntegration(object):
 
         database = "scratch/known_and_novel_test_case.db"
         annot = "test"
-        expected_transcripts = [ 18, 41, 13]
-        transcripts = filt.filter_talon_transcripts(database, annot)
+        expected_transcripts = [ "18", "41", "13"]
+        transcript_tuples = filt.filter_talon_transcripts(database, annot)
+        transcripts = [ x[1] for x in transcript_tuples ]
 
         assert sorted(transcripts) == sorted(expected_transcripts)
 

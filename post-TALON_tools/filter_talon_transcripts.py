@@ -16,6 +16,7 @@ def filter_talon_transcripts(database, annot, dataset_pairings = None,
                                               novel_multiexon_reqmt = True):
 
     # Create a set to keep track of whitelisted transcripts
+    # Each entry is a gene-transcript tuple
     transcript_whitelist = set()
 
     # Connect to the database
@@ -67,8 +68,8 @@ def filter_talon_transcripts(database, annot, dataset_pairings = None,
 
         # Iterate over transcripts
         for transcript in transcripts:
-            gene_ID = transcript[0]
-            transcript_ID = transcript[1] 
+            gene_ID = str(transcript[0])
+            transcript_ID = str(transcript[1])
             path = transcript[2] 
             gene_status = transcript[3] 
             transcript_status = transcript[4]
@@ -76,20 +77,20 @@ def filter_talon_transcripts(database, annot, dataset_pairings = None,
            
             # Decide whether to add transcript to whitelist or not 
             if transcript_status == "KNOWN" or novel_filtered == False:
-                transcript_whitelist.add(transcript_ID)
+                transcript_whitelist.add((gene_ID, transcript_ID))
             else:
                 n_exons = (len(path.split(",")) + 1)/2
                 if n_datasets >= 2:
                     if novel_multiexon_reqmt == False:
-                        transcript_whitelist.add(transcript_ID)
+                        transcript_whitelist.add((gene_ID, transcript_ID))
                     elif n_exons > 1:
-                        transcript_whitelist.add(transcript_ID)
+                        transcript_whitelist.add((gene_ID, transcript_ID))
                 
 
     # Disconnect from database
     conn.close()
 
-    return list(transcript_whitelist)
+    return transcript_whitelist
 
 
 def process_pairings(pairings_file):
@@ -141,9 +142,9 @@ def main():
 
     # Write transcript IDs to file
     o = open(options.outfile, 'w')
-    print "Writing whitelisted transcripts to " + options.outfile + "..."
+    print "Writing whitelisted gene-transcript pairs to " + options.outfile + "..."
     for transcript in whitelist:
-        o.write(str(transcript) + "\n")
+        o.write(transcript[0] + "," + transcript[1] + "\n")
     o.close()
     
 
