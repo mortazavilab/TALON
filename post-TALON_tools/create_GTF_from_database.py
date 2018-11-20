@@ -182,9 +182,15 @@ def create_gtf(database, annot, genome_build, whitelist):
     conn.close()
 
     # TODO: iterate over gene groups
+    for gene_group in gene_groups:
+        gene_id = gene_group[0][0]
+        
+
+        exit()
 
 
 def main():
+    # TODO: checkOptions function needs to fail when genome build not provided
     options = getOptions()
     database = options.database
     annot = options.annot

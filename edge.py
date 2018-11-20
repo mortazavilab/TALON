@@ -112,18 +112,26 @@ def extract_edge_annotations_from_GTF(tab_fields):
 def get_edge_from_db(vertex_info_1, vertex_info_2):
     """ Uses information from a database edge entry to create an edge object.
     """
-    if vertex_info_1["edge_id"] != vertex_info_2["edge_id"]:
+
+    edge_id_index = 0
+    vertex_id_index = 1
+    chrom_index = 2
+    pos_index = 3
+    strand_index = 4
+    gene_id_index = 5
+
+    if vertex_info_1[edge_id_index] != vertex_info_2[edge_id_index]:
         raise ValueError('Tried to create edge from endpoints with different IDs')
-    edge_id = vertex_info_1["edge_id"]
-    chromosome = vertex_info_1['chromosome']
-    start = min(vertex_info_1['position'], vertex_info_2['position'])
-    end = max(vertex_info_1['position'], vertex_info_2['position']) 
-    strand = vertex_info_1['strand']
-    gene_id = vertex_info_1['gene_id']
+    edge_id = vertex_info_1[edge_id_index]
+    chromosome = vertex_info_1[chrom_index]
+    start = min(vertex_info_1[pos_index], vertex_info_2[pos_index])
+    end = max(vertex_info_1[pos_index], vertex_info_2[pos_index]) 
+    strand = vertex_info_1[strand_index]
+    gene_id = vertex_info_1[gene_id_index]
 
     edge = Edge(edge_id, chromosome, start, end, strand, gene_id, None, None)
-    edge.v1 = str(vertex_info_1["vertex_ID"])
-    edge.v2 = str(vertex_info_2["vertex_ID"])
+    edge.v1 = str(vertex_info_1[vertex_id_index])
+    edge.v2 = str(vertex_info_2[vertex_id_index])
     return edge
 
 def create_novel_edge(chromosome, start, end, strand, gene_id, transcript_id, counter):
