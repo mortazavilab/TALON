@@ -186,14 +186,10 @@ def get_transcript_from_db(transcript_row, exon_tree, intron_tree):
             transcript_row: Tuple-formatted row from transcripts table of a 
             TALON database
     """
-    gene_ID_index = 0
-    transcript_ID_index = 1
-    path_index = 2
-    
-    transcript_id = str(transcript_row[transcript_ID_index])
-    gene_id = str(transcript_row[gene_ID_index])
+    transcript_id = str(transcript_row['transcript_id'])
+    gene_id = str(transcript_row['gene_id'])
 
-    edges = transcript_row[path_index].split(",")
+    edges = transcript_row['path'].split(",")
 
     # Check strand
     sample_edge = str(edges[0])
