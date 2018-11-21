@@ -84,12 +84,24 @@ def add_transcript_table(database):
     c = conn.cursor()
 
     # Add table and set keys
+    #command = """ CREATE TABLE IF NOT EXISTS transcripts (
+    #            transcript_ID INTEGER PRIMARY KEY,
+    #            gene_ID INTEGER,
+    #            path TEXT,
+
+    #            FOREIGN KEY (gene_ID) REFERENCES genes(gene_ID)
+    #); """
     command = """ CREATE TABLE IF NOT EXISTS transcripts (
                 transcript_ID INTEGER PRIMARY KEY,
                 gene_ID INTEGER,
                 path TEXT,
+                start_vertex INTEGER,
+                end_vertex INTEGER,
+                n_exons INTEGER,
                  
-                FOREIGN KEY (gene_ID) REFERENCES genes(gene_ID)
+                FOREIGN KEY (gene_ID) REFERENCES genes(gene_ID),
+                FOREIGN KEY (start_vertex) REFERENCES vertex(vertex_ID),
+                FOREIGN KEY (end_vertex) REFERENCES vertex(vertex_ID)
                 ); """
 
     c.execute(command)
@@ -120,8 +132,8 @@ def add_edge_table(database):
                 edge_type TEXT,
                 
                 PRIMARY KEY (edge_ID),
-                FOREIGN KEY (v1) REFERENCES vertex(ID),
-                FOREIGN KEY (v2) REFERENCES vertex(ID),
+                FOREIGN KEY (v1) REFERENCES vertex(vertex_ID),
+                FOREIGN KEY (v2) REFERENCES vertex(vertex_ID),
                 FOREIGN KEY (edge_type) REFERENCES edge_type(type)
                 ); """
 
@@ -699,10 +711,11 @@ def add_transcripts(c, transcripts, annot_name, gene_id_map, genome_build):
 
         # Process exons to create vertices and edges 
         #start_time = time.time()
-        transcript_path, vertices, edges = process_transcript(c,
-                                           transcript, db_gene_id, genome_build,
-                                           annot_name, vertices, edges)
-        bulk_transcripts.append((db_transcript_id, db_gene_id, transcript_path))
+        transcript_tuple = process_transcript(c, transcript, db_transcript_id, 
+                                              db_gene_id, genome_build,
+                                              annot_name, vertices, edges)
+        bulk_transcripts.append(transcript_tuple)
+        #bulk_transcripts.append((db_transcript_id, db_gene_id, transcript_path))
 
         # Create annotation entries
         ignore = ["gene_id", "gene_name"]
@@ -729,9 +742,9 @@ def bulk_update_transcripts(c, transcripts, counter):
        into the database at the provided cursor (c).
     """
     cols = " (" + ", ".join([str_wrap_double(x) for x in ["transcript_ID",
-           "gene_ID", "path"]]) + ") "
+           "gene_ID", "path", "start_vertex", "end_vertex", "n_exons"]]) + ") "
     g_command = 'INSERT INTO "transcripts"' + cols + "VALUES " + \
-                '(?,?,?)'
+                '(?,?,?,?,?,?)'
     c.executemany(g_command,transcripts)
  
     update_counter = 'UPDATE "counters" SET "count" = ? WHERE "category" = ?'
@@ -802,7 +815,8 @@ def bulk_update_edges(c, edges):
 
     return
 
-def process_transcript(c, transcript, gene_id, genome_build, annot_name, vertices, edges):
+def process_transcript(c, transcript, transcript_id, gene_id, genome_build, 
+                       annot_name, vertices, edges):
 
     exons = transcript.exons
     strand = transcript.strand
@@ -821,11 +835,16 @@ def process_transcript(c, transcript, gene_id, genome_build, annot_name, vertice
                                      exon.chromosome, right, strand, vertices)
         transcript_vertices.append(v2)
 
-   # Iterate over vertices in order to create edges. If the transcript is on the
+    # Iterate over vertices in order to create edges. If the transcript is on the
     # minus strand, reverse the vertex and edge lists
     if strand == "-":
          transcript_vertices = transcript_vertices[::-1]
          exons = exons[::-1]
+
+    # Keep track of start vertex, end vertex, and n_exons
+    start_vertex = transcript_vertices[0]
+    end_vertex = transcript_vertices[-1]
+    n_exons = len(exons)
 
     prev_edge_type = None
     exon_index = 0
@@ -851,7 +870,10 @@ def process_transcript(c, transcript, gene_id, genome_build, annot_name, vertice
         prev_edge_type = edge_type
     transcript_path = ",".join(map(str,transcript_edges))
 
-    return transcript_path, vertices, edges 
+    transcript_tuple = (transcript_id, gene_id, transcript_path,
+                        start_vertex, end_vertex, n_exons)
+    
+    return transcript_tuple
 
 
 def add_exon_annotations_to_db(c, exon, exon_id, annot_name):
