@@ -38,6 +38,21 @@ class Transcript(object):
         self.introns = []
         self.annotations = annotations
 
+    def get_5prime_vertex(self):
+        """ Returns ID of 5' end vertex """
+
+        if self.strand == "+":
+            return self.exons[0].v1
+        if self.strand == "-":
+            return self.exons[-1].v2
+
+    def get_3prime_vertex(self):
+        """ Returns ID of 5' end vertex """
+
+        if self.strand == "+":
+            return self.exons[-1].v2
+        if self.strand == "-":
+            return self.exons[0].v1
 
     def get_edge_path(self):
         edges = self.get_all_edges()

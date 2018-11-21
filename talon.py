@@ -373,8 +373,13 @@ def identify_sam_transcripts(sam_transcripts, gene_tree, transcripts, exon_tree,
                                                      exon_tree, intron_tree, vertices,
                                                      counter, novel_ids)
 
+            start_vertex = annot_transcript.get_5prime_vertex()
+            end_vertex = annot_transcript.get_3prime_vertex()
+            n_exons = annot_transcript.n_exons
+
             novel_tuple = (annot_transcript.identifier, annot_transcript.gene_id,
-                           annot_transcript.get_edge_path(), dataset)
+                           annot_transcript.get_edge_path(), start_vertex, 
+                           end_vertex, n_exons, dataset)
             novel_ids["transcripts"][annot_transcript.identifier] = novel_tuple
             transcripts[annot_transcript.identifier] = annot_transcript
 
@@ -689,8 +694,8 @@ def batch_add_transcripts(cursor, novel_ids, batch_size):
     transcript_entries = []
     transcript_annotations = []
     for nt in novel_tuples:
-        transcript_entries.append(nt[0:3])
-        transcript_annotations.append((nt[0], "talon_run", nt[3], 
+        transcript_entries.append(nt[0:6])
+        transcript_annotations.append((nt[0], "talon_run", nt[6], 
                                        "transcript_status", "NOVEL"))
     index = 0
     while index < len(transcript_entries):
@@ -704,9 +709,10 @@ def batch_add_transcripts(cursor, novel_ids, batch_size):
 
         try:
             cols = " (" + ", ".join([str_wrap_double(x) for x in 
-                   ["transcript_id", "gene_id", "path"]]) +\
+                   ["transcript_id", "gene_id", "path", "start_vertex",
+                     "end_vertex", "n_exons"]]) +\
                     ") "
-            command = 'INSERT INTO "transcripts"' + cols + "VALUES " + '(?,?,?)'
+            command = 'INSERT INTO "transcripts"' + cols + "VALUES " + '(?,?,?,?,?,?)'
             cursor.executemany(command, transcript_batch)
         except Exception as e:
             print(e) 
