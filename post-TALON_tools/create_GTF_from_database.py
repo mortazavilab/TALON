@@ -129,7 +129,7 @@ def create_outname(options):
     outname += ".gtf"
     return outname
 
-def get_annotations(database, feat_type, annot):
+def get_annotations(database, feat_type, annot, whitelist = None):
     """ Extracts annotations from the gene/transcript/exon annotation table of
         the database (depending on choice of feat_type). Limited to rows where
         the annot_name column matches the value of annot.
@@ -145,7 +145,13 @@ def get_annotations(database, feat_type, annot):
     cursor = conn.cursor()
 
     table_name = feat_type + "_annotations"
-    query = "SELECT * FROM " + table_name + " WHERE annot_name = '" + annot + "'"
+    if whitelist == None:
+        query = "SELECT * FROM " + table_name + " WHERE annot_name = '" + annot + "'"
+    else:
+        whitelist_string = "(" + ','.join(whitelist) + ")"
+        query = "SELECT * FROM " + table_name + " WHERE annot_name = '" + annot + \
+                "' AND ID IN " + whitelist_string
+
     cursor.execute(query)
     annotation_tuples = cursor.fetchall()
 
@@ -159,6 +165,51 @@ def get_annotations(database, feat_type, annot):
 
     return ID_groups
 
+def get_gene_2_transcripts(database, genome_build, whitelist):
+    """ Creates a dictionary mapping gene IDs to the transcripts that belong to
+        them. The columns in each tuple are:
+            0: gene ID
+            1: transcript ID
+            2: chromosome
+            3: start position (min of 5' and 3')
+            4: end position (max of 5' and 3')
+            5: strand
+            6: edge path
+ """
+
+    conn = sqlite3.connect(database)
+    cursor = conn.cursor()
+    whitelist_string = "(" + ','.join(whitelist) + ")"
+    query = """
+            SELECT 
+               t.gene_ID,
+               t.transcript_ID,
+               loc1.chromosome,
+               MIN(loc1.position,loc2.position),
+               MAX(loc1.position,loc2.position),
+               loc1.strand,
+               t.path
+           FROM transcripts t
+           LEFT JOIN location loc1 ON t.start_vertex = loc1.location_ID
+           LEFT JOIN location loc2 ON t.end_vertex = loc2.location_ID
+           WHERE loc1.genome_build = '""" + genome_build + """' AND 
+           loc2.genome_build = '""" + genome_build + \
+           """' AND t.transcript_ID IN """ + whitelist_string 
+           
+    cursor.execute(query)
+    transcript_tuples = cursor.fetchall()
+
+    # Sort based on gene ID
+    sorted_transcript_tuples = sorted(transcript_tuples, key=lambda x: x[0])
+
+    # Group by gene ID and store in a dictionary
+    gene_groups = {}
+    for key,group in itertools.groupby(transcript_tuples,operator.itemgetter(0)):
+        # Sort by transcript start position
+        gene_groups[str(key)] = sorted(list(group), key=lambda x: x[3])
+
+    return gene_groups 
+
 def create_gtf(database, annot, genome_build, whitelist):
 
     # Divide transcript tuples into separate sublists based on gene
@@ -167,22 +218,58 @@ def create_gtf(database, annot, genome_build, whitelist):
         gene_groups.append(list(group))
 
     # Get gene, transcript, and exon annotations
-    gene_annotations = get_annotations(database, "gene", annot)  
-    transcript_annotations = get_annotations(database, "transcript", annot) 
+    gene_whitelist = [ x[0] for x in whitelist ]
+    transcript_whitelist = [ x[1] for x in whitelist ]
+
+    gene_annotations = get_annotations(database, "gene", annot, 
+                                       whitelist = gene_whitelist)  
+    transcript_annotations = get_annotations(database, "transcript", annot,
+                                             whitelist = transcript_whitelist) 
     exon_annotations = get_annotations(database, "exon", annot)
 
+
+
     # Get transcript data from the database
-    conn = sqlite3.connect(database)
-    cursor = conn.cursor()
-    
-    exon_tree = TALON.read_edges(cursor, genome_build, "exon")
-    intron_tree = TALON.read_edges(cursor, genome_build, "intron")
-    transcripts = TALON.read_transcripts(cursor, exon_tree, intron_tree)
- 
-    conn.close()
+    gene_2_transcripts = get_gene_2_transcripts(database, genome_build, 
+                         transcript_whitelist)
 
     # TODO: iterate over gene groups
+    for gene_ID, transcript_tuples in gene_2_transcripts.iteritems():
 
+        # Get attribute info for gene
+        curr_annot = gene_annotations[gene_ID]
+                 
+        # GTF fields
+        chromosome = transcript_tuples[0][2]
+        source = [ str(x[-1]) for x in curr_annot if str(x[-2]) == "source"][0]
+        feature = "gene"
+        start = transcript_tuples[0][3]
+        end = transcript_tuples[-1][4]
+        score = "."
+        strand = transcript_tuples[0][5]
+        frame = "."
+        
+
+        print "\t".join([chromosome, source, feature, str(start), str(end),
+                         score, strand, frame]) 
+
+        for transcript_entry in transcript_tuples:
+            # Get attribute info for transcript
+            transcript_ID = str(transcript_entry[1])
+            curr_transcript_annot = transcript_annotations[transcript_ID]
+            
+            # GTF fields
+            chromosome = transcript_tuples[0][2]
+            source = [ str(x[-1]) for x in curr_transcript_annot if str(x[-2]) == "source"][0]
+            feature = "transcript"
+            start = transcript_entry[3]
+            end = transcript_entry[4]
+            score = "."
+            strand = transcript_entry[5]
+            frame = "."         
+            print "\t".join([chromosome, source, feature, str(start), str(end),
+                         score, strand, frame])
+        exit()
 
 def main():
     options = getOptions()
