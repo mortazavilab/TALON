@@ -217,7 +217,7 @@ def str_wrap_double(string):
     """ Adds double quotes around the input string """
     return '"' + string + '"'
 
-def process_sam_file(sam_file, dataset, min_coverage, min_identity):
+def process_sam_file(sam_file, dataset, min_coverage, min_identity, outprefix):
     """ Reads transcripts from a SAM file
         Args:
             sam_file: Path to the SAM file
@@ -226,6 +226,13 @@ def process_sam_file(sam_file, dataset, min_coverage, min_identity):
     """
 
     sam_transcripts = []
+
+    o = open(outprefix + "_talon_QC.log", 'w')
+    o.write("# TALON run filtering settings:\n")
+    o.write("# Fraction aligned: " + str(min_coverage) + "\n")
+    o.write("# Min identity to reference: " + str(min_identity) + "\n")
+    o.write("-------------------------------------------\n")
+    o.write("\t".join(["dataset", "read_ID", "fraction_aligned", "identity"]) + "\n")
 
     with open(sam_file) as sam:
         for line in sam:
@@ -256,23 +263,19 @@ def process_sam_file(sam_file, dataset, min_coverage, min_identity):
             coverage = compute_alignment_coverage(sam[5])
             identity = compute_alignment_identity(sam[md_index], sam[9])
 
-            if coverage < min_coverage:
-                print "Skipping transcript with id " + sam[0] + \
-                      " (fraction read aligned = " + str(coverage) + ")"
+            if coverage < min_coverage or identity < min_identity:
+                outstr = "\t".join([dataset, sam[0], str(coverage), str(identity)])
+                o.write(outstr + "\n")
                 continue
 
-            if identity < min_identity:
-                print "Skipping transcript with id " + sam[0] + \
-                      " (alignment identity = " + str(identity) + ")"
-                continue 
-           
             try: 
                 sam_transcript = SamTranscript.get_sam_transcript(sam, dataset)
                 sam_transcripts.append(sam_transcript)
             except:
                 print "An error occurred while processing sam transcript " + \
                       sam[0] + ". Will skip this transcript."
-        
+        o.close() 
+
     return sam_transcripts
 
 def compute_alignment_coverage(CIGAR):
@@ -1321,7 +1324,8 @@ def main():
         counter['datasets'] += 1
 
         print "Identifying transcripts in " + d_name + "..............."
-        sam_transcripts = process_sam_file(sam, d_name, min_coverage, min_identity)
+        sam_transcripts = process_sam_file(sam, d_name, min_coverage, 
+                                           min_identity, out)
         if len(sam_transcripts) == 0:
             print "Warning: no transcripts detected in file " + sam
         identify_sam_transcripts(sam_transcripts, gene_tree, annot_transcripts, 
