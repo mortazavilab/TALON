@@ -1291,8 +1291,8 @@ def main():
 
     annot = options.annot
     build = options.build
-    min_coverage = options.min_coverage
-    min_identity = options.min_identity
+    min_coverage = float(options.min_coverage)
+    min_identity = float(options.min_identity)
     out = options.outfile
 
     # Process the annotations
