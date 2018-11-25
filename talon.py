@@ -217,7 +217,7 @@ def str_wrap_double(string):
     """ Adds double quotes around the input string """
     return '"' + string + '"'
 
-def process_sam_file(sam_file, dataset, min_coverage, min_identity, outprefix):
+def process_sam_file(sam_file, dataset, min_coverage, min_identity, logfile):
     """ Reads transcripts from a SAM file
         Args:
             sam_file: Path to the SAM file
@@ -227,7 +227,7 @@ def process_sam_file(sam_file, dataset, min_coverage, min_identity, outprefix):
 
     sam_transcripts = []
 
-    o = open(outprefix + "_talon_QC.log", 'a')
+    o = open(logfile, 'a')
 
     with open(sam_file) as sam:
         for line in sam:
@@ -1297,7 +1297,7 @@ def main():
     
     # Process the SAM files
     print "Processing SAM file......................"
-    qc_file = outprefix + "_talon_QC.log"
+    qc_file = out + "_talon_QC.log"
     o = open(qc_file, 'w')
     o.write("# TALON run filtering settings:\n")
     o.write("# Fraction aligned: " + str(min_coverage) + "\n")
