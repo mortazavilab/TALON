@@ -227,12 +227,7 @@ def process_sam_file(sam_file, dataset, min_coverage, min_identity, outprefix):
 
     sam_transcripts = []
 
-    o = open(outprefix + "_talon_QC.log", 'w')
-    o.write("# TALON run filtering settings:\n")
-    o.write("# Fraction aligned: " + str(min_coverage) + "\n")
-    o.write("# Min identity to reference: " + str(min_identity) + "\n")
-    o.write("-------------------------------------------\n")
-    o.write("\t".join(["dataset", "read_ID", "fraction_aligned", "identity"]) + "\n")
+    o = open(outprefix + "_talon_QC.log", 'a')
 
     with open(sam_file) as sam:
         for line in sam:
@@ -1302,6 +1297,15 @@ def main():
     
     # Process the SAM files
     print "Processing SAM file......................"
+    qc_file = outprefix + "_talon_QC.log"
+    o = open(qc_file, 'w')
+    o.write("# TALON run filtering settings:\n")
+    o.write("# Fraction aligned: " + str(min_coverage) + "\n")
+    o.write("# Min identity to reference: " + str(min_identity) + "\n")
+    o.write("-------------------------------------------\n")
+    o.write("\t".join(["dataset", "read_ID", "fraction_aligned", "identity"]) + "\n")
+    o.close()
+
     novel_ids = {'datasets': {}, \
                  'genes': {}, \
                  'transcripts': {}, \
@@ -1325,7 +1329,7 @@ def main():
 
         print "Identifying transcripts in " + d_name + "..............."
         sam_transcripts = process_sam_file(sam, d_name, min_coverage, 
-                                           min_identity, out)
+                                           min_identity, qc_file)
         if len(sam_transcripts) == 0:
             print "Warning: no transcripts detected in file " + sam
         identify_sam_transcripts(sam_transcripts, gene_tree, annot_transcripts, 
