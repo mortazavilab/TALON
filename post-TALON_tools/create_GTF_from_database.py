@@ -4,6 +4,7 @@
 # create_GTF_from_database.py is a utility that outputs the genes, transcripts,
 # and exons stored a TALON database into a GTF annotation file. 
 
+import copy
 import itertools
 import operator
 from optparse import OptionParser
@@ -282,14 +283,25 @@ def create_gtf(database, annot, genome_build, whitelist):
             attribute = annot[3]
             value = annot[4]
             gene_annotation_dict[attribute] = value
+        gene_annot_original = copy.copy(gene_annotation_dict)
         gene_GTF = get_gene_GTF_entry(gene_ID, transcript_tuples, 
                                       gene_annotation_dict)
         print gene_GTF
     
         # Create a GTF entry for every transcript
         for transcript_entry in transcript_tuples:
+            transcript_ID = str(transcript_entry[1])
+            curr_transcript_annot = transcript_annotations[transcript_ID]
+       
+            transcript_annotation_dict = {}
+            for annot in curr_transcript_annot:
+                attribute = annot[3]
+                value = annot[4]
+                transcript_annotation_dict[attribute] = value
+            transcript_annot_original = copy.copy(transcript_annotation_dict)
             transcript_GTF_line = get_transcript_GTF_entry(transcript_entry, 
-                                                           transcript_annotations)
+                                                           gene_annot_original,
+                                                           transcript_annotation_dict)
             print transcript_GTF_line
             transcript_edges = str(transcript_entry[6]).split(",")
             
@@ -356,6 +368,71 @@ def format_GTF_tag_values_for_gene(gene_ID, annotation_dict):
 
     return attributes
 
+def format_GTF_tag_values_for_transcript(gene_ID, transcript_ID, gene_annot_dict,
+                                         transcript_annot_dict):
+    """ Parses the annotations for this gene, and supplements them where
+        necessary for novel transcripts """
+
+    attributes = []
+
+    # Mandatory: Gene ID
+    if "gene_id" in gene_annot_dict:
+        gene_ID_val = gene_annot_dict.pop("gene_id")
+    else:
+        gene_ID_val = gene_ID
+    attributes.append(make_descriptor_string("gene_id", gene_ID_val))
+
+    # Mandatory: Transcript ID
+    if "transcript_id" in transcript_annot_dict:
+        transcript_ID_val = transcript_annot_dict.pop("transcript_id")
+    else:
+        transcript_ID_val = transcript_ID
+    attributes.append(make_descriptor_string("transcript_id", transcript_ID_val))
+
+    # Mandatory: Gene Name
+    if "gene_name" in gene_annot_dict:
+        gene_name = gene_annot_dict.pop("gene_name")
+    else:
+        gene_name = "TALON_gene-" + str(gene_ID)
+    attributes.append(make_descriptor_string("gene_name", gene_name))
+
+    # Mandatory: Gene Status
+    gene_status = gene_annot_dict.pop("gene_status")
+    attributes.append(make_descriptor_string("gene_status", gene_status))
+
+    # Gene Type
+    if "gene_type" in gene_annot_dict:
+        gene_type = gene_annot_dict.pop("gene_type")
+        attributes.append(make_descriptor_string("gene_type", gene_type))
+ 
+    # Transcript Type
+    if "transcript_type" in transcript_annot_dict:
+        transcript_type = transcript_annot_dict.pop("transcript_type")
+        attributes.append(make_descriptor_string("transcript_type", transcript_type))
+
+    # Mandatory: Transcript Status
+    transcript_status = transcript_annot_dict.pop("transcript_status")
+    attributes.append(make_descriptor_string("transcript_status", transcript_status))
+    
+    # Mandatory: Transcript Name
+    if "transcript_name" in transcript_annot_dict:
+        transcript_name = transcript_annot_dict.pop("transcript_name")
+    else:
+        gene_name = "TALON_transcript-" + str(transcript_ID)
+    attributes.append(make_descriptor_string("transcript_name", transcript_name))
+    
+    # TALON Gene ID
+    attributes.append(make_descriptor_string("talon_gene", gene_ID))
+
+    # TALON Transcript ID
+    attributes.append(make_descriptor_string("talon_transcript", transcript_ID))
+
+    # Add any remaining annotations
+    for attribute,value in sorted(transcript_annot_dict.iteritems()):
+        attributes.append(make_descriptor_string(attribute, value)) 
+
+    return attributes
+
 def get_gene_GTF_entry(gene_ID, associated_transcript_tuples, annotation_dict):
     """ Creates a GTF annotation entry for the given gene """
 
@@ -379,23 +456,32 @@ def get_gene_GTF_entry(gene_ID, associated_transcript_tuples, annotation_dict):
     return GTF
 
 
-def get_transcript_GTF_entry(transcript_entry, transcript_annotations):
+def get_transcript_GTF_entry(transcript_entry, curr_gene_annot_dict, curr_transcript_annot_dict):
     """ Creates a GTF annotation entry for the given transcript """
 
-    transcript_ID = str(transcript_entry[1])
-    curr_transcript_annot = transcript_annotations[transcript_ID]
+    if "source" in curr_transcript_annot_dict:
+        source = curr_transcript_annot_dict["source"]
+    else:
+        source = "TALON"
+
+    gene_ID = transcript_entry[0]
+    transcript_ID = transcript_entry[1]
 
     # GTF fields for transcript
     chromosome = str(transcript_entry[2])
-    source = [ str(x[-1]) for x in curr_transcript_annot if str(x[-2]) == "source"][0]
     feature = "transcript"
     start = str(transcript_entry[3])
     end = str(transcript_entry[4])
     score = "."
     strand = transcript_entry[5]
     frame = "."
+    attributes = " ".join(format_GTF_tag_values_for_transcript(gene_ID, 
+                                                               transcript_ID, 
+                                                               curr_gene_annot_dict,
+                                                               curr_transcript_annot_dict))
 
-    GTF = "\t".join([chromosome, source, feature, start, end, score, strand, frame])
+    GTF = "\t".join([chromosome, source, feature, start, end, score, strand,
+                     frame, attributes])
     return GTF
 
 def get_exon_GTF_entry(exon_ID, exon_ID_2_location, exon_annotations):
