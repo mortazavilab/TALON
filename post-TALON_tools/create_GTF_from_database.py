@@ -275,7 +275,15 @@ def create_gtf(database, annot, genome_build, whitelist):
     # Create a GTF entry for every gene
     for gene_ID, transcript_tuples in gene_2_transcripts.iteritems():
 
-        gene_GTF = get_gene_GTF_entry(gene_ID, transcript_tuples, gene_annotations)
+        curr_annot = gene_annotations[gene_ID]
+
+        gene_annotation_dict = {}
+        for annot in curr_annot:
+            attribute = annot[3]
+            value = annot[4]
+            gene_annotation_dict[attribute] = value
+        gene_GTF = get_gene_GTF_entry(gene_ID, transcript_tuples, 
+                                      gene_annotation_dict)
         print gene_GTF
     
         # Create a GTF entry for every transcript
@@ -294,23 +302,80 @@ def create_gtf(database, annot, genome_build, whitelist):
                 exit()
         exit()
 
-def get_gene_GTF_entry(gene_ID, associated_transcript_tuples, gene_annotations):
+def make_descriptor_string(attribute, value):
+    """ Create a key-value string to form part of a GTF entry.
+        Example:    gene_id and ENSG00000117676.13
+                          becomes
+                    gene_id "ENSG00000117676.13";
+    """
+
+    return str(attribute) + ' "' + str(value) + '";'
+
+def format_GTF_tag_values_for_gene(gene_ID, annotation_dict):
+    """ Parses the annotations for this gene, and supplements them where 
+        necessary for novel transcripts """
+ 
+    attributes = []
+
+    # Mandatory: Gene ID
+    if "gene_id" in annotation_dict:
+        gene_ID_val = annotation_dict.pop("gene_id")
+    else:
+        gene_ID_val = gene_ID
+    attributes.append(make_descriptor_string("gene_id", gene_ID_val))
+
+    # Mandatory: Gene Name
+    if "gene_name" in annotation_dict:
+        gene_name = annotation_dict.pop("gene_name")
+    else:
+        gene_name = "TALON-" + str(gene_ID)
+    attributes.append(make_descriptor_string("gene_name", gene_name))
+
+    # Mandatory: Gene Status
+    gene_status = annotation_dict.pop("gene_status")
+    attributes.append(make_descriptor_string("gene_status", gene_status))
+   
+    # Gene type
+    if "gene_type" in annotation_dict:
+        gene_type = annotation_dict.pop("gene_type")
+        attributes.append(make_descriptor_string("gene_type", gene_type))
+
+    # Source
+    if "source" in annotation_dict:
+        source = annotation_dict.pop("source")
+    else:
+        source = "TALON"
+        attributes.append(make_descriptor_string("source", source))
+    
+    # TALON Gene ID
+    attributes.append(make_descriptor_string("talon_gene", gene_ID)) 
+
+    # Add any remaining annotations
+    for attribute,value in sorted(annotation_dict.iteritems()):
+        attributes.append(make_descriptor_string(attribute, value))
+
+    return attributes
+
+def get_gene_GTF_entry(gene_ID, associated_transcript_tuples, annotation_dict):
     """ Creates a GTF annotation entry for the given gene """
 
-    # Get attribute info for gene
-    curr_annot = gene_annotations[gene_ID]
+    if "source" in annotation_dict:
+        source = annotation_dict["source"]
+    else:
+        source = "TALON"
 
     # GTF fields
     chromosome = associated_transcript_tuples[0][2]
-    source = [ str(x[-1]) for x in curr_annot if str(x[-2]) == "source"][0]
     feature = "gene"
     start = str(associated_transcript_tuples[0][3])
     end = str(associated_transcript_tuples[-1][4])
     score = "."
     strand = associated_transcript_tuples[0][5]
     frame = "."
+    attributes = " ".join(format_GTF_tag_values_for_gene(gene_ID, annotation_dict))
 
-    GTF = "\t".join([chromosome, source, feature, start, end, score, strand, frame])
+    GTF = "\t".join([chromosome, source, feature, start, end, score, strand, 
+                     frame, attributes])
     return GTF
 
 
