@@ -10,6 +10,7 @@ from optparse import OptionParser
 import sqlite3
 import warnings
 import filter_talon_transcripts as filt
+import pdb
 import sys
 sys.path.append("..")
 import talon as TALON
@@ -145,6 +146,7 @@ def get_annotations(database, feat_type, annot, whitelist = None):
     cursor = conn.cursor()
 
     table_name = feat_type + "_annotations"
+
     if whitelist == None:
         query = "SELECT * FROM " + table_name + " WHERE annot_name = '" + annot + "'"
     else:
@@ -208,7 +210,41 @@ def get_gene_2_transcripts(database, genome_build, whitelist):
         # Sort by transcript start position
         gene_groups[str(key)] = sorted(list(group), key=lambda x: x[3])
 
+    conn.close()
     return gene_groups 
+
+def fetch_exon_locations(database, genome_build):
+    """ Queries the database to create a dictionary mapping exon IDs to 
+        the chromosome, start, end, and strand of the exon """
+
+    conn = sqlite3.connect(database)
+    cursor = conn.cursor()
+
+    query = """
+            SELECT 
+                e.edge_ID,
+                loc1.chromosome,
+                MIN(loc1.position,loc2.position),
+                MAX(loc1.position,loc2.position),
+                loc1.strand
+             FROM edge e
+             LEFT JOIN location loc1 ON e.v1 = loc1.location_ID
+             LEFT JOIN location loc2 ON e.v2 = loc2.location_ID
+             WHERE loc1.genome_build = '""" + genome_build + """' AND
+             loc2.genome_build = '""" + genome_build + \
+             """' AND e.edge_type = 'exon';"""
+    
+    cursor.execute(query)
+    exon_location_tuples = cursor.fetchall()
+
+    # Create dictionary
+    exon_locations = {}
+    for loc_tuple in exon_location_tuples:
+        exon_ID = str(loc_tuple[0])
+        exon_locations[exon_ID] = loc_tuple[1:]
+
+    conn.close() 
+    return exon_locations
 
 def create_gtf(database, annot, genome_build, whitelist):
 
@@ -227,49 +263,92 @@ def create_gtf(database, annot, genome_build, whitelist):
                                              whitelist = transcript_whitelist) 
     exon_annotations = get_annotations(database, "exon", annot)
 
-
-
     # Get transcript data from the database
     gene_2_transcripts = get_gene_2_transcripts(database, genome_build, 
                          transcript_whitelist)
 
-    # TODO: iterate over gene groups
+    # Get exon location info from database
+    exon_ID_2_location = fetch_exon_locations(database, genome_build)
+ 
+    # -------------------------------------------------------------
+
+    # Create a GTF entry for every gene
     for gene_ID, transcript_tuples in gene_2_transcripts.iteritems():
 
-        # Get attribute info for gene
-        curr_annot = gene_annotations[gene_ID]
-                 
-        # GTF fields
-        chromosome = transcript_tuples[0][2]
-        source = [ str(x[-1]) for x in curr_annot if str(x[-2]) == "source"][0]
-        feature = "gene"
-        start = transcript_tuples[0][3]
-        end = transcript_tuples[-1][4]
-        score = "."
-        strand = transcript_tuples[0][5]
-        frame = "."
-        
-
-        print "\t".join([chromosome, source, feature, str(start), str(end),
-                         score, strand, frame]) 
-
+        gene_GTF = get_gene_GTF_entry(gene_ID, transcript_tuples, gene_annotations)
+        print gene_GTF
+    
+        # Create a GTF entry for every transcript
         for transcript_entry in transcript_tuples:
-            # Get attribute info for transcript
-            transcript_ID = str(transcript_entry[1])
-            curr_transcript_annot = transcript_annotations[transcript_ID]
+            transcript_GTF_line = get_transcript_GTF_entry(transcript_entry, 
+                                                           transcript_annotations)
+            print transcript_GTF_line
+            transcript_edges = str(transcript_entry[6]).split(",")
             
-            # GTF fields
-            chromosome = transcript_tuples[0][2]
-            source = [ str(x[-1]) for x in curr_transcript_annot if str(x[-2]) == "source"][0]
-            feature = "transcript"
-            start = transcript_entry[3]
-            end = transcript_entry[4]
-            score = "."
-            strand = transcript_entry[5]
-            frame = "."         
-            print "\t".join([chromosome, source, feature, str(start), str(end),
-                         score, strand, frame])
+
+            # Create a GTF entry for every exon (skip introns)
+            for exon_ID in transcript_edges[::2]:
+                exon_GTF_line = get_exon_GTF_entry(exon_ID, exon_ID_2_location, 
+                                                   exon_annotations)
+                print exon_GTF_line   
+                exit()
         exit()
+
+def get_gene_GTF_entry(gene_ID, associated_transcript_tuples, gene_annotations):
+    """ Creates a GTF annotation entry for the given gene """
+
+    # Get attribute info for gene
+    curr_annot = gene_annotations[gene_ID]
+
+    # GTF fields
+    chromosome = associated_transcript_tuples[0][2]
+    source = [ str(x[-1]) for x in curr_annot if str(x[-2]) == "source"][0]
+    feature = "gene"
+    start = str(associated_transcript_tuples[0][3])
+    end = str(associated_transcript_tuples[-1][4])
+    score = "."
+    strand = associated_transcript_tuples[0][5]
+    frame = "."
+
+    GTF = "\t".join([chromosome, source, feature, start, end, score, strand, frame])
+    return GTF
+
+
+def get_transcript_GTF_entry(transcript_entry, transcript_annotations):
+    """ Creates a GTF annotation entry for the given transcript """
+
+    transcript_ID = str(transcript_entry[1])
+    curr_transcript_annot = transcript_annotations[transcript_ID]
+
+    # GTF fields for transcript
+    chromosome = str(transcript_entry[2])
+    source = [ str(x[-1]) for x in curr_transcript_annot if str(x[-2]) == "source"][0]
+    feature = "transcript"
+    start = str(transcript_entry[3])
+    end = str(transcript_entry[4])
+    score = "."
+    strand = transcript_entry[5]
+    frame = "."
+
+    GTF = "\t".join([chromosome, source, feature, start, end, score, strand, frame])
+    return GTF
+
+def get_exon_GTF_entry(exon_ID, exon_ID_2_location, exon_annotations):
+    """ Creates a GTF annotation entry for the given exon """
+
+    curr_exon_location = exon_ID_2_location[exon_ID]
+    curr_exon_annot = exon_annotations[exon_ID]
+    chromosome = str(curr_exon_location[0])
+    source = [ str(x[-1]) for x in curr_exon_annot if str(x[-2]) == "source"][0]
+    feature = "exon"
+    start = str(curr_exon_location[1])
+    end = str(curr_exon_location[2])
+    score = "."
+    strand = curr_exon_location[3]
+    frame = "."
+
+    GTF = "\t".join([chromosome, source, feature, start, end, score, strand, frame])
+    return GTF
 
 def main():
     options = getOptions()
@@ -277,6 +356,12 @@ def main():
     annot = options.annot
     build = options.build
     outfile = create_outname(options)
+
+    if build == None:
+        raise ValueError("Please provide a valid genome build name")
+    if annot == None:
+        raise ValueError("Please provide a valid annotation name")
+
 
     # Determine which transcripts to include
     transcript_whitelist = handle_filtering(options)
