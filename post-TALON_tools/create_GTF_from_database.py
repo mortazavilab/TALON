@@ -149,11 +149,12 @@ def get_annotations(database, feat_type, annot, whitelist = None):
     table_name = feat_type + "_annotations"
 
     if whitelist == None:
-        query = "SELECT * FROM " + table_name + " WHERE annot_name = '" + annot + "'"
+        query = "SELECT * FROM " + table_name + " WHERE annot_name = '" + annot + \
+         "' OR annot_name = 'talon_run'"
     else:
         whitelist_string = "(" + ','.join(whitelist) + ")"
-        query = "SELECT * FROM " + table_name + " WHERE annot_name = '" + annot + \
-                "' AND ID IN " + whitelist_string
+        query = "SELECT * FROM " + table_name + " WHERE (annot_name = '" + annot + \
+                "' OR annot_name = 'talon_run') AND ID IN " + whitelist_string
 
     cursor.execute(query)
     annotation_tuples = cursor.fetchall()
@@ -204,14 +205,15 @@ def get_gene_2_transcripts(database, genome_build, whitelist):
 
     # Sort based on gene ID
     sorted_transcript_tuples = sorted(transcript_tuples, key=lambda x: x[0])
-
-    # Group by gene ID and store in a dictionary
+    
     gene_groups = {}
-    for key,group in itertools.groupby(transcript_tuples,operator.itemgetter(0)):
+
+    gene_groups = {}
+    for key,group in itertools.groupby(sorted_transcript_tuples,operator.itemgetter(0)):
         # Sort by transcript start position
         gene_groups[str(key)] = sorted(list(group), key=lambda x: x[3])
-
     conn.close()
+
     return gene_groups 
 
 def fetch_exon_locations(database, genome_build):
@@ -247,17 +249,17 @@ def fetch_exon_locations(database, genome_build):
     conn.close() 
     return exon_locations
 
-def create_gtf(database, annot, genome_build, whitelist):
+def create_gtf(database, annot, genome_build, whitelist, outfile):
 
-    # Divide transcript tuples into separate sublists based on gene
-    gene_groups = []
+    # Create separate gene and transcript whitelists
+    gene_whitelist = []
+    transcript_whitelist = []
     for key,group in itertools.groupby(whitelist,operator.itemgetter(0)):
-        gene_groups.append(list(group))
+        gene_whitelist.append(key)
+        for id_tuple in list(group):
+            transcript_whitelist.append(id_tuple[1])
 
     # Get gene, transcript, and exon annotations
-    gene_whitelist = [ x[0] for x in whitelist ]
-    transcript_whitelist = [ x[1] for x in whitelist ]
-
     gene_annotations = get_annotations(database, "gene", annot, 
                                        whitelist = gene_whitelist)  
     transcript_annotations = get_annotations(database, "transcript", annot,
@@ -273,9 +275,10 @@ def create_gtf(database, annot, genome_build, whitelist):
  
     # -------------------------------------------------------------
 
+    o = open(outfile, 'w')
+
     # Create a GTF entry for every gene
     for gene_ID, transcript_tuples in gene_2_transcripts.iteritems():
-
         curr_annot = gene_annotations[gene_ID]
 
         gene_annotation_dict = {}
@@ -283,12 +286,11 @@ def create_gtf(database, annot, genome_build, whitelist):
             attribute = annot[3]
             value = annot[4]
             gene_annotation_dict[attribute] = value
-        gene_annot_original = copy.copy(gene_annotation_dict)
-        gene_GTF = get_gene_GTF_entry(gene_ID, transcript_tuples, 
-                                      gene_annotation_dict)
-        print gene_GTF
+        gene_GTF_line = get_gene_GTF_entry(gene_ID, transcript_tuples, 
+                                      copy.copy(gene_annotation_dict))
+        o.write(gene_GTF_line + "\n")
     
-        # Create a GTF entry for every transcript
+        # Create a GTF entry for every transcript of this gene
         for transcript_entry in transcript_tuples:
             transcript_ID = str(transcript_entry[1])
             curr_transcript_annot = transcript_annotations[transcript_ID]
@@ -298,21 +300,34 @@ def create_gtf(database, annot, genome_build, whitelist):
                 attribute = annot[3]
                 value = annot[4]
                 transcript_annotation_dict[attribute] = value
-            transcript_annot_original = copy.copy(transcript_annotation_dict)
             transcript_GTF_line = get_transcript_GTF_entry(transcript_entry, 
-                                                           gene_annot_original,
-                                                           transcript_annotation_dict)
-            print transcript_GTF_line
+                                            copy.copy(gene_annotation_dict),
+                                       copy.copy(transcript_annotation_dict))
+            o.write(transcript_GTF_line + "\n")
             transcript_edges = str(transcript_entry[6]).split(",")
             
 
-            # Create a GTF entry for every exon (skip introns)
+            # Create a GTF entry for every exon of this transcript (skip introns)
+            exon_num = 1
             for exon_ID in transcript_edges[::2]:
-                exon_GTF_line = get_exon_GTF_entry(exon_ID, exon_ID_2_location, 
-                                                   exon_annotations)
-                print exon_GTF_line   
-                exit()
-        exit()
+                curr_exon_annot = exon_annotations[exon_ID]
+
+                exon_annotation_dict = {}
+                for annot in curr_exon_annot:
+                    attribute = annot[3]
+                    value = annot[4]
+                    exon_annotation_dict[attribute] = value
+
+                exon_GTF_line = get_exon_GTF_entry(gene_ID, transcript_ID, 
+                                                   exon_ID, exon_num,
+                                                   exon_ID_2_location,
+                                                   copy.copy(gene_annotation_dict), 
+                                                   copy.copy(transcript_annotation_dict),
+                                                   exon_annotation_dict)
+                o.write(exon_GTF_line + "\n")
+                exon_num += 1
+    o.close()
+    return
 
 def make_descriptor_string(attribute, value):
     """ Create a key-value string to form part of a GTF entry.
@@ -370,7 +385,7 @@ def format_GTF_tag_values_for_gene(gene_ID, annotation_dict):
 
 def format_GTF_tag_values_for_transcript(gene_ID, transcript_ID, gene_annot_dict,
                                          transcript_annot_dict):
-    """ Parses the annotations for this gene, and supplements them where
+    """ Parses the annotations for this transcript, and supplements them where
         necessary for novel transcripts """
 
     attributes = []
@@ -418,7 +433,7 @@ def format_GTF_tag_values_for_transcript(gene_ID, transcript_ID, gene_annot_dict
     if "transcript_name" in transcript_annot_dict:
         transcript_name = transcript_annot_dict.pop("transcript_name")
     else:
-        gene_name = "TALON_transcript-" + str(transcript_ID)
+        transcript_name = "TALON_transcript-" + str(transcript_ID)
     attributes.append(make_descriptor_string("transcript_name", transcript_name))
     
     # TALON Gene ID
@@ -430,6 +445,87 @@ def format_GTF_tag_values_for_transcript(gene_ID, transcript_ID, gene_annot_dict
     # Add any remaining annotations
     for attribute,value in sorted(transcript_annot_dict.iteritems()):
         attributes.append(make_descriptor_string(attribute, value)) 
+
+    return attributes
+
+def format_GTF_tag_values_for_exon(gene_ID, transcript_ID, exon_ID, exon_number,
+                                   gene_annot_dict, transcript_annot_dict, 
+                                   exon_annot_dict):
+    """ Parses the annotations for this exon, and supplements them where
+        necessary for novel exons """
+
+    attributes = []
+
+    # Mandatory: Gene ID
+    if "gene_id" in gene_annot_dict:
+        gene_ID_val = gene_annot_dict.pop("gene_id")
+    else:
+        gene_ID_val = gene_ID
+    attributes.append(make_descriptor_string("gene_id", gene_ID_val))
+
+    # Mandatory: Transcript ID
+    if "transcript_id" in transcript_annot_dict:
+        transcript_ID_val = transcript_annot_dict.pop("transcript_id")
+    else:
+        transcript_ID_val = transcript_ID
+    attributes.append(make_descriptor_string("transcript_id", transcript_ID_val))
+
+    # Gene Type
+    if "gene_type" in gene_annot_dict:
+        gene_type = gene_annot_dict.pop("gene_type")
+        attributes.append(make_descriptor_string("gene_type", gene_type))
+
+    # Mandatory: Gene Status
+    gene_status = gene_annot_dict.pop("gene_status")
+    attributes.append(make_descriptor_string("gene_status", gene_status))
+
+    # Mandatory: Gene Name
+    if "gene_name" in gene_annot_dict:
+        gene_name = gene_annot_dict.pop("gene_name")
+    else:
+        gene_name = "TALON_gene-" + str(gene_ID)
+    attributes.append(make_descriptor_string("gene_name", gene_name))
+
+    # Transcript Type
+    if "transcript_type" in transcript_annot_dict:
+        transcript_type = transcript_annot_dict.pop("transcript_type")
+        attributes.append(make_descriptor_string("transcript_type", transcript_type))
+
+    # Mandatory: Transcript Status
+    transcript_status = transcript_annot_dict.pop("transcript_status")
+    attributes.append(make_descriptor_string("transcript_status", transcript_status))
+
+    # Mandatory: Transcript Name
+    if "transcript_name" in transcript_annot_dict:
+        transcript_name = transcript_annot_dict.pop("transcript_name")
+    else:
+        transcript_name = "TALON_transcript-" + str(transcript_ID)
+    attributes.append(make_descriptor_string("transcript_name", transcript_name))
+
+    # Exon number
+    attributes.append(make_descriptor_string("exon_number", exon_number))
+
+    # Exon ID
+    if "exon_id" in exon_annot_dict:
+        exon_ID_val = exon_annot_dict.pop("exon_id")
+    else:
+        exon_ID_val = exon_ID
+    attributes.append(make_descriptor_string("exon_id", exon_ID_val))
+
+    # TALON Gene ID
+    attributes.append(make_descriptor_string("talon_gene", gene_ID))
+
+    # TALON Transcript ID
+    attributes.append(make_descriptor_string("talon_transcript", transcript_ID))
+
+    # TALON Exon ID
+    attributes.append(make_descriptor_string("talon_exon", exon_ID))
+    if "exon_number" in exon_annot_dict:
+        exon_annot_dict.pop("exon_number")
+
+    # Add any remaining annotations
+    for attribute,value in sorted(exon_annot_dict.iteritems()):
+        attributes.append(make_descriptor_string(attribute, value))
 
     return attributes
 
@@ -451,7 +547,7 @@ def get_gene_GTF_entry(gene_ID, associated_transcript_tuples, annotation_dict):
     frame = "."
     attributes = " ".join(format_GTF_tag_values_for_gene(gene_ID, annotation_dict))
 
-    GTF = "\t".join([chromosome, source, feature, start, end, score, strand, 
+    GTF = '\t'.join([chromosome, source, feature, start, end, score, strand, 
                      frame, attributes])
     return GTF
 
@@ -480,25 +576,37 @@ def get_transcript_GTF_entry(transcript_entry, curr_gene_annot_dict, curr_transc
                                                                curr_gene_annot_dict,
                                                                curr_transcript_annot_dict))
 
-    GTF = "\t".join([chromosome, source, feature, start, end, score, strand,
+    GTF = '\t'.join([chromosome, source, feature, start, end, score, strand,
                      frame, attributes])
     return GTF
 
-def get_exon_GTF_entry(exon_ID, exon_ID_2_location, exon_annotations):
+def get_exon_GTF_entry(gene_ID, transcript_ID, exon_ID, exon_num, exon_ID_2_location, 
+                       curr_gene_annot_dict, curr_transcript_annot_dict,
+                       curr_exon_annot_dict):
     """ Creates a GTF annotation entry for the given exon """
 
+    if "source" in curr_exon_annot_dict:
+        source = curr_exon_annot_dict["source"]
+    else:
+        source = "TALON"
+
     curr_exon_location = exon_ID_2_location[exon_ID]
-    curr_exon_annot = exon_annotations[exon_ID]
     chromosome = str(curr_exon_location[0])
-    source = [ str(x[-1]) for x in curr_exon_annot if str(x[-2]) == "source"][0]
     feature = "exon"
     start = str(curr_exon_location[1])
     end = str(curr_exon_location[2])
     score = "."
     strand = curr_exon_location[3]
     frame = "."
+    attributes = " ".join(format_GTF_tag_values_for_exon(gene_ID, 
+                                                         transcript_ID, 
+                                                         exon_ID, exon_num,
+                                                         curr_gene_annot_dict,
+                                                         curr_transcript_annot_dict,
+                                                         curr_exon_annot_dict))
 
-    GTF = "\t".join([chromosome, source, feature, start, end, score, strand, frame])
+    GTF = '\t'.join([chromosome, source, feature, start, end, score, strand, 
+                     frame, attributes])
     return GTF
 
 def main():
@@ -517,7 +625,7 @@ def main():
     # Determine which transcripts to include
     transcript_whitelist = handle_filtering(options)
 
-    create_gtf(database, annot, build, transcript_whitelist)    
+    create_gtf(database, annot, build, transcript_whitelist, outfile)    
     
 
 if __name__ == '__main__':
