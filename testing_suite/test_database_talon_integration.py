@@ -10,6 +10,7 @@ sys.path.append("..")
 import talon as TALON
 sys.path.append("../post-TALON_tools")
 import filter_talon_transcripts as filt
+import create_GTF_from_database as createGTF
 @pytest.mark.integration
 
 class TestDatabaseTalonIntegration(object):
@@ -193,5 +194,44 @@ class TestDatabaseTalonIntegration(object):
         transcripts = [ x[1] for x in transcript_tuples ]
 
         assert sorted(transcripts) == sorted(expected_transcripts)
+
+    #--------- GTF testing section, which requires a TALON database ------
+
+    @pytest.mark.incremental
+    def test_gtf_get_gene_2_transcripts(self):
+        """ Make sure that all genes and transcripts get included in this
+            data structure that maps each TALON gene ID to its transcript
+            tuples (from database). Also ensure that transcripts are
+            sorted based on start position (ascending). """
+
+        database = "scratch/known_and_novel_test_case.db"
+        genome_build = "hg38"
+        whitelist = [ str(x) for x in range(1,43) ]
+
+        gene_2_transcripts = createGTF.get_gene_2_transcripts(database, 
+                                                              genome_build, 
+                                                              whitelist)
+
+        # Check if the keys (genes) match what's expected
+        assert sorted(gene_2_transcripts.keys()) == [str(x) for x in range(1,5)] 
+        
+        # For each gene, check that the transcripts expected are present and 
+        # in the correct order
+        for gene in sorted(gene_2_transcripts.keys()):
+            transcript_tuples = gene_2_transcripts[gene]
+            transcript_ids = [ x[1] for x in transcript_tuples ]
+            if gene == "1":
+                expected_transcripts = [15,26,36,5,27,33,29,12,24,38,34,14,18,7,23,35,16,11,39,9]
+                assert transcript_ids == expected_transcripts
+            if gene == "2":
+                expected_transcripts = [25,6,8,40,17,32,19,28,41,37,21,20,4,22,31,1]
+                assert transcript_ids == expected_transcripts
+            if gene == "3":
+                assert transcript_ids == [13,30,10,2,3]
+            if gene == "4":
+                assert transcript_ids == [42]
+
+
+
 
 
