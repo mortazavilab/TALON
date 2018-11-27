@@ -231,7 +231,26 @@ class TestDatabaseTalonIntegration(object):
             if gene == "4":
                 assert transcript_ids == [42]
 
+    @pytest.mark.incremental
+    def test_validate_GTF(self):
+        """ Run code to create a GTF from the test example, then validate
+            the GTF file by running ..."""
 
+        # Create the GTF
+        try:
+            subprocess.check_output(
+                 ["python", "../post-TALON_tools/create_GTF_from_database.py",
+                  "--db", "scratch/known_and_novel_test_case.db",
+                  "-b", "hg38", "-a", "test", "--o", "scratch/known_and_novel"])
+        except:
+            pytest.fail("GTF creation code crashed")
+
+        # Check whether Bedtools sort runs on the GTF without crashing
+        try:
+            subprocess.check_output(
+                ["bedtools", "sort", "-i", "scratch/known_and_novel_talon.gtf"])
+        except:
+            pytest.fail("Bedtools crashed while trying to sort GTF- likely a formatting problem")
 
 
 
