@@ -13,9 +13,10 @@ import warnings
 import filter_talon_transcripts as filt
 import pdb
 import sys
-sys.path.append("..")
-import talon as TALON
 import os
+script_dir = os.path.dirname(os.path.realpath(__file__))
+sys.path.append(os.path.abspath(os.path.join(script_dir, os.pardir)))
+import talon as TALON
 
 def getOptions():
     parser = OptionParser()
@@ -78,7 +79,13 @@ def handle_filtering(options):
         print "--------------------------------------"
         print "Running transcript filtering process:"
         if pairings != None:
-            whitelist = filt.filter_talon_transcripts(database, annot, dataset_pairings = pairings)
+            pairings_list = []
+            with open(pairings, 'r') as f:
+                for pairing in f:
+                    pairings_list.append(pairing.strip().split(","))
+
+            whitelist = filt.filter_talon_transcripts(database, annot, 
+                                  dataset_pairings = pairings_list)
         else:
             whitelist = filt.filter_talon_transcripts(database, annot)
         print "--------------------------------------"
