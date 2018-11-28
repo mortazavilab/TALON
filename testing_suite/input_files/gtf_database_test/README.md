@@ -11,4 +11,7 @@ grep '"ACTB";' /bio/dwyman/pacbio_f2016/data/GENCODEv24/gencode.v24.annotation.g
 grep '"LINC01128";' /bio/dwyman/pacbio_f2016/data/GENCODEv24/gencode.v24.annotation.gtf >> test.gtf
 grep '"RPS6KA1";' /bio/dwyman/pacbio_f2016/data/GENCODEv24/gencode.v24.annotation.gtf >> test.gtf
 grep '"XIST";' /bio/dwyman/pacbio_f2016/data/GENCODEv24/gencode.v24.annotation.gtf >> test.gtf
+
+awk '{if($3 == "gene" || $3 == "transcript" || $3 == "exon") print $0}' test.gtf > tmp.gtf
+mv tmp.gtf test.gtf
 ```

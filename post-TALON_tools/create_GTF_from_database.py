@@ -207,8 +207,6 @@ def get_gene_2_transcripts(database, genome_build, whitelist):
     sorted_transcript_tuples = sorted(transcript_tuples, key=lambda x: x[0])
     
     gene_groups = {}
-
-    gene_groups = {}
     for key,group in itertools.groupby(sorted_transcript_tuples,operator.itemgetter(0)):
         # Sort by transcript start position
         gene_groups[str(key)] = sorted(list(group), key=lambda x: x[3])

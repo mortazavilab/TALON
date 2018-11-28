@@ -266,13 +266,75 @@ class TestDatabaseTalonIntegration(object):
         # Check to see that the GTF we generated matches the original, pre-TALON
         # GTF that was used to build the database originally (known transcripts
         # only).
-
+        # ---------------------------------------------------------------------
         # Check the first 8 fields first for transcripts and exons. These have
         # very fixed start and endpoints.
+        subset_gtf(["transcript", "exon"], range(1,9), 
+                  "input_files/gtf_database_test/test.gtf",
+                  "scratch/original_coords.txt")    
+        subset_gtf(["transcript", "exon"], range(1,9),
+                    "scratch/gtftest_talon.gtf", "scratch/talon_coords.txt")
 
-        os.system("""awk '{if($3 == "transcript" || $3 == "exon") print $1,$2,$3,$4,$5,$6,$7,$8}' input_files/gtf_database_test/test.gtf | sort > scratch/original_coords.txt""")
-        os.system("""awk '{if($3 == "transcript" || $3 == "exon") print $1,$2,$3,$4,$5,$6,$7,$8}' scratch/gtftest_talon.gtf | sort > scratch/talon_coords.txt""")
-        diff = subprocess.check_output(["diff", "scratch/original_coords.txt", "scratch/talon_coords.txt"])
-
+        diff = subprocess.check_output(["diff", "scratch/original_coords.txt", 
+                                        "scratch/talon_coords.txt"])
         assert diff == ""
 
+        # Check the first 8 fields (minus column 5) for genes. The ends
+        # will differ because I compute them based on all of the transcripts
+        # of each gene 
+        subset_gtf(["gene"], [1,2,3,4,6,7,8], "input_files/gtf_database_test/test.gtf",
+                  "scratch/original_gene_coords.txt")
+        subset_gtf(["gene"], [1,2,3,4,6,7,8], "scratch/gtftest_talon.gtf", 
+                   "scratch/talon_gene_coords.txt")
+     
+        gdiff = subprocess.check_output(["diff", "scratch/original_gene_coords.txt", 
+                                        "scratch/talon_gene_coords.txt"])   
+        assert gdiff == ""
+
+        # Check that the attributes before and after match (ignoring attribute
+        # fields with 'talon' in the name, of course)
+        subset_gtf(["gene", "transcript", "exon"], range(1,10),
+                  "input_files/gtf_database_test/test.gtf",
+                  "scratch/sorted_original_gtf.txt")
+        subset_gtf(["gene", "transcript", "exon"], range(1,10),
+                    "scratch/gtftest_talon.gtf", "scratch/sorted_talon_gtf.txt")
+
+        orig = open("scratch/sorted_original_gtf.txt", 'r')
+        talon = open("scratch/sorted_talon_gtf.txt", 'r')
+        for line_o,line_t in zip(orig, talon):        
+            attributes_before = create_attribute_dict(line_o)
+            attributes_after = create_attribute_dict(line_t)
+            assert attributes_before == attributes_after
+        orig.close()
+        talon.close()
+
+def subset_gtf(features, cols, infile, outfile):
+    """ Selects lines of GTF that match features, and trims to include only
+        the columns provided. Writes clipped lines in sorted order to outfile"""
+
+    feat_str = 'if($3 == ' + "|| $3 ==".join(['"' + x + '"' for x in features]) + ")"
+    col_str = "$" + ",$".join([str(x) for x in cols])
+
+    cmd = " ".join(["awk -F\t '{", feat_str, "print", col_str, "}'", infile, 
+                    "| sort >", outfile])
+
+    os.system(cmd)
+    return
+
+def create_attribute_dict(gtf_line):
+    """ Creates a dictionary from the key-value GTF attribute pairs for the
+        provided GTF line. Ignores attributes with the string 'talon' in them. 
+    """
+
+    attributes = {}
+    att_col = gtf_line.strip().split("\t")[8]
+    atts = att_col.split(";").strip()
+    for att_pair in atts:
+        key, value = att_pair.split(" ")
+        if "talon" in key:
+            continue
+
+        attributes[key] = value
+
+    return attributes
+            
