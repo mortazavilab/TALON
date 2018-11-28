@@ -3,6 +3,7 @@
 # addition over time) are working correctly.
 
 import pytest
+import os
 import subprocess
 import sqlite3
 import sys
@@ -236,21 +237,42 @@ class TestDatabaseTalonIntegration(object):
         """ Run code to create a GTF from the test example, then validate
             the GTF file by running ..."""
 
+        # Create a new database from the GTF
+        try:
+            subprocess.check_output(
+                ["python", "../initialize_talon_database.py",
+                 "--f", "input_files/gtf_database_test/test.gtf",
+                 "--a",  "test", "--l", "0",
+                 "--g",  "hg38", "--o", "scratch/gtftest"])
+        except:
+            pytest.fail("TALON database init failed on known_novel test case")
+
         # Create the GTF
         try:
             subprocess.check_output(
                  ["python", "../post-TALON_tools/create_GTF_from_database.py",
-                  "--db", "scratch/known_and_novel_test_case.db",
-                  "-b", "hg38", "-a", "test", "--o", "scratch/known_and_novel"])
+                  "--db", "scratch/gtftest.db",
+                  "-b", "hg38", "-a", "test", "--o", "scratch/gtftest"])
         except:
             pytest.fail("GTF creation code crashed")
 
         # Check whether Bedtools sort runs on the GTF without crashing
         try:
             subprocess.check_output(
-                ["bedtools", "sort", "-i", "scratch/known_and_novel_talon.gtf"])
+                ["bedtools", "sort", "-i", "scratch/gtftest_talon.gtf"])
         except:
             pytest.fail("Bedtools crashed while trying to sort GTF- likely a formatting problem")
 
+        # Check to see that the GTF we generated matches the original, pre-TALON
+        # GTF that was used to build the database originally (known transcripts
+        # only).
 
+        # Check the first 8 fields first for transcripts and exons. These have
+        # very fixed start and endpoints.
+
+        os.system("""awk '{if($3 == "transcript" || $3 == "exon") print $1,$2,$3,$4,$5,$6,$7,$8}' input_files/gtf_database_test/test.gtf | sort > scratch/original_coords.txt""")
+        os.system("""awk '{if($3 == "transcript" || $3 == "exon") print $1,$2,$3,$4,$5,$6,$7,$8}' scratch/gtftest_talon.gtf | sort > scratch/talon_coords.txt""")
+        diff = subprocess.check_output(["diff", "scratch/original_coords.txt", "scratch/talon_coords.txt"])
+
+        assert diff == ""
 
