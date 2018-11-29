@@ -954,100 +954,6 @@ def write_outputs(sam_transcripts, outprefix):
     out_txt.close()
     return
 
-def write_abundance_file(transcripts, abundances, novel_ids, annot, datasets, 
-                         outprefix):
-    """ Create a tab-delimited summary file that lists the number of times
-        each transcript was observed in each dataset from the run"""
-
-    dataset_names = [ x[0] for x in datasets ]
-    out_txt = open(outprefix + "_talon_abundance.tsv", 'w')
-    columns = ["gene_ID", 
-               "transcript_ID",
-               "gene_name",
-               "transcript_name",
-               "gene_annotated",
-               "gene_discovery_dataset", 
-               "transcript_annotated",
-               "transcript_discovery_dataset",
-               "transcript_match_type",
-               "n_exons"] + dataset_names
-    out_txt.write("\t".join(columns) + "\n")
-
-    # Using the database, get the annotation status of each gene and transcript
-    gene_status = get_annotation_status_dict(annot, "gene")
-    transcript_status = get_annotation_status_dict(annot, "transcript")
-    exon_status = get_annotation_status_dict(annot, "exon")
-
-    # Using the database, get the human-readable name of each gene and transcript
-    gene_names = get_readable_name_dict(annot, "gene")
-    transcript_names = get_readable_name_dict(annot, "transcript")
-
-    for transcript_ID in abundances.keys():
-        gene_ID = transcripts[transcript_ID].gene_id
-        n_exons = str(len(transcripts[transcript_ID].exons))
-        gene_transcript_info = get_transcript_info(transcript_ID, gene_ID, 
-                                              gene_status, transcript_status)
-
-        # Unpack info
-        gene_annotated = gene_transcript_info[0]
-        gene_discovery_dataset = gene_transcript_info[1]
-        transcript_annotated = gene_transcript_info[2]
-        transcript_discovery_dataset = gene_transcript_info[3] 
-
-        # Get the type of transcript match
-        match_type = get_match_type(transcripts[transcript_ID], gene_annotated,
-                                    transcript_annotated, exon_status)
-
-        # Get the gene and transcript names
-        try:
-            gene_name = gene_names[gene_ID]
-        except:
-            gene_name = "NA"
-        try:
-            transcript_name = transcript_names[transcript_ID]
-        except:
-            transcript_name = "NA"
-
-        counts_by_dataset = abundances[transcript_ID]
-        all_counts = []
-        for dataset in dataset_names:
-            if dataset in counts_by_dataset:
-                count = counts_by_dataset[dataset]
-            else:
-                count = 0
-            all_counts.append(str(count))
-
-        output = [gene_ID, transcript_ID, gene_name, transcript_name] + \
-                  gene_transcript_info + [match_type, n_exons] + all_counts
-       
-        out_txt.write("\t".join(output) + "\n")
-
-    out_txt.close()
-    return         
-
-def get_match_type(transcript, gene_annotated, transcript_annotated, exon_status):
-
-    if transcript_annotated == "KNOWN":
-        match_type = "full_match"
-    else:
-        if gene_annotated == "KNOWN":
-            exon_known = []
-            for exon in transcript.exons:
-                if exon.identifier in exon_status:
-                    exon_known.append(exon_status[exon.identifier][0])
-                else:
-                    exon_known.append("AMBIGUOUS")
-
-            if all([ x == "KNOWN" for x in exon_known]):
-                match_type = "known_exons"
-            else:
-                match_type = "novel_exons"
-        elif gene_annotated == "NOVEL":
-            match_type = "novel_gene"
-        else:
-            match_type = "NA"
-    return match_type
-
 def get_transcript_info(transcript_ID, gene_ID, gene_status, transcript_status):
     """ Look up annotation info about the provided transcript and gene IDs. 
         If not found, set values to NA """
@@ -1122,98 +1028,6 @@ def get_annotation_status_dict(database, cat_type):
 
     conn.close()
     return annotation_status  
-
-def filter_outputs_for_encode(curr_run_abundances, novel_ids, database):
-    """ This function only gets run if 'encode' mode is enabled. It filters
-        novel genes, transcripts, edges, vertices, and observed starts/stops
-        so that only those belonging to novel transcripts observed in more
-        than one dataset get added to the final abundance output file. """
-
-    filtered_abundances = {}
-
-    filtered_novel_ids = {'datasets': {}, \
-                          'genes': {}, \
-                          'transcripts': {}, \
-                          'edges': {}, \
-                          'vertices': {}, \
-                          'observed_starts': {}, \
-                          'observed_ends': {}}
-
-    verified_genes = {}
-    verified_edges = {}
-    verified_vertices = {}
-    database_abundances = {}
-
-    # Find out how many datasets every transcript has been seen in
-    conn = sqlite3.connect(database)
-    cursor = conn.cursor()
-    query = "SELECT transcript_ID FROM abundance"
-    cursor.execute(query)
-    
-    for transcript_id in cursor.fetchall():
-        transcript_id = str(transcript_id[0])
-        try:
-            database_abundances[transcript_id] += 1
-        except:
-            database_abundances[transcript_id] = 1
-    conn.close()
-
-    # Get novel/known status of transcripts
-    transcript_status = get_annotation_status_dict(database, "transcript")
-
-    for transcript_id in curr_run_abundances.keys():
-        try:
-            transcript_is_known = transcript_status[transcript_id][0] == "KNOWN"
-        except:
-            transcript_is_known = False
-
-        if transcript_is_known or database_abundances[transcript_id] >= 2:
-            filtered_abundances[transcript_id] = curr_run_abundances[transcript_id]
-
-            if not transcript_is_known and transcript_id in novel_ids['transcripts']:
-               filtered_novel_ids['transcripts'][transcript_id] = novel_ids['transcripts'][transcript_id]
-               gene = novel_ids['transcripts'][transcript_id][1]
-               edges = novel_ids['transcripts'][transcript_id][2]
-               if gene in novel_ids['genes']:
-                   verified_genes[gene] = 1
-
-               # Whitelist the novel edges from this transcript
-               for edge_id in edges.split(","):
-                   if edge_id in novel_ids['edges']:
-                       verified_edges[edge_id] = 1
-                       v1 = novel_ids['edges'][edge_id][1]
-                       v2 = novel_ids['edges'][edge_id][2]
-                       verified_vertices[v1] = 1
-                       verified_vertices[v2] = 1
-
-    for gene_id in novel_ids['genes']:
-        if gene_id in verified_genes:
-            filtered_novel_ids['genes'][gene_id] = novel_ids['genes'][gene_id]
-
-    for edge_id in novel_ids['edges']:
-        if edge_id in verified_edges:
-            filtered_novel_ids['edges'][edge_id] = novel_ids['edges'][edge_id]
-        
-    for vertex_id in novel_ids['vertices']:
-        if vertex_id in verified_vertices:
-            filtered_novel_ids['vertices'][vertex_id] = novel_ids['vertices'][vertex_id]
-
-    for start in novel_ids['observed_starts']:
-        transcript = novel_ids['observed_starts'][start][1]
-        transcript_is_whitelisted = transcript in filtered_novel_ids['transcripts']
-        transcript_is_known = transcript not in novel_ids['transcripts']
-        if transcript_is_whitelisted or transcript_is_known:
-            filtered_novel_ids['observed_starts'][start] = novel_ids['observed_starts'][start]
-
-    for end in novel_ids['observed_ends']:
-        transcript = novel_ids['observed_ends'][end][1]
-        transcript_is_whitelisted = transcript in filtered_novel_ids['transcripts']
-        transcript_is_known = transcript_id not in novel_ids['transcripts']
-        if transcript_is_whitelisted or transcript_is_known:
-            filtered_novel_ids['observed_ends'][end] = novel_ids['observed_ends'][end]
-
-    return filtered_abundances, filtered_novel_ids 
-    
 
 
 def checkArgs(options):
@@ -1345,14 +1159,8 @@ def main():
         update_database(annot, dataset_list, annot_transcripts, counter,
                         novel_ids, abundances, batch_size, build)
 
-    print "Writing SAM and summary file outputs..............."
-    #if options.encode_mode:
-    #    abundances, novel_ids = filter_outputs_for_encode(abundances, novel_ids, 
-    #                                                      annot)
-
+    print "Writing summary file output..............."
     write_outputs(all_sam_transcripts, out)
-    #write_abundance_file(annot_transcripts, abundances, novel_ids, annot, 
-    #                     dataset_list, out)
 
 
 if __name__ == '__main__':
