@@ -9,6 +9,7 @@ from optparse import OptionParser
 import sqlite3
 import sys
 import os
+import filter_talon_transcripts as filt
 script_dir = os.path.dirname(os.path.realpath(__file__))
 sys.path.append(os.path.abspath(os.path.join(script_dir, os.pardir)))
 
@@ -82,11 +83,12 @@ def handle_filtering(options):
         cursor = conn.cursor()
 
         cursor.execute("SELECT gene_ID,transcript_ID FROM transcripts")
-        whitelist = [str(x[1]) for x in sorted(cursor.fetchall())]
+        whitelist = sorted(cursor.fetchall())
 
         conn.close()
 
     # Sort the whitelist transcript IDs
+    whitelist = [str(x[1]) for x in whitelist]
     sorted_whitelist = sorted(whitelist)
 
     return sorted_whitelist
@@ -109,7 +111,7 @@ def fetch_dataset_list(database):
     cursor = conn.cursor()
 
     cursor.execute("SELECT dataset_name FROM dataset")
-    datasets = sorted([str(x[0]) for x in cursor.fetchall()])
+    datasets = [str(x[0]) for x in cursor.fetchall()]
    
     conn.close()
     return datasets
@@ -143,7 +145,10 @@ def fetch_abundances(database, datasets, annot, whitelist):
 	               ta_name.value AS annot_transcript_name,
                        t.n_exons,
 	               ga_status.value AS gene_status,
-	               ta_status.value AS transcript_status, """
+	               ta_status.value AS transcript_status"""
+
+    if len(datasets) > 0:
+        col_query = col_query + ","
 
     conn = sqlite3.connect(database)
     conn.row_factory = sqlite3.Row
@@ -183,7 +188,7 @@ def fetch_abundances(database, datasets, annot, whitelist):
     # Combine the subparts of the query into one and run it
     full_query = "\n".join([col_query, dataset_cols, name_status_query, 
                             abundance_queries, whitelist_string])
-    #print full_query
+
     try:
         abundance_tuples = (cursor.execute(full_query)).fetchall()
     except Exception as e:
