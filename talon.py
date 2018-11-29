@@ -33,10 +33,6 @@ def getOptions():
     parser.add_option("--o", dest = "outfile",
         help = "Outfile name",
         metavar = "FILE", type = "string")
-    parser.add_option("--encode", dest ="encode_mode", action='store_true',
-                      help = "If this option is set, TALON will require novel \
-                      transcripts to be corroborated by at least one other dataset \
-                      in order to be included in the output file.")
     parser.add_option("--noUpdate", dest ="noUpdate", action='store_true',
                       help = "If this option is set, the database will not be updated.\
                              Typically this is not used.")
