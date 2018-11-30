@@ -81,8 +81,9 @@ def filter_talon_transcripts(database, annot, dataset_pairings = None,
             else:
                 n_exons = (len(path.split(",")) + 1)/2
                 if n_datasets >= 2:
-                    if novel_multiexon_reqmt == False:
+                    if novel_multiexon_reqmt == False or gene_status == "NOVEL":
                         transcript_whitelist.add((gene_ID, transcript_ID))
+
                     elif n_exons > 1:
                         transcript_whitelist.add((gene_ID, transcript_ID))
                 
