@@ -203,10 +203,14 @@ def read_transcripts(cursor, exon_tree, intron_tree):
     cursor.execute('SELECT * FROM transcripts')
     transcript_rows = cursor.fetchall()
     for t in transcript_rows:
-        transcript = Transcript.get_transcript_from_db(t, exon_tree, intron_tree)
-        if transcript != None:
-            transcripts[transcript.identifier] = transcript
+        try:
+            transcript = Transcript.get_transcript_from_db(t, exon_tree, intron_tree)
+            if transcript != None:
+                transcripts[transcript.identifier] = transcript
+        except Exception as e:
+            print e
 
+    print "check"
     return transcripts
 
 def str_wrap_double(string):

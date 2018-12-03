@@ -215,10 +215,14 @@ def get_transcript_from_db(transcript_row, exon_tree, intron_tree):
         edges = edges[::-1]    
 
     # Get start and end of transcript
-    chromosome = (exon_tree.edges[edges[0]]).chromosome
-    start = (exon_tree.edges[edges[0]]).start
-    end = (exon_tree.edges[edges[-1]]).end
-
+    if edges[0] in exon_tree.edges and edges[-1] in exon_tree.edges:
+        chromosome = (exon_tree.edges[edges[0]]).chromosome
+        start = (exon_tree.edges[edges[0]]).start
+        end = (exon_tree.edges[edges[-1]]).end
+    else:
+        raise RuntimeError("Ignoring transcript with ID " + transcript_id +\
+                " because first or last exon not found in exon tree.")
+        
     transcript = Transcript(transcript_id, chromosome, start, end, strand, 
                             gene_id,{})
 
@@ -229,9 +233,9 @@ def get_transcript_from_db(transcript_row, exon_tree, intron_tree):
         if i % 2 == 0:
             curr_exon_id = str(edges[i])
             if curr_exon_id not in exon_tree.edges:
-                print "Warning: Ignoring transcript with ID " + transcript_id +\
-                " because exon " + curr_exon_id + " not found in exon tree."
-                return None
+                raise RuntimeError("Ignoring transcript with ID " + transcript_id +\
+                " because exon " + curr_exon_id + " not found in exon tree.")
+                
         else:
             curr_intron_id = str(edges[i])
             if curr_intron_id not in intron_tree.edges:
