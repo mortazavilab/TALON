@@ -87,8 +87,8 @@ The columns in the abundance file are as follows:
 6. Transcript name from your annotation of choice. If the transcript is novel relative to that annotation, this will be 'NA'.	
 7. Number of exons in the transcript
 8. Gene status (KNOWN or NOVEL)	
-9. Transcript status (KNOWN or NOVEL)
-10+ One column per dataset, with a count indicating how many times the current transcript was observed in that dataset.
+9. Transcript status (KNOWN or NOVEL)  
+10. One column per dataset, with a count indicating how many times the current transcript was observed in that dataset.
 
 # License
 MIT, see LICENSE
