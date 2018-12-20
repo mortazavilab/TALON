@@ -1,6 +1,7 @@
 ### Testing Suite
 These tests are designed to check whether specific parts of TALON are behaving as expected.
 A single command is sufficient to run the entire testing suite, but it is also possible to run select groups of tests at a time if desired.
+Bedtools must be installed for some of the tests to work.
 ```
 # Run all tests
 make test
