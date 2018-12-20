@@ -169,33 +169,6 @@ def add_edgetype_table(database):
     conn.close()
     return
 
-#def add_vertextype_table(database):
-#    """ Add a table to the database to track permitted vertex types. We start
-#        with "start", "end", "donor", and "acceptor"
-#        Attributes are:
-#        - Primary Key: Type
-#    """
-#    # Connecting to the database file
-#    conn = sqlite3.connect(database)
-#    c = conn.cursor()
-
-#    # Add table and set primary key column, which will be the transcript ID
-#    # Also include relationship to the gene table
-#    command = """CREATE TABLE IF NOT EXISTS vertex_type (type TEXT PRIMARY KEY);"""
-#    c.execute(command)
-
-#    # Add entries
-#    for t in ["start", "end", "donor", "acceptor"]:
-#        cols = "(type)"
-#        vals = [ t ]
-#        command = 'INSERT OR IGNORE INTO "vertex_type"' + cols + "VALUES " + \
-#                  '(?)'
-#        c.execute(command,vals)
-
-#    conn.commit()
-#    conn.close()
-#    return
-
 def add_vertex_table(database):
     """ Add a table to the database to track vertices.
         Attributes are:
@@ -274,6 +247,38 @@ def add_dataset_table(database):
                      dataset_name TEXT,
                      sample TEXT,
                      platform TEXT
+              )""")
+
+    conn.commit()
+    conn.close()
+    return
+
+def add_observed_table(database):
+    """ Add a table that tracks attributes of observed transcripts, including
+        5' and 3' end deltas, as well as the read length. """
+
+    # Connecting to the database file
+    conn = sqlite3.connect(database)
+    c = conn.cursor()
+
+    # Add table and set primary key column
+    c.execute("""CREATE TABLE observed (
+                     obs_ID INTEGER PRIMARY KEY,
+                     gene_ID INTEGER, 
+                     transcript_ID INTEGER,
+                     read_name TEXT,
+                     dataset TEXT,
+                     start_vertex_ID INTEGER,
+                     end_vertex_ID INTEGER,
+                     start_delta INTEGER,
+                     end_delta INTEGER,
+                     read_length INTEGER,
+
+                     FOREIGN KEY(gene_ID) REFERENCES transcripts(gene_ID),
+                     FOREIGN KEY(transcript_ID) REFERENCES transcripts(transcript_ID),
+                     FOREIGN KEY(dataset) REFERENCES dataset(dataset_name),
+                     FOREIGN KEY(start_vertex_ID) REFERENCES vertex(vertex_ID),
+                     FOREIGN KEY(end_vertex_ID) REFERENCES vertex(vertex_ID)
               )""")
 
     conn.commit()
@@ -391,10 +396,10 @@ def add_counter_table(database):
         format(tn=table_name, idf="category", cn="count"))
     c.execute("INSERT INTO {tn} ({idf}, {cn}) VALUES ('dataset', 0)".\
         format(tn=table_name, idf="category", cn="count"))
-    c.execute("INSERT INTO {tn} ({idf}, {cn}) VALUES ('observed_transcript_start', 0)".\
+    c.execute("INSERT INTO {tn} ({idf}, {cn}) VALUES ('observed', 0)".\
         format(tn=table_name, idf="category", cn="count"))
-    c.execute("INSERT INTO {tn} ({idf}, {cn}) VALUES ('observed_transcript_end', 0)".\
-        format(tn=table_name, idf="category", cn="count"))
+    #c.execute("INSERT INTO {tn} ({idf}, {cn}) VALUES ('observed_transcript_end', 0)".\
+    #    format(tn=table_name, idf="category", cn="count"))
 
     conn.commit()
     conn.close()
@@ -982,8 +987,9 @@ def main():
     add_annotation_table(db_name, "exon_annotations", "exon", "ID")
     add_dataset_table(db_name)
     add_abundance_table(db_name)
-    add_observed_start_table(db_name)
-    add_observed_end_table(db_name)
+    add_observed_table(db_name)
+    #add_observed_start_table(db_name)
+    #add_observed_end_table(db_name)
 
     # Read in genes, transcripts, and edges from GTF file
     genes, transcripts, exons = read_gtf_file(gtf_file)
