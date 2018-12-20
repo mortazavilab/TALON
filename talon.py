@@ -91,10 +91,8 @@ def get_counters(cursor):
     counter["edges"] = int(cursor.fetchone()[0])
     cursor.execute('SELECT "count" FROM "counters" WHERE "category" = "dataset"')
     counter["datasets"] = int(cursor.fetchone()[0])
-    cursor.execute('SELECT "count" FROM "counters" WHERE "category" = "observed_transcript_start"')
-    counter["observed_starts"] = int(cursor.fetchone()[0])
-    cursor.execute('SELECT "count" FROM "counters" WHERE "category" = "observed_transcript_end"')
-    counter["observed_ends"] = int(cursor.fetchone()[0])
+    cursor.execute('SELECT "count" FROM "counters" WHERE "category" = "observed"')
+    counter["observed"] = int(cursor.fetchone()[0])
 
     return counter
 
@@ -401,10 +399,8 @@ def get_transcript_start_and_end_diffs(sam_transcript, annot_transcript,
     """Must already have a completed match for the query transcript"""
 
     # Get IDs
-    obs_start_id = str(counter["observed_starts"] + 1)
-    counter["observed_starts"] += 1
-    obs_end_id = str(counter["observed_ends"] + 1)
-    counter["observed_ends"] += 1
+    obs_id = str(counter["observed"] + 1)
+    counter["observed"] += 1
 
     # Get the 5' and 3' difference between the sam transcript and the 
     # annotated transcript assigned to it
@@ -425,18 +421,29 @@ def get_transcript_start_and_end_diffs(sam_transcript, annot_transcript,
                                     annot_transcript.end, gene_id).identifier
 
     if strand == "+":
-        observed_start = (obs_start_id, annot_transcript.identifier,
-                          first_vertex, dataset, diff_5)
-        observed_end = (obs_end_id, annot_transcript.identifier,
-                          last_vertex, dataset, diff_3) 
+        observed = (obs_id, 
+                    annot_transcript.gene_id,
+                    annot_transcript.identifier,
+                    sam_transcript.identifier,
+                    dataset,
+                    first_vertex,
+                    last_vertex,
+                    diff_5,
+                    diff_3,
+                    sam_transcript.get_length())
     elif strand == "-":
-        observed_start = (obs_start_id, annot_transcript.identifier,
-                          last_vertex, dataset, diff_5)
-        observed_end = (obs_end_id, annot_transcript.identifier,
-                          first_vertex, dataset, diff_3)
+        observed = (obs_id,
+                    annot_transcript.gene_id,
+                    annot_transcript.identifier,
+                    sam_transcript.identifier,
+                    dataset,
+                    last_vertex,
+                    first_vertex,
+                    diff_5,
+                    diff_3,
+                    sam_transcript.get_length())
 
-    novel_ids['observed_starts'][obs_start_id] = observed_start
-    novel_ids['observed_ends'][obs_end_id] = observed_end
+    novel_ids['observed'][obs_id] = observed
 
     return 
 
@@ -574,8 +581,7 @@ def update_database(database, datasets, transcripts, counter, novel_ids,
     batch_add_vertices_and_locations(cursor, novel_ids, genome_build, batch_size)
 
     print "Adding observed starts and ends to database............"
-    batch_add_observed_starts(cursor, novel_ids, batch_size)
-    batch_add_observed_ends(cursor, novel_ids, batch_size)
+    batch_add_observed(cursor, novel_ids, batch_size)
 
     print "Adding datasets to database............"
     add_datasets(cursor, novel_ids, counter)
@@ -635,12 +641,9 @@ def update_counter(cursor, counter):
     update_d = 'UPDATE "counters" SET "count" = ? WHERE "category" = "dataset"'
     cursor.execute(update_d,[counter['datasets']])
 
-    update_os = 'UPDATE "counters" SET "count" = ? WHERE "category" = "observed_transcript_start"'
-    cursor.execute(update_os,[counter['observed_starts']])
+    update_o = 'UPDATE "counters" SET "count" = ? WHERE "category" = "observed"'
+    cursor.execute(update_o,[counter['observed']])
 
-    update_oe = 'UPDATE "counters" SET "count" = ? WHERE "category" = "observed_transcript_end"'
-    cursor.execute(update_oe,[counter['observed_ends']])
-  
     return
 
 def batch_add_genes(cursor, novel_ids, batch_size):
@@ -813,8 +816,8 @@ def batch_add_vertices_and_locations(cursor, novel_ids, genome_build, batch_size
 
     return
 
-def batch_add_observed_starts(cursor, novel_ids, batch_size):
-    observed = novel_ids['observed_starts'].values()
+def batch_add_observed(cursor, novel_ids, batch_size):
+    observed = novel_ids['observed'].values()
     index = 0
     while index < len(observed):
         try:
@@ -826,39 +829,16 @@ def batch_add_observed_starts(cursor, novel_ids, batch_size):
         # Add to database
         try:
             cols = " (" + ", ".join([str_wrap_double(x) for x in
-                   ["obs_start_ID", "transcript_ID", "vertex_ID", "dataset",
-                     "delta"]]) + ") "
-            command = 'INSERT INTO "observed_transcript_start"' + cols + \
-                      "VALUES " + '(?,?,?,?,?)'
+                   ["obs_ID", "gene_ID", "transcript_ID", "read_name", 
+                    "dataset", "start_vertex_ID", "end_vertex_ID", 
+                    "start_delta", "end_delta", "read_length"]]) + ") "
+            command = 'INSERT INTO "observed"' + cols + \
+                      "VALUES " + '(?,?,?,?,?,?,?,?,?,?)'
             cursor.executemany(command, batch)
 
         except Exception as e:
             print(e)
     return
-
-def batch_add_observed_ends(cursor, novel_ids, batch_size):
-    observed = novel_ids['observed_ends'].values()
-    index = 0
-    while index < len(observed):
-        try:
-            batch = observed[index:index + batch_size]
-        except:
-            batch = observed[index:]
-        index += batch_size
-
-    # Add to database
-        try:
-            cols = " (" + ", ".join([str_wrap_double(x) for x in
-                   ["obs_end_ID", "transcript_ID", "vertex_ID", "dataset",
-                     "delta"]]) + ") "
-            command = 'INSERT INTO "observed_transcript_end"' + cols + \
-                      "VALUES " + '(?,?,?,?,?)'
-            cursor.executemany(command, batch)
-
-        except Exception as e:
-            print(e)
-    return
-
 
 def add_datasets(cursor, novel_ids, counter):
     datasets = novel_ids['datasets'].values()
@@ -1125,8 +1105,7 @@ def main():
                  'transcripts': {}, \
                  'edges': {}, \
                  'vertices': {}, \
-                 'observed_starts': {}, \
-                 'observed_ends': {}}
+                 'observed': {}}
                  
     all_sam_transcripts = []
     abundances = {}

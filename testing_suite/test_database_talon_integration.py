@@ -112,8 +112,7 @@ class TestDatabaseTalonIntegration(object):
         assert counter["vertices"] == 16
         assert counter["edges"] == 15
         assert counter["datasets"] == 2
-        assert counter["observed_starts"] == 2
-        assert counter["observed_ends"] == 2
+        assert counter["observed"] == 2
 
     @pytest.mark.incremental
     def test_TALON_known_novel_run(self):

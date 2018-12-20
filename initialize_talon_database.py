@@ -285,58 +285,6 @@ def add_observed_table(database):
     conn.close()
     return
 
-def add_observed_start_table(database):
-    """ Add a table that tracks how far observed 5' ends deviate from the
-        'official' transcript start.
-    """
-
-    # Connecting to the database file
-    conn = sqlite3.connect(database)
-    c = conn.cursor()
-
-    # Add table and set primary key column
-    c.execute("""CREATE TABLE observed_transcript_start (
-                     obs_start_ID INTEGER PRIMARY KEY,
-                     transcript_ID INTEGER,
-                     vertex_ID INTEGER,
-                     dataset INTEGER,
-                     delta INTEGER,
-
-                     FOREIGN KEY(transcript_ID) REFERENCES transcripts(transcript_ID),
-                     FOREIGN KEY(dataset) REFERENCES dataset(dataset_ID),
-                     FOREIGN KEY(vertex_ID) REFERENCES vertex(vertex_ID)
-              )""")
-
-    conn.commit()
-    conn.close()
-    return
-
-def add_observed_end_table(database):
-    """ Add a table that tracks how far observed 5' ends deviate from the
-        'official' transcript start.
-    """
-
-    # Connecting to the database file
-    conn = sqlite3.connect(database)
-    c = conn.cursor()
-
-    # Add table and set primary key column
-    c.execute("""CREATE TABLE observed_transcript_end (
-                     obs_end_ID INTEGER PRIMARY KEY,
-                     transcript_ID INTEGER,
-                     vertex_ID INTEGER,
-                     dataset INTEGER,
-                     delta INTEGER,
-
-                     FOREIGN KEY(transcript_ID) REFERENCES transcripts(transcript_ID),
-                     FOREIGN KEY(dataset) REFERENCES dataset(ID),
-                     FOREIGN KEY(vertex_ID) REFERENCES vertex(vertex_ID)
-              )""")
-
-    conn.commit()
-    conn.close()
-    return
-
 def add_abundance_table(database):
     """ Add a table to the database to track transcript abundance over
         all datasets.
@@ -988,8 +936,6 @@ def main():
     add_dataset_table(db_name)
     add_abundance_table(db_name)
     add_observed_table(db_name)
-    #add_observed_start_table(db_name)
-    #add_observed_end_table(db_name)
 
     # Read in genes, transcripts, and edges from GTF file
     genes, transcripts, exons = read_gtf_file(gtf_file)
