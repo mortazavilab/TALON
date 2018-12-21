@@ -8,14 +8,17 @@
 main <- function() {
 
     load_packages()
+    custom_theme <- custom_theme()
     opt <- parse_options()
 
     database <- opt$database
+    outdir <- opt$outdir
     datasets <- str_split(opt$datasets, ",")[[1]]
  
-    print(count_known_genes(database, datasets))
-    print(count_known_transcripts(database, datasets))
-    #print(head(count_reads_processed(database, dataset_1)))
+    #print(count_known_genes(database, datasets))
+    #print(count_known_transcripts(database, datasets))
+
+    plot_read_length_distribution(database, datasets[1], custom_theme, outdir)
 
 }
 
@@ -109,6 +112,73 @@ count_known_transcripts <- function(database, datasets) {
 
 }
 
+plot_read_length_distribution <- function(database, datasets, custom_theme, outdir) {
+    # Use the read lengths recorded in the 'observed' table to plot a read length
+    # distribution. In the query, grab the annotation status so that I can use 
+    # it in future versions if I want 
+
+    # Connect to the database
+    con <- dbConnect(SQLite(), dbname=database)
+
+    # Query to fetch read lengths of observed transcripts, along with the 
+    # annotation status
+    dataset_str <- paste("('", paste(datasets, collapse = "','"), "')", sep="")
+    query_text <- paste("SELECT obs.read_name,
+                                obs.transcript_ID,
+                                obs.dataset,
+                                ta.value AS annot,
+                                obs.read_length
+                           FROM observed AS obs
+                           LEFT JOIN transcript_annotations as ta
+                               ON obs.transcript_ID = ta.ID
+                               AND obs.dataset IN ", dataset_str, " ",
+                              "AND ta.attribute = 'transcript_status'
+                               AND ta.value = 'KNOWN'",
+                           sep="")
+
+    query <- dbSendQuery(con, query_text)
+    reads <- as.data.frame(dbFetch(query, n = -1))
+    reads$annot[is.na(reads$annot)] <- "NOVEL"
+    reads$read_length <- reads$read_length/1000
+    reads$annot <- as.factor(reads$annot)
+
+    dbClearResult(query)
+    dbDisconnect(con)
+
+    # Plotting and output settings
+    fname <- paste(outdir, "/transcript_length_by_annotation_status.png", sep="")
+    xlabel <- "Transcript length (kilobases)"
+    ylabel <- "Count"
+    colors <- c("skyblue", "olivedrab3")
+
+    png(filename = fname,
+        width = 3000, height = 2000, units = "px",
+        bg = "white",  res = 300)    
+
+    g = ggplot(reads, aes(read_length, color = annot, fill = annot)) + 
+               geom_histogram(alpha = 0.5, position="identity") + 
+               xlab(xlabel) + ylab(ylabel) + 
+               scale_colour_manual(values = c(colors)) +
+               scale_fill_manual(values = c(colors)) +
+               custom_theme
+    print(g)   
+ 
+    dev.off()
+}
+
+custom_theme <- function() {
+    # Create custom GGPlot2 theme
+    customTheme <- suppressMessages(theme_bw(base_family = "Helvetica", base_size = 18) +
+                       theme(axis.line.x = element_line(color="black", size = 0.5),
+                             axis.line.y = element_line(color="black", size = 0.5)))
+        #theme(axis.title.x = element_text(color="black", size=18, vjust = -2, margin=margin(5,0,0,0)),
+        #axis.text.x  = element_text(color="black", vjust=0.75, size=16),
+        #axis.title.y = element_text(color="black", size=18, margin=margin(0,10,0,0)),
+        #axis.text.y  = element_text(color="black", vjust=0.75, size=16))  +
+        #theme(legend.text = element_text(color="black", size = 14), legend.title = element_text(color="black", size=11), legend.key.size = unit(0.5, "cm")))
+
+    return(customTheme)
+}
 
 load_packages <- function() {
 
@@ -143,13 +213,13 @@ parse_options <- function() {
         #make_option(c("--whitelist"), action = "store", dest = "whitelist",
         #            default = NULL, help = "File of whitelisted transcripts for the Pacbio data"),
         make_option(c("--datasets"), action = "store", dest = "datasets",
-                    default = NULL, help = "Comma-delimited list of two dataset names to include in the analysis.")
+                    default = NULL, help = "Comma-delimited list of two dataset names to include in the analysis."),
         #make_option(c("--ik"), action = "store", dest = "illumina_kallisto",
         #            default = NULL, help = "Illumina Kallisto file."),
         #make_option(c("--color"), action = "store", dest = "color_scheme",
         #            default = NULL, help = "blue, red, or green"),
-        #make_option(c("-o","--outdir"), action = "store", dest = "outdir",
-        #            default = NULL, help = "Output directory for plots and outfiles")
+        make_option(c("-o","--outdir"), action = "store", dest = "outdir",
+                    default = NULL, help = "Output directory for plots and outfiles")
         )
 
     opt <- parse_args(OptionParser(option_list=option_list))
