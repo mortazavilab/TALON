@@ -17,6 +17,7 @@ main <- function() {
     whitelists <- process_whitelists(database, datasets, opt$whitelists)
     
  
+    #print(count_reads_processed(database, datasets[1]))
     #print(count_known_genes(database, datasets))
     #print(count_known_transcripts(database, datasets))
 
@@ -26,9 +27,12 @@ main <- function() {
 
     #plot_isoforms_per_gene(whitelists[[1]], custom_theme, outdir)
 
-    plot_exons_per_read(database, datasets[1],
-                                   whitelists[[1]]$transcript_ID,
-                                   custom_theme, outdir)
+    #plot_exons_per_read(database, datasets[1],
+    #                               whitelists[[1]]$transcript_ID,
+    #                               custom_theme, outdir)
+
+    plot_TPM_distributions(database, datasets[1], whitelists[[1]]$transcript_ID,
+                           custom_theme, outdir)
 
 }
 
@@ -237,14 +241,14 @@ plot_read_length_distribution <- function(database, datasets, whitelist,
 
 plot_exons_per_read <- function(database, datasets, whitelist,
                                           custom_theme, outdir) {
-    # Use the read lengths recorded in the 'observed' table to plot a read length
-    # distribution. In the query, grab the annotation status so that I can use
-    # it in future versions if I want
+    # Fetch the reads in the 'observed' table and join to transcript table in
+    # order to plot the distribution of exons per read. In the query, grab the 
+    # annotation status as well.
 
     # Connect to the database
     con <- dbConnect(SQLite(), dbname=database)
 
-    # Query to fetch read lengths of observed transcripts, along with the
+    # Query to fetch n_exons of observed transcripts, along with the
     # annotation status
     dataset_str <- paste("('", paste(datasets, collapse = "','"), "')", sep="")
     whitelist_str <- paste("('", paste(whitelist, collapse = "','"), "')", sep="")
@@ -293,6 +297,71 @@ plot_exons_per_read <- function(database, datasets, whitelist,
     print(g)
 
     dev.off()
+}
+
+plot_TPM_distributions <- function(database, datasets, whitelist,
+                                          custom_theme, outdir) {
+
+    # Connect to the database
+    con <- dbConnect(SQLite(), dbname=database)
+
+    # Query to fetch information from abundance table
+    dataset_str <- paste("('", paste(datasets, collapse = "','"), "')", sep="")
+    whitelist_str <- paste("('", paste(whitelist, collapse = "','"), "')", sep="")
+
+    query_text <- paste("SELECT t.gene_ID,
+                                abd.transcript_ID,
+                                abd.count
+                           FROM abundance AS abd
+                           LEFT JOIN transcripts as t
+                               ON t.transcript_ID = abd.transcript_ID
+                               AND abd.dataset IN ", dataset_str, " ",
+                              "AND abd.transcript_ID IN", whitelist_str,
+                           sep="")
+
+    query <- dbSendQuery(con, query_text)
+    abundance <- as.data.frame(dbFetch(query, n = -1))
+
+    dbClearResult(query)
+    dbDisconnect(con)
+
+    # Compute gene and transcript TPMs
+    transcript_TPMs <- abundance
+    transcript_TPMs$TPM <- (transcript_TPMs$count)*1000000/sum(transcript_TPMs$count)
+    transcript_TPMs$Type <- "Transcript"
+
+    gene_TPMs <- aggregate(transcript_TPMs$TPM, by=list(transcript_TPMs$gene_ID), FUN=sum)
+    colnames(gene_TPMs) <- c("gene_ID", "TPM")
+    gene_TPMs$Type <- "Gene"
+
+    all_TPMs <- rbind(gene_TPMs[,c("TPM", "Type")], 
+                      transcript_TPMs[,c("TPM", "Type")])
+    all_TPMs$TPM <- log(all_TPMs$TPM + 1, base = 2)
+
+    # Plotting and output settings
+    fname <- paste(outdir, "/TPM_distributions.png", sep="")
+    xlabel <- "log2(TPM + 1)"
+    ylabel <- "Count"
+    colors <- c("skyblue", "olivedrab3")
+
+    png(filename = fname,
+        width = 3000, height = 2000, units = "px",
+        bg = "white",  res = 300)
+
+    g = ggplot(all_TPMs, aes(TPM, color = Type, fill = Type)) +
+               geom_histogram(alpha = 0.5, position="identity") +
+               xlab(xlabel) + ylab(ylabel) + facet_grid(Type ~ .) +
+               scale_colour_manual(values = c(colors)) +
+               scale_fill_manual(values = c(colors)) +
+               custom_theme
+    print(g)
+
+    dev.off() 
+ 
+
+
+
+    quit()
 }
 
 plot_isoforms_per_gene <- function(whitelist, custom_theme, outdir) {
