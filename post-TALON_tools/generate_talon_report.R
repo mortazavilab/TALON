@@ -15,21 +15,25 @@ main <- function() {
     outdir <- opt$outdir
     datasets <- str_split(opt$datasets, ",")[[1]]
     whitelists <- process_whitelists(database, datasets, opt$whitelists)
-    
- 
-    #print(count_reads_processed(database, datasets[1]))
-    #print(count_known_genes(database, datasets))
-    #print(count_known_transcripts(database, datasets))
+    message("--------------------------") 
 
-    #plot_read_length_distribution(database, datasets[1], 
-    #                              whitelists[[1]]$transcript_ID,
-    #                              custom_theme, outdir)
+    message("Number of reads successfully annotated in dataset ", datasets[1],
+            ": ", count_reads_processed(database, datasets[1]), sep="")
+    message("Number of known genes detected at least once in dataset ", 
+            datasets[1], ": ", count_known_genes(database, datasets[1]), sep="")
+    message("Number of known transcripts detected at least once in dataset ",
+            datasets[1], ": ", count_known_transcripts(database, datasets[1]), sep="")
+    message("--------------------------")
 
-    #plot_isoforms_per_gene(whitelists[[1]], custom_theme, outdir)
+    plot_read_length_distribution(database, datasets[1], 
+                                  whitelists[[1]]$transcript_ID,
+                                  custom_theme, outdir)
 
-    #plot_exons_per_read(database, datasets[1],
-    #                               whitelists[[1]]$transcript_ID,
-    #                               custom_theme, outdir)
+    plot_isoforms_per_gene(whitelists[[1]], custom_theme, outdir)
+
+    plot_exons_per_read(database, datasets[1],
+                                   whitelists[[1]]$transcript_ID,
+                                   custom_theme, outdir)
 
     plot_TPM_distributions(database, datasets[1], whitelists[[1]]$transcript_ID,
                            custom_theme, outdir)
