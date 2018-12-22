@@ -14,11 +14,70 @@ main <- function() {
     database <- opt$database
     outdir <- opt$outdir
     datasets <- str_split(opt$datasets, ",")[[1]]
+    whitelists <- process_whitelists(database, datasets, opt$whitelists)
+    
  
     #print(count_known_genes(database, datasets))
     #print(count_known_transcripts(database, datasets))
 
-    plot_read_length_distribution(database, datasets[1], custom_theme, outdir)
+    plot_read_length_distribution(database, datasets[1], 
+                                  whitelists[[1]]$transcript_ID,
+                                  custom_theme, outdir)
+
+}
+
+process_whitelists <- function(database, datasets, whitelist_input) {
+    # If the user provided whitelists, read into a list data structure.
+    # If whitelists are missing, then create them by pulling all of the 
+    # transcript and gene IDs from the database.
+
+    if (is.null(whitelist_input)) {
+        whitelists <- lapply(datasets, fetch_all_genes_and_transcripts, database)           
+
+    } else {
+        whitelist_files <- str_split(whitelist_input, ",")[[1]]
+        whitelists <- lapply(whitelist_files, read_whitelists)
+ 
+    }
+
+    if (length(datasets) != length(whitelists)) {
+           stop("Error: If providing whitelists, make sure that the quantity matches the number of dataset names you are providing.")
+    }
+
+    return(whitelists)
+}
+
+read_whitelists <- function(whitelist_file) {
+    # Read a whitelist from a file
+    w <- as.data.frame(read_delim(whitelist_file, ",", escape_double = FALSE,
+                            col_names = FALSE, trim_ws = TRUE, na = "NA"))
+    colnames(w) <- c("gene_ID", "transcript_ID")   
+    return(w)
+}
+
+fetch_all_genes_and_transcripts <- function(dataset, database) {
+    # Given a dataset, get a table of all genes and transcripts detected
+    # (no filtering)
+
+    # Connect to the database
+    con <- dbConnect(SQLite(), dbname=database)
+
+    # Count number of reads on record for this dataset
+    query_text <- paste("SELECT t.gene_ID,
+                                abd.transcript_ID
+                         FROM abundance AS abd
+                         LEFT JOIN transcripts as t
+                             ON t.transcript_ID = abd.transcript_ID
+                             AND dataset =", dataset, "", sep="'")
+
+    query <- dbSendQuery(con, query_text)
+    genes_and_transcripts <- dbFetch(query, n = -1)
+
+    dbClearResult(query)
+    dbDisconnect(con)
+
+    return(genes_and_transcripts)
+
 
 }
 
@@ -112,7 +171,8 @@ count_known_transcripts <- function(database, datasets) {
 
 }
 
-plot_read_length_distribution <- function(database, datasets, custom_theme, outdir) {
+plot_read_length_distribution <- function(database, datasets, whitelist, 
+                                          custom_theme, outdir) {
     # Use the read lengths recorded in the 'observed' table to plot a read length
     # distribution. In the query, grab the annotation status so that I can use 
     # it in future versions if I want 
@@ -123,6 +183,7 @@ plot_read_length_distribution <- function(database, datasets, custom_theme, outd
     # Query to fetch read lengths of observed transcripts, along with the 
     # annotation status
     dataset_str <- paste("('", paste(datasets, collapse = "','"), "')", sep="")
+    whitelist_str <- paste("('", paste(whitelist, collapse = "','"), "')", sep="")
     query_text <- paste("SELECT obs.read_name,
                                 obs.transcript_ID,
                                 obs.dataset,
@@ -133,7 +194,8 @@ plot_read_length_distribution <- function(database, datasets, custom_theme, outd
                                ON obs.transcript_ID = ta.ID
                                AND obs.dataset IN ", dataset_str, " ",
                               "AND ta.attribute = 'transcript_status'
-                               AND ta.value = 'KNOWN'",
+                               AND ta.value = 'KNOWN'
+                               AND obs.transcript_ID IN", whitelist_str,
                            sep="")
 
     query <- dbSendQuery(con, query_text)
@@ -209,17 +271,15 @@ parse_options <- function() {
 
     option_list <- list(
         make_option(c("--db"), action = "store", dest = "database",
-                    default = NULL, help = "TALON database file"),
-        #make_option(c("--whitelist"), action = "store", dest = "whitelist",
-        #            default = NULL, help = "File of whitelisted transcripts for the Pacbio data"),
+                    help = "TALON database file"),
+        make_option(c("--whitelists", "-w"), action = "store", dest = "whitelists",
+                    default = NULL, help = "Comma-delimited list of up to two filesnames. File contains whitelisted transcripts for the datasets provided. If this option is omitted, all genes and transcripts are included in the analyses."),
         make_option(c("--datasets"), action = "store", dest = "datasets",
-                    default = NULL, help = "Comma-delimited list of two dataset names to include in the analysis."),
-        #make_option(c("--ik"), action = "store", dest = "illumina_kallisto",
-        #            default = NULL, help = "Illumina Kallisto file."),
+                    help = "Comma-delimited list of up to two dataset names to include in the analysis."),
         #make_option(c("--color"), action = "store", dest = "color_scheme",
         #            default = NULL, help = "blue, red, or green"),
-        make_option(c("-o","--outdir"), action = "store", dest = "outdir",
-                    default = NULL, help = "Output directory for plots and outfiles")
+        make_option(c("-o", "--outdir"), action = "store", dest = "outdir",
+                    help = "Output directory for plots and outfiles")
         )
 
     opt <- parse_args(OptionParser(option_list=option_list))
