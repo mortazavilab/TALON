@@ -24,7 +24,11 @@ main <- function() {
     #                              whitelists[[1]]$transcript_ID,
     #                              custom_theme, outdir)
 
-    plot_isoforms_per_gene(whitelists[[1]], custom_theme, outdir)
+    #plot_isoforms_per_gene(whitelists[[1]], custom_theme, outdir)
+
+    plot_exons_per_read(database, datasets[1],
+                                   whitelists[[1]]$transcript_ID,
+                                   custom_theme, outdir)
 
 }
 
@@ -231,6 +235,66 @@ plot_read_length_distribution <- function(database, datasets, whitelist,
     dev.off()
 }
 
+plot_exons_per_read <- function(database, datasets, whitelist,
+                                          custom_theme, outdir) {
+    # Use the read lengths recorded in the 'observed' table to plot a read length
+    # distribution. In the query, grab the annotation status so that I can use
+    # it in future versions if I want
+
+    # Connect to the database
+    con <- dbConnect(SQLite(), dbname=database)
+
+    # Query to fetch read lengths of observed transcripts, along with the
+    # annotation status
+    dataset_str <- paste("('", paste(datasets, collapse = "','"), "')", sep="")
+    whitelist_str <- paste("('", paste(whitelist, collapse = "','"), "')", sep="")
+
+    query_text <- paste("SELECT obs.read_name,
+                                obs.transcript_ID,
+                                obs.dataset,
+                                ta.value AS annot,
+                                t.n_exons
+                           FROM observed AS obs
+                           LEFT JOIN transcript_annotations as ta
+                               ON obs.transcript_ID = ta.ID
+                               AND obs.dataset IN ", dataset_str, " ",
+                              "AND ta.attribute = 'transcript_status'
+                               AND ta.value = 'KNOWN'
+                               AND obs.transcript_ID IN", whitelist_str,
+                          "LEFT JOIN transcripts as t
+                               ON t.transcript_ID = obs.transcript_ID",
+                           sep="")
+
+    query <- dbSendQuery(con, query_text)
+    reads <- as.data.frame(dbFetch(query, n = -1))
+
+    reads$annot[is.na(reads$annot)] <- "NOVEL"
+    reads$annot <- as.factor(reads$annot)
+
+    dbClearResult(query)
+    dbDisconnect(con)
+
+    # Plotting and output settings
+    fname <- paste(outdir, "/exons_per_read_by_annotation_status.png", sep="")
+    xlabel <- "Number of exons in read"
+    ylabel <- "Count"
+    colors <- c("skyblue", "olivedrab3")
+
+    png(filename = fname,
+        width = 3000, height = 2000, units = "px",
+        bg = "white",  res = 300)
+
+    g = ggplot(reads, aes(n_exons, color = annot, fill = annot)) +
+               geom_histogram(alpha = 0.5, position="identity") +
+               xlab(xlabel) + ylab(ylabel) +
+               scale_colour_manual(values = c(colors)) +
+               scale_fill_manual(values = c(colors)) +
+               custom_theme
+    print(g)
+
+    dev.off()
+}
+
 plot_isoforms_per_gene <- function(whitelist, custom_theme, outdir) {
     # Plot the number of unique isoforms detected per gene
 
@@ -255,6 +319,8 @@ plot_isoforms_per_gene <- function(whitelist, custom_theme, outdir) {
     dev.off()
 
 }
+
+
 
 custom_theme <- function() {
     # Create custom GGPlot2 theme
