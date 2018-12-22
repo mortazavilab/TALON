@@ -20,9 +20,11 @@ main <- function() {
     #print(count_known_genes(database, datasets))
     #print(count_known_transcripts(database, datasets))
 
-    plot_read_length_distribution(database, datasets[1], 
-                                  whitelists[[1]]$transcript_ID,
-                                  custom_theme, outdir)
+    #plot_read_length_distribution(database, datasets[1], 
+    #                              whitelists[[1]]$transcript_ID,
+    #                              custom_theme, outdir)
+
+    plot_isoforms_per_gene(whitelists[[1]], custom_theme, outdir)
 
 }
 
@@ -171,6 +173,7 @@ count_known_transcripts <- function(database, datasets) {
 
 }
 
+
 plot_read_length_distribution <- function(database, datasets, whitelist, 
                                           custom_theme, outdir) {
     # Use the read lengths recorded in the 'observed' table to plot a read length
@@ -226,6 +229,31 @@ plot_read_length_distribution <- function(database, datasets, whitelist,
     print(g)   
  
     dev.off()
+}
+
+plot_isoforms_per_gene <- function(whitelist, custom_theme, outdir) {
+    # Plot the number of unique isoforms detected per gene
+
+    isoforms_per_genes <- as.data.frame(table(whitelist$gene_ID))
+
+    # Plotting and output settings
+    fname <- paste(outdir, "/isoforms_per_gene.png", sep="")
+    xlabel <- "Number of unique isoforms detected per gene"
+    ylabel <- "Count"
+    col <- "skyblue"
+
+    png(filename = fname,
+        width = 3000, height = 2000, units = "px",
+        bg = "white",  res = 300)
+
+    g = ggplot(isoforms_per_genes, aes(Freq)) +
+               geom_histogram(alpha = 0.8, position="identity", 
+                              fill = col, color = col) +
+               xlab(xlabel) + ylab(ylabel) + custom_theme
+    print(g)
+
+    dev.off()
+
 }
 
 custom_theme <- function() {
