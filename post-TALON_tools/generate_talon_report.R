@@ -332,40 +332,46 @@ plot_TPM_distributions <- function(database, datasets, whitelist,
     # Compute gene and transcript TPMs
     transcript_TPMs <- abundance
     transcript_TPMs$TPM <- (transcript_TPMs$count)*1000000/sum(transcript_TPMs$count)
-    transcript_TPMs$Type <- "Transcript"
 
     gene_TPMs <- aggregate(transcript_TPMs$TPM, by=list(transcript_TPMs$gene_ID), FUN=sum)
     colnames(gene_TPMs) <- c("gene_ID", "TPM")
-    gene_TPMs$Type <- "Gene"
+    transcript_TPMs$TPM <- log(transcript_TPMs$TPM + 1, base = 2)
+    gene_TPMs$TPM <- log(gene_TPMs$TPM + 1, base = 2)
 
-    all_TPMs <- rbind(gene_TPMs[,c("TPM", "Type")], 
-                      transcript_TPMs[,c("TPM", "Type")])
-    all_TPMs$TPM <- log(all_TPMs$TPM + 1, base = 2)
-
-    # Plotting and output settings
-    fname <- paste(outdir, "/TPM_distributions.png", sep="")
+    # Plotting and output settings for genes
+    fname <- paste(outdir, "/gene_TPM_distribution.png", sep="")
     xlabel <- "log2(TPM + 1)"
     ylabel <- "Count"
     colors <- c("skyblue", "olivedrab3")
 
     png(filename = fname,
-        width = 3000, height = 2000, units = "px",
+        width = 3000, height = 3000, units = "px",
         bg = "white",  res = 300)
 
-    g = ggplot(all_TPMs, aes(TPM, color = Type, fill = Type)) +
-               geom_histogram(alpha = 0.5, position="identity") +
-               xlab(xlabel) + ylab(ylabel) + facet_grid(Type ~ .) +
-               scale_colour_manual(values = c(colors)) +
-               scale_fill_manual(values = c(colors)) +
-               custom_theme
+    g = ggplot(gene_TPMs, aes(TPM)) +
+               geom_histogram(alpha = 0.5, position="identity", 
+                              color = colors[1], fill = colors[1]) +
+               xlab(xlabel) + ylab(ylabel) + custom_theme
     print(g)
-
     dev.off() 
  
+    # Plotting and output settings for transcripts
+    fname <- paste(outdir, "/transcript_TPM_distribution.png", sep="")
+    xlabel <- "log2(TPM + 1)"
+    ylabel <- "Count"
 
+    png(filename = fname,
+        width = 3000, height = 3000, units = "px",
+        bg = "white",  res = 300)
 
+    g = ggplot(transcript_TPMs, aes(TPM)) +
+               geom_histogram(alpha = 0.5, position="identity",
+                              color = colors[2], fill = colors[2]) +
+               xlab(xlabel) + ylab(ylabel) + custom_theme 
 
-    quit()
+    print(g)
+    dev.off()
+
 }
 
 plot_isoforms_per_gene <- function(whitelist, custom_theme, outdir) {
@@ -399,7 +405,9 @@ custom_theme <- function() {
     # Create custom GGPlot2 theme
     customTheme <- suppressMessages(theme_bw(base_family = "Helvetica", base_size = 18) +
                        theme(axis.line.x = element_line(color="black", size = 0.5),
-                             axis.line.y = element_line(color="black", size = 0.5)))
+                             axis.line.y = element_line(color="black", size = 0.5),
+                             axis.text.x = element_text(color="black", size = 16),
+                             axis.text.y = element_text(color="black", size = 16)))
         #theme(axis.title.x = element_text(color="black", size=18, vjust = -2, margin=margin(5,0,0,0)),
         #axis.text.x  = element_text(color="black", vjust=0.75, size=16),
         #axis.title.y = element_text(color="black", size=18, margin=margin(0,10,0,0)),
