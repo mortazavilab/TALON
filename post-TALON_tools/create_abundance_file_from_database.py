@@ -105,7 +105,7 @@ def create_outname(options):
     return outname
 
 def fetch_dataset_list(database):
-    """ Gets a list of all dataasets in the database """
+    """ Gets a list of all datasets in the database """
 
     conn = sqlite3.connect(database)
     cursor = conn.cursor()
@@ -195,7 +195,7 @@ def fetch_abundances(database, datasets, annot, whitelist):
         print e
         raise RuntimeError("Something went wrong with the database query")
 
-    conn.close()
+    conn.close() 
     return abundance_tuples
 
 def write_abundance_file(abundances, datasets, outfile):
@@ -229,14 +229,40 @@ def write_abundance_file(abundances, datasets, outfile):
     o.close()
     return
 
+def check_annot_validity(annot, database):
+    """ Make sure that the user has entered a correct annotation name """
+
+    conn = sqlite3.connect(database)
+    cursor = conn.cursor()
+
+    cursor.execute("SELECT DISTINCT annot_name FROM gene_annotations")
+    annotations = [str(x[0]) for x in cursor.fetchall()]
+    conn.close()
+
+    if "talon_run" in annotations:
+        annotations.remove("talon_run") 
+
+    if annot == None:
+        message = "Please provide a valid annotation name. " + \
+                  "In this database, your options are: " + \
+                  ", ".join(annotations)
+        raise ValueError(message)
+
+    if annot not in annotations:
+        message = "Annotation name '" + annot + \
+                  "' not found in this database. Try one of the following: " + \
+                  ", ".join(annotations)  
+        raise ValueError(message)
+
+    return
+
 def main():
     options = getOptions()
     database = options.database
     annot = options.annot
     outfile = create_outname(options)
 
-    if annot == None:
-        raise ValueError("Please provide a valid annotation name")
+    check_annot_validity(annot, database)
 
     # Determine which transcripts to include
     transcript_whitelist = handle_filtering(options)
