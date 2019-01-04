@@ -233,8 +233,15 @@ plot_read_length_distribution <- function(database, datasets, whitelist,
         width = 3000, height = 2000, units = "px",
         bg = "white",  res = 300)    
 
+    if (nrow(subset(reads, annot == "KNOWN")) < nrow(subset(reads, annot == "NOVEL"))) {
+        colors <- rev(colors)
+        reads$annot <- factor(reads$annot, levels = c("NOVEL", "KNOWN"))
+    } else {
+        reads$annot <- factor(reads$annot, levels = c("KNOWN", "NOVEL"))
+    }
+
     g = ggplot(reads, aes(read_length, color = annot, fill = annot)) + 
-               geom_histogram(alpha = 0.5, position="identity") + 
+               geom_histogram(alpha = 0.6, position="identity") + 
                xlab(xlabel) + ylab(ylabel) + 
                scale_colour_manual(values = c(colors)) +
                scale_fill_manual(values = c(colors)) +
@@ -296,21 +303,16 @@ plot_exons_per_read <- function(database, datasets, whitelist,
     if (nrow(subset(reads, annot == "KNOWN")) < nrow(subset(reads, annot == "NOVEL"))) {
         colors <- rev(colors)
         reads$annot <- factor(reads$annot, levels = c("NOVEL", "KNOWN"))
-        g = ggplot(reads, aes(n_exons, color = annot, fill = annot)) +
-                   geom_histogram(alpha = 0.5, position="identity") +
-                   xlab(xlabel) + ylab(ylabel) +
-                   scale_colour_manual(values = c(colors)) +
-                   scale_fill_manual(values = c(colors)) +
-                   custom_theme
     } else {
         reads$annot <- factor(reads$annot, levels = c("KNOWN", "NOVEL"))
-        g = ggplot(reads, aes(n_exons, color = annot, fill = annot)) +
-                   geom_histogram(alpha = 0.5, position="identity") +
-                   xlab(xlabel) + ylab(ylabel) +
-                   scale_colour_manual(values = c(colors)) +
-                   scale_fill_manual(values = c(colors)) +
-                   custom_theme
     }
+
+    g = ggplot(reads, aes(n_exons, color = annot, fill = annot)) +
+               geom_histogram(alpha = 0.6, position="identity") +
+               xlab(xlabel) + ylab(ylabel) +
+               scale_colour_manual(values = c(colors)) +
+               scale_fill_manual(values = c(colors)) +
+               custom_theme
     print(g)
 
     dev.off()
