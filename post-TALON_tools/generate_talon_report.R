@@ -30,7 +30,8 @@ main <- function() {
                                   whitelists[[1]]$transcript_ID,
                                   custom_theme, outdir)
 
-    plot_isoforms_per_gene(whitelists[[1]], custom_theme, outdir)
+    plot_isoforms_per_gene(database, datasets[1], whitelists[[1]]$transcript_ID, 
+                            custom_theme, outdir)
 
     plot_exons_per_read(database, datasets[1],
                                    whitelists[[1]]$transcript_ID,
@@ -131,15 +132,15 @@ count_known_genes <- function(database, datasets) {
                            FROM abundance AS abd
                            LEFT JOIN transcripts as t 
                                ON t.transcript_ID = abd.transcript_ID
-                               AND abd.dataset IN ", dataset_str, " ",
-                          "LEFT JOIN gene_annotations as ga  
+                          LEFT JOIN gene_annotations as ga  
                                ON t.gene_ID = ga.ID
                                AND ga.attribute = 'gene_status'
                                AND ga.value = 'KNOWN'
                            LEFT JOIN transcript_annotations as ta
                                ON t.transcript_ID = ta.ID
                                AND ta.attribute = 'transcript_status'
-                               AND ta.value = 'KNOWN'",
+                               AND ta.value = 'KNOWN'
+                           WHERE abd.dataset IN ", dataset_str,
                            sep="")
    
     query <- dbSendQuery(con, query_text)
@@ -150,7 +151,7 @@ count_known_genes <- function(database, datasets) {
 
     dbClearResult(query)
     dbDisconnect(con)
- 
+
     return(length(genes))
 
 }
@@ -168,9 +169,9 @@ count_known_transcripts <- function(database, datasets) {
                            FROM abundance AS abd
                            LEFT JOIN transcript_annotations as ta
                                ON abd.transcript_ID = ta.ID
-                               AND abd.dataset IN ", dataset_str, " ",
-                              "AND ta.attribute = 'transcript_status'
-                               AND ta.value = 'KNOWN'",
+                              AND ta.attribute = 'transcript_status'
+                               AND ta.value = 'KNOWN'
+                           WHERE abd.dataset IN ", dataset_str,
                            sep="")
 
     query <- dbSendQuery(con, query_text)
@@ -190,8 +191,7 @@ count_known_transcripts <- function(database, datasets) {
 plot_read_length_distribution <- function(database, datasets, whitelist, 
                                           custom_theme, outdir) {
     # Use the read lengths recorded in the 'observed' table to plot a read length
-    # distribution. In the query, grab the annotation status so that I can use 
-    # it in future versions if I want 
+    # distribution. In the query, grab the annotation status 
 
     # Connect to the database
     con <- dbConnect(SQLite(), dbname=database)
@@ -200,6 +200,7 @@ plot_read_length_distribution <- function(database, datasets, whitelist,
     # annotation status
     dataset_str <- paste("('", paste(datasets, collapse = "','"), "')", sep="")
     whitelist_str <- paste("('", paste(whitelist, collapse = "','"), "')", sep="")
+    
     query_text <- paste("SELECT obs.read_name,
                                 obs.transcript_ID,
                                 obs.dataset,
@@ -208,11 +209,12 @@ plot_read_length_distribution <- function(database, datasets, whitelist,
                            FROM observed AS obs
                            LEFT JOIN transcript_annotations as ta
                                ON obs.transcript_ID = ta.ID
-                               AND obs.dataset IN ", dataset_str, " ",
-                              "AND ta.attribute = 'transcript_status'
+                               AND ta.attribute = 'transcript_status'
                                AND ta.value = 'KNOWN'
-                               AND obs.transcript_ID IN", whitelist_str,
+                           WHERE obs.transcript_ID IN", whitelist_str, " ",
+                           "AND obs.dataset IN ", dataset_str,
                            sep="")
+ 
 
     query <- dbSendQuery(con, query_text)
     reads <- as.data.frame(dbFetch(query, n = -1))
@@ -220,17 +222,22 @@ plot_read_length_distribution <- function(database, datasets, whitelist,
     reads$read_length <- reads$read_length/1000
     reads$annot <- as.factor(reads$annot)
 
+    # Safeguard for query issues
+    if (length(unique(reads$transcript_ID)) > length(whitelist)) {
+        stop("Query error: number transcripts observed exceed whitelist length")  
+    }
+
     dbClearResult(query)
     dbDisconnect(con)
 
     # Plotting and output settings
     fname <- paste(outdir, "/transcript_length_by_annotation_status.png", sep="")
-    xlabel <- "Transcript length (kilobases)"
+    xlabel <- "Read length (kilobases)"
     ylabel <- "Count"
     colors <- c("skyblue", "olivedrab3")
 
     png(filename = fname,
-        width = 3000, height = 2000, units = "px",
+        width = 2500, height = 2000, units = "px",
         bg = "white",  res = 300)    
 
     if (nrow(subset(reads, annot == "KNOWN")) < nrow(subset(reads, annot == "NOVEL"))) {
@@ -243,9 +250,15 @@ plot_read_length_distribution <- function(database, datasets, whitelist,
     g = ggplot(reads, aes(read_length, color = annot, fill = annot)) + 
                geom_histogram(alpha = 0.6, position="identity") + 
                xlab(xlabel) + ylab(ylabel) + 
-               scale_colour_manual(values = c(colors)) +
-               scale_fill_manual(values = c(colors)) +
-               custom_theme
+               scale_colour_manual(values = c(colors), guide = FALSE) +
+               scale_fill_manual(name="Annotation status\nof read", 
+                                 values = c(colors)) +
+               custom_theme  
+               #theme(legend.justification = c(1, 1), 
+               #      legend.position = c(1, 1),
+               #      #legend.box.margin=margin(c(50,50,50,50)),
+               #      legend.background = element_blank(),
+               #      legend.box.background = element_rect(colour = "black"))
     print(g)   
  
     dev.off()
@@ -273,13 +286,14 @@ plot_exons_per_read <- function(database, datasets, whitelist,
                            FROM observed AS obs
                            LEFT JOIN transcript_annotations as ta
                                ON obs.transcript_ID = ta.ID
-                               AND obs.dataset IN ", dataset_str, " ",
-                              "AND ta.attribute = 'transcript_status'
+                              AND ta.attribute = 'transcript_status'
                                AND ta.value = 'KNOWN'
-                               AND obs.transcript_ID IN", whitelist_str,
-                          "LEFT JOIN transcripts as t
-                               ON t.transcript_ID = obs.transcript_ID",
+                          LEFT JOIN transcripts as t
+                               ON t.transcript_ID = obs.transcript_ID
+                          WHERE obs.transcript_ID IN", whitelist_str, " ",
+                           "AND obs.dataset IN ", dataset_str,
                            sep="")
+
 
     query <- dbSendQuery(con, query_text)
     reads <- as.data.frame(dbFetch(query, n = -1))
@@ -330,12 +344,13 @@ plot_TPM_distributions <- function(database, datasets, whitelist,
 
     query_text <- paste("SELECT t.gene_ID,
                                 abd.transcript_ID,
-                                abd.count
+                                abd.count,
+                                abd.dataset
                            FROM abundance AS abd
                            LEFT JOIN transcripts as t
                                ON t.transcript_ID = abd.transcript_ID
-                               AND abd.dataset IN ", dataset_str, " ",
-                              "AND abd.transcript_ID IN", whitelist_str,
+                           WHERE abd.dataset IN ", dataset_str, " ",
+                           "AND abd.transcript_ID IN", whitelist_str,
                            sep="")
 
     query <- dbSendQuery(con, query_text)
@@ -343,6 +358,7 @@ plot_TPM_distributions <- function(database, datasets, whitelist,
 
     dbClearResult(query)
     dbDisconnect(con)
+
 
     # Compute gene and transcript TPMs
     transcript_TPMs <- abundance
@@ -389,10 +405,35 @@ plot_TPM_distributions <- function(database, datasets, whitelist,
 
 }
 
-plot_isoforms_per_gene <- function(whitelist, custom_theme, outdir) {
+plot_isoforms_per_gene <- function(database, datasets, whitelist, custom_theme, outdir) {
     # Plot the number of unique isoforms detected per gene
 
-    isoforms_per_genes <- as.data.frame(table(whitelist$gene_ID))
+    #isoforms_per_genes <- as.data.frame(table(whitelist$gene_ID))
+
+    # Connect to the database
+    con <- dbConnect(SQLite(), dbname=database)
+
+    # Query to fetch information from abundance table
+    dataset_str <- paste("('", paste(datasets, collapse = "','"), "')", sep="")
+    whitelist_str <- paste("('", paste(whitelist, collapse = "','"), "')", sep="")
+
+    query_text <- paste("SELECT t.gene_ID,
+                                abd.transcript_ID,
+                                abd.dataset
+                           FROM abundance AS abd
+                           LEFT JOIN transcripts as t
+                               ON t.transcript_ID = abd.transcript_ID
+                           WHERE abd.dataset IN ", dataset_str, " ",
+                           "AND abd.transcript_ID IN", whitelist_str,
+                           sep="")
+
+    query <- dbSendQuery(con, query_text)
+    abundance <- as.data.frame(dbFetch(query, n = -1))
+
+    dbClearResult(query)
+    dbDisconnect(con)
+
+    isoforms_per_genes <- as.data.frame(table(abundance$gene_ID))
 
     # Plotting and output settings
     fname <- paste(outdir, "/isoforms_per_gene.png", sep="")
@@ -401,7 +442,7 @@ plot_isoforms_per_gene <- function(whitelist, custom_theme, outdir) {
     col <- "skyblue"
 
     png(filename = fname,
-        width = 3000, height = 2000, units = "px",
+        width = 2000, height = 3000, units = "px",
         bg = "white",  res = 300)
 
     g = ggplot(isoforms_per_genes, aes(Freq)) +
