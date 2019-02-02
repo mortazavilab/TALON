@@ -69,16 +69,16 @@ class Gene(object):
 
         if "name" in self.annotations != "":
             # Include name in output if there is one
-            print self.identifier + " (" + self.annotations['name']  + "):"
+            print(self.identifier + " (" + self.annotations['name']  + "):")
         else:
-            print self.identifier + ":"
+            print(self.identifier + ":")
 
-        print "\tLocation: " + self.chromosome + ":" + str(self.start) + "-" + \
-              str(self.end) + "(" + self.strand + ")"
+        print("\tLocation: " + self.chromosome + ":" + str(self.start) + "-" + \
+              str(self.end) + "(" + self.strand + ")")
         
         # Print transcripts in shorthand 
         for transcript in self.transcripts:
-            print "\t Transcript: " + transcript
+            print("\t Transcript: " + transcript)
 
         return
 

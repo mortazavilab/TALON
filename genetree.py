@@ -100,7 +100,7 @@ class GeneTree(object):
     def print_tree(self):
         """ Print a rudimentary visual representation of the GeneTree. """
         for chrom in self.chromosomes:
-            print chrom + ":"
+            print(chrom + ":")
             for gene_interval in self.chromosomes[chrom]:
-                print "\t" + str(gene_interval)
+                print("\t" + str(gene_interval))
         return 

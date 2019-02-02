@@ -53,7 +53,7 @@ class EdgeTree(object):
         if chromosome not in self.chromosomes:
             self.add_chromosome(chromosome)
         if edge.start == edge.end:
-            print "Ignoring edge with ID " + edge_id + " because its length is zero."
+            print("Ignoring edge with ID " + edge_id + " because its length is zero.")
             return
 
         # Check for collisions. There are two ways a collision can happen.
@@ -143,8 +143,8 @@ class EdgeTree(object):
         """ Print a rudimentary visual representation of the EdgeTree. """
         # TODO: It would be nice if it printed the chromosomes in order 
         for chrom in self.chromosomes:
-            print chrom + ":"
+            print(chrom + ":")
             for edge_interval in self.chromosomes[chrom]:
-                print "\t" + str(edge_interval)
+                print("\t" + str(edge_interval))
         return               
 

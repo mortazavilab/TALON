@@ -41,9 +41,9 @@ class Edge(object):
 
     def print_edge(self):
         """ Prints a string representation of the edge"""
-        print self.identifier + ": " + self.chromosome + ":" + \
-              str(self.start) + "-" + str(self.end)
-        print self.transcript_ids
+        print(self.identifier + ": " + self.chromosome + ":" + \
+              str(self.start) + "-" + str(self.end))
+        print(self.transcript_ids)
         return
 
 def create_edge_from_gtf(edge_info):

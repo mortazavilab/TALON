@@ -146,10 +146,10 @@ class Transcript(object):
                 raise ValueError('Invalid exon in transcript ' + \
                       self.identifier + ': wrong chromosome')
             if exon.start < self.start or exon.end > self.end:
-                print "self.start: " + str(self.start)
-                print "self.end: " + str(self.end)
-                print "exon.start: " + str(exon.start)
-                print "exon.end: " + str(exon.end)
+                print("self.start: " + str(self.start))
+                print("self.end: " + str(self.end))
+                print("exon.start: " + str(exon.start))
+                print("exon.end: " + str(exon.end))
                 raise ValueError('Invalid exon in transcript ' + \
                       self.identifier + ': (' + str(exon.start) + "-" + \
                       str(exon.end) + \
@@ -187,11 +187,11 @@ class Transcript(object):
         if transcript_id == None:
             transcript_id = "Transcript"
 
-        print "\tLocation: " + self.chromosome + ":" + str(self.start) + "-" + \
-              str(self.end) + "(" + self.strand + ")"
+        print("\tLocation: " + self.chromosome + ":" + str(self.start) + "-" + \
+              str(self.end) + "(" + self.strand + ")")
 
         # Print exons
-        print "\tExons: " + "\n".join([str(x.start) + "-" + str(x.end) for x in self.exons])
+        print("\tExons: " + "\n".join([str(x.start) + "-" + str(x.end) for x in self.exons]))
         return 
 
 def get_transcript_from_db(transcript_row, exon_tree, intron_tree):
@@ -239,8 +239,8 @@ def get_transcript_from_db(transcript_row, exon_tree, intron_tree):
         else:
             curr_intron_id = str(edges[i])
             if curr_intron_id not in intron_tree.edges:
-                print "Warning: Ignoring transcript with ID " + transcript_id +\
-                " because intron " + curr_intron_id + " not found in intron tree."
+                print("Warning: Ignoring transcript with ID " + transcript_id +\
+                " because intron " + curr_intron_id + " not found in intron tree.")
                 return None
 
     for i in range(0,len(edges)):

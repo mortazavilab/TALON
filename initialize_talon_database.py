@@ -545,7 +545,7 @@ def populate_db(database, annot_name, chrom_genes, chrom_transcripts, edges, gen
 
     for chromosome in chrom_genes.keys():
         start_time = time.time()
-        print chromosome
+        print(chromosome)
         genes = chrom_genes[chromosome]
         transcripts = chrom_transcripts[chromosome]        
 
@@ -554,7 +554,7 @@ def populate_db(database, annot_name, chrom_genes, chrom_transcripts, edges, gen
 
         conn.commit()
         end_time = time.time()
-        print "It took {} to process chromosome".format(hms_string(end_time - start_time))
+        print("It took {} to process chromosome".format(hms_string(end_time - start_time)))
     conn.close()
     
     return
@@ -588,9 +588,9 @@ def add_genes(c, genes, annot_name):
             bulk_annotations.append((db_gene_id, annot_name, source, att, value))
 
 
-    print "bulk update genes..."
+    print("bulk update genes...")
     bulk_update_genes(c, bulk_genes, gene_counter)
-    print "bulk update gene_annotations..."
+    print("bulk update gene_annotations...")
     bulk_update_gene_annotations(c, bulk_annotations)
     return gene_id_map
  
@@ -678,13 +678,13 @@ def add_transcripts(c, transcripts, annot_name, gene_id_map, genome_build):
             value = attributes[att]
             bulk_annotations.append((db_transcript_id, annot_name, source, att, value))
            
-    print "bulk update transcripts..."
+    print("bulk update transcripts...")
     bulk_update_transcripts(c, bulk_transcripts, counter)
-    print "bulk update annotations..."
+    print("bulk update annotations...")
     bulk_update_transcript_annotations(c, bulk_annotations)
-    print "bulk update vertices/locations..."
+    print("bulk update vertices/locations...")
     bulk_update_vertices(c, vertices)
-    print "bulk update edges..."
+    print("bulk update edges...")
     bulk_update_edges(c, edges)
 
     return

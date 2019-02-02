@@ -208,9 +208,8 @@ def read_transcripts(cursor, exon_tree, intron_tree):
             if transcript != None:
                 transcripts[transcript.identifier] = transcript
         except Exception as e:
-            print e
+            print(e)
 
-    print "check"
     return transcripts
 
 def str_wrap_double(string):
@@ -268,8 +267,8 @@ def process_sam_file(sam_file, dataset, min_coverage, min_identity, min_length,
                 sam_transcript = SamTranscript.get_sam_transcript(sam, dataset)
                 sam_transcripts.append(sam_transcript)
             except:
-                print "An error occurred while processing sam transcript " + \
-                      sam[0] + ". Will skip this transcript."
+                print("An error occurred while processing sam transcript " + \
+                      sam[0] + ". Will skip this transcript.")
         o.close() 
 
     return sam_transcripts
@@ -573,23 +572,23 @@ def update_database(database, datasets, transcripts, counter, novel_ids,
     n_genes = str(len(novel_ids["genes"]))
     n_transcripts = str(len(novel_ids["transcripts"]))
 
-    print "Adding " + n_genes + " novel genes to database..."
+    print("Adding " + n_genes + " novel genes to database...")
     batch_add_genes(cursor, novel_ids, batch_size)
         
-    print "Adding " + n_transcripts + " novel transcripts to database..."
+    print("Adding " + n_transcripts + " novel transcripts to database...")
     batch_add_transcripts(cursor, novel_ids, batch_size)
 
-    print "Adding edges and vertices to database............"
+    print("Adding edges and vertices to database............")
     batch_add_edges(cursor, novel_ids, batch_size)
     batch_add_vertices_and_locations(cursor, novel_ids, genome_build, batch_size)
 
-    print "Adding observed starts and ends to database............"
+    print("Adding observed starts and ends to database............")
     batch_add_observed(cursor, novel_ids, batch_size)
 
-    print "Adding datasets to database............"
+    print("Adding datasets to database............")
     add_datasets(cursor, novel_ids, counter)
 
-    print "Updating counter............."
+    print("Updating counter.............")
     update_counter(cursor, counter)
 
     # Update abundance table
@@ -606,7 +605,7 @@ def update_database(database, datasets, transcripts, counter, novel_ids,
 def check_database_integrity(cursor):
     """ Perform some checks on the database. Run before committing changes"""
 
-    print "Validating database........"    
+    print("Validating database........")   
     # For each category, check that the number of table entries matches the counter
     counter_query = "SELECT * FROM counters"
     cursor.execute(counter_query)
@@ -619,8 +618,8 @@ def check_database_integrity(cursor):
         actual_count = int(cursor.fetchone()[0])
 
         if actual_count != curr_counter:
-            print "table_count: "  + str(actual_count)
-            print "counter_value: " + str(curr_counter)
+            print("table_count: "  + str(actual_count))
+            print("counter_value: " + str(curr_counter))
             raise ValueError("Database counter for '" + table_name + \
                   "' does not match the number of entries in the table." + \
                   " Discarding changes to database and exiting...")
@@ -1060,8 +1059,8 @@ def checkArgs(options):
             metadata = (line[0], line[1], line[2])
             dataname = metadata[0]
             if dataname in existing_datasets and options.noUpdate == False:
-                print "Ignoring dataset with name '" + dataname + "' because"+\
-                      " it is already in the database."
+                print("Ignoring dataset with name '" + dataname + "' because"+\
+                      " it is already in the database.")
             else:
                 dataset_metadata.append(metadata)
                 if not line[3].endswith(".sam"):
@@ -1078,7 +1077,7 @@ def main():
     sam_files, dataset_list = checkArgs(options)
 
     if len(sam_files) == 0:
-        print "No new SAM files included in input. Exiting..."
+        print("No new SAM files included in input. Exiting...")
         exit()
 
     annot = options.annot
@@ -1089,12 +1088,12 @@ def main():
     out = options.outfile
 
     # Process the annotations
-    print "Processing annotation...................."
+    print("Processing annotation....................")
     gene_tree, annot_transcripts, exon_tree, intron_tree, vertices, counter \
                                                  = read_annotation(annot, build)
     
     # Process the SAM files
-    print "Processing SAM file......................"
+    print("Processing SAM file......................")
     qc_file = out + "_talon_QC.log"
     o = open(qc_file, 'w')
     o.write("# TALON run filtering settings:\n")
@@ -1124,11 +1123,11 @@ def main():
         novel_ids['datasets'][d_id] = novel_tuple
         counter['datasets'] += 1
 
-        print "Identifying transcripts in " + d_name + "..............."
+        print("Identifying transcripts in " + d_name + "...............")
         sam_transcripts = process_sam_file(sam, d_name, min_coverage, 
                                            min_identity, min_length, qc_file)
         if len(sam_transcripts) == 0:
-            print "Warning: no transcripts detected in file " + sam
+            print("Warning: no transcripts detected in file " + sam)
         identify_sam_transcripts(sam_transcripts, gene_tree, annot_transcripts, 
                                  exon_tree, intron_tree, vertices, counter, 
                                  d_name, novel_ids, abundances)
@@ -1137,12 +1136,12 @@ def main():
 
     # Update database
     if options.noUpdate == None:
-        print "Updating TALON database.................."
+        print("Updating TALON database..................")
         batch_size = 10000
         update_database(annot, dataset_list, annot_transcripts, counter,
                         novel_ids, abundances, batch_size, build)
 
-    print "Writing summary file output..............."
+    print("Writing summary file output...............")
     write_outputs(all_sam_transcripts, out)
 
 
