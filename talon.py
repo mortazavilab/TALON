@@ -650,7 +650,7 @@ def update_counter(cursor, counter):
 
 def batch_add_genes(cursor, novel_ids, batch_size):
 
-    novel_tuples = novel_ids['genes'].values()
+    novel_tuples = list(novel_ids['genes'].values())
     gene_entries = []
     gene_annotations = []
     for nt in novel_tuples:
@@ -693,7 +693,7 @@ def batch_add_transcripts(cursor, novel_ids, batch_size):
     # Using the novel IDs, extract transcripts that need to be added
     # and fetch their gene IDs and path (sequence of edges)
 
-    novel_tuples = novel_ids['transcripts'].values()
+    novel_tuples = list(novel_ids['transcripts'].values())
     transcript_entries = []
     transcript_annotations = []
     for nt in novel_tuples:
@@ -734,7 +734,7 @@ def batch_add_transcripts(cursor, novel_ids, batch_size):
 
 def batch_add_edges(cursor, novel_ids, batch_size):
 
-    edge_tuples = novel_ids['edges'].values()
+    edge_tuples = list(novel_ids['edges'].values())
     edge_entries = []
     exon_annotations = []
 
@@ -783,7 +783,7 @@ def batch_add_edges(cursor, novel_ids, batch_size):
 
 def batch_add_vertices_and_locations(cursor, novel_ids, genome_build, batch_size):
 
-    novel_tuples = novel_ids['vertices'].values()
+    novel_tuples = list(novel_ids['vertices'].values())
     vertex_entries = []
     location_entries = []
     for nt in novel_tuples:
@@ -819,7 +819,7 @@ def batch_add_vertices_and_locations(cursor, novel_ids, genome_build, batch_size
     return
 
 def batch_add_observed(cursor, novel_ids, batch_size):
-    observed = novel_ids['observed'].values()
+    observed = list(novel_ids['observed'].values())
     index = 0
     while index < len(observed):
         try:
@@ -843,7 +843,7 @@ def batch_add_observed(cursor, novel_ids, batch_size):
     return
 
 def add_datasets(cursor, novel_ids, counter):
-    datasets = novel_ids['datasets'].values()
+    datasets = list(novel_ids['datasets'].values())
 
     try:
         cols = " (" + ", ".join([str_wrap_double(x) for x in
@@ -861,9 +861,9 @@ def batch_add_abundance(cursor, abundance_dict, batch_size):
 
     abundances = []   
 
-    for transcript_id in abundance_dict.keys():
+    for transcript_id in list(abundance_dict.keys()):
         dataset_abundances = abundance_dict[transcript_id]
-        for dataset in dataset_abundances.keys():
+        for dataset in list(dataset_abundances.keys()):
             abundance_tuple = (transcript_id, dataset, dataset_abundances[dataset])
             abundances.append(abundance_tuple)
 
@@ -898,7 +898,7 @@ def compute_abundances(sam_transcripts, dataset):
         except:
             abundance_dict[transcript_id] = 1
 
-    abundances = [(x, dataset, abundance_dict[x]) for x in abundance_dict.keys()]
+    abundances = [(x, dataset, abundance_dict[x]) for x in list(abundance_dict.keys())]
     return abundances
 
 def write_outputs(sam_transcripts, outprefix):
