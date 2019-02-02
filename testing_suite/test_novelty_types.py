@@ -41,6 +41,7 @@ class TestNoveltyTypes(object):
                       "--f", "input_files/toy_transcript/config.csv",
                       "-a", "scratch/toy.db",
                       "-b", "toy_build",
+                      "-l", "0",
                       "--o", "scratch/toy"])
         except:
             pytest.fail("TALON run failed on toy data")
@@ -52,7 +53,18 @@ class TestNoveltyTypes(object):
         """
         pass
 
-def get_novelty_type(transcript_ID, database):
-    """ For now, this function checks whether a transcript is an ISM (i.e. a
-        suffix) of a known transcript."""
-    pass
+def is_suffix_ISM(transcript_ID, database):
+    """ For now, this function checks whether a transcript is an incomplete 
+        splice match (ISM) and a suffix of a known transcript."""
+    
+    # Connect to the database
+    conn = sqlite3.connect(database)
+    cursor = conn.cursor()
+
+    # Formulate query
+    query = """ SELECT * FROM observed WHERE transcript_ID = %s"""
+    print query
+    cursor.execute(query % transcript_ID)
+    print cursor.fetchall()
+
+
