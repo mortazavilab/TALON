@@ -42,7 +42,9 @@ def getOptions():
     parser.add_option("--identity", "-i", dest = "min_identity",
         help = "Minimum alignment identity in order to use a SAM entry. Default = 0.85",
         type = "string", default = 0.85)
-
+    parser.add_option("--min_length", "-l", dest = "min_length",
+        help = "Minimum transcript length to use a SAM entry. Default = 300 basepairs",
+        type = "string", default = 300)
     
     (options, args) = parser.parse_args()
     return options
@@ -215,7 +217,8 @@ def str_wrap_double(string):
     """ Adds double quotes around the input string """
     return '"' + string + '"'
 
-def process_sam_file(sam_file, dataset, min_coverage, min_identity, logfile):
+def process_sam_file(sam_file, dataset, min_coverage, min_identity, min_length, 
+                     logfile):
     """ Reads transcripts from a SAM file
         Args:
             sam_file: Path to the SAM file
@@ -242,7 +245,7 @@ def process_sam_file(sam_file, dataset, min_coverage, min_identity, logfile):
                 continue
 
             # Only use reads that are >= 300 bp long
-            if len(sam[9]) < 300:
+            if len(sam[9]) < min_length:
                 continue
 
             # Locate the MD field of the sam transcript
@@ -1082,6 +1085,7 @@ def main():
     build = options.build
     min_coverage = float(options.min_coverage)
     min_identity = float(options.min_identity)
+    min_length = int(options.min_length)
     out = options.outfile
 
     # Process the annotations
@@ -1122,7 +1126,7 @@ def main():
 
         print "Identifying transcripts in " + d_name + "..............."
         sam_transcripts = process_sam_file(sam, d_name, min_coverage, 
-                                           min_identity, qc_file)
+                                           min_identity, min_length, qc_file)
         if len(sam_transcripts) == 0:
             print "Warning: no transcripts detected in file " + sam
         identify_sam_transcripts(sam_transcripts, gene_tree, annot_transcripts, 
