@@ -121,27 +121,57 @@ def match_all_transcript_vertices(chromosome, positions, location_dict,
 
     return vertex_matches
 
-def permissive_vertex_search(chromosome, position, dist_to_splice,
+def permissive_vertex_search(chromosome, position, strand, sj_pos, pos_type,
                              locations, cutoff, run_info):
     """ Given a position, this function tries to find a vertex match within the
         cutoff distance that also comes before the splice junction begins.
         If no vertex is found, the function returns None. """
 
-    location_keys = list(filter(lambda t: t[0]==chromosome and
-                           abs(t[1] - position) + 1 < cutoff and
-                           abs(t[1] - position) + 1 < dist_to_splice,
-                           list(locations.keys())))
+    # Try a strict match first
+    if (chromosome, position) in locations:
+        match = locations[(chromosome, position)]['location_ID']
+        dist = 0
+        return match, dist
 
-    min_dist = cutoff
+    if pos_type != "start" and pos_type != "end":
+        raise ValueError("Please set pos_type to either 'start' or 'end'.") 
+    if strand != "+" and strand != "-":
+        raise ValueError("Invalid strand specified: %s" % strand)
+
+    # If there is no strict match, look for vertices that are
+    #     (1) On the correct chromosome
+    #     (2) Are not located at or past the adjoining splice junction
+    #     (3) Are within the permitted cutoff distance
+
+    if (strand == "+" and pos_type == "start") or \
+       (strand == "-" and pos_type == "end"):
+        location_keys = list(filter(lambda t: t[0]==chromosome and
+                             abs(t[1] - position) <= cutoff and
+                             t[1] < sj_pos,
+                             list(locations.keys())))
+    else:
+        location_keys = list(filter(lambda t: t[0]==chromosome and
+                             abs(t[1] - position) <= cutoff and
+                             t[1] > sj_pos,
+                             list(locations.keys())))
+
+    min_dist = cutoff*2
     closest = None
     for candidate_match in location_keys:
-        dist = abs(candidate_match[1] - position)
-        if dist < min_dist:
+        if strand == "+":
+            dist = candidate_match[1] - position
+        else:
+            dist = position - candidate_match[1]
+
+        if abs(dist) <= abs(min_dist):
             min_dist = dist
             closest = locations[candidate_match]['location_ID']
+        #elif abs(dist) == abs(min_dist)
+        #    # Tiebreaker: 
 
     if closest == None:
-        closest = create_vertex(chromosome, position, run_info, location_dict)
+        closest = create_vertex(chromosome, position, 
+                                run_info, locations)['location_ID']
         min_dist = "NA"
 
     return closest, min_dist
@@ -158,7 +188,7 @@ def create_vertex(chromosome, position, run_info, location_dict):
     vertex_match = new_vertex
     location_dict[(chromosome, position)] = new_vertex
 
-    return new_ID
+    return new_vertex
 
 # TODO: validation of input options
 def check_inputs(options):
@@ -214,14 +244,7 @@ def main():
     edge_dict = make_edge_dict(cursor)
     transcript_dict = make_transcript_dict(cursor)
     conn.close()
-    #chrom = "chr1"
-    #pos1 = 500
-    #pos2 = 600
-    #v1 = search_for_vertex_at_pos(chrom, pos1, location_dict)["location_ID"]
-    #v2 = search_for_vertex_at_pos(chrom, pos2, location_dict)["location_ID"]
 
-    #edge_match = search_for_edge(v1, v2, "exon", edge_dict)
-    print(permissive_vertex_search("chr1", 1, 100, location_dict, 500, run_info))
 
 if __name__ == '__main__':
     main()
