@@ -3,6 +3,7 @@ import sys
 import sqlite3
 sys.path.append("..")
 import talonQ as talon
+import dstruct
 @pytest.mark.dbunit
 
 class TestMatchAllVertices(object):
@@ -36,6 +37,7 @@ class TestMatchAllVertices(object):
         location_dict = talon.make_location_dict(build, cursor)
         run_info = talon.init_run_info(cursor, build, "TALON")
         orig_vertex_count = run_info['vertex']
+        orig_n_locations = len(location_dict)
         conn.close()
 
         chrom = "chr1"
@@ -47,7 +49,10 @@ class TestMatchAllVertices(object):
         # TODO: 7 should really be 5 once I update the db schema to remove strand
         new_vertex_count = run_info['vertex']
         assert vertex_IDs == [ "TALON-%d" % new_vertex_count, 3, 4, 7 ]
+       
+        # Make sure the data structures got updated
         assert new_vertex_count == orig_vertex_count + 1
+        assert len(location_dict) == orig_n_locations + 1
 
 def get_db_cursor():
     conn = sqlite3.connect("scratch/toy.db")

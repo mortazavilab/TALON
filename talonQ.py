@@ -7,6 +7,7 @@
 
 import argparse
 import sqlite3
+import dstruct
 
 def get_args():
     """ Fetches the arguments for the program """
@@ -112,19 +113,52 @@ def match_all_transcript_vertices(chromosome, positions, location_dict,
                                                 location_dict)
         if vertex_match == None:
             # If no vertex matches the position, one is created.
-            run_info['vertex'] += 1
-            new_ID = "%s-%d" % (run_info['prefix'], run_info['vertex'])
-            new_vertex = {'location_ID': new_ID, 
-                          'genome_build': run_info['build'],
-                          'chromosome': chromosome,
-                          'position': position}
-            vertex_match = new_vertex
-            location_dict[(chromosome, position)] = new_vertex
+            vertex_match = create_vertex(chromosome, position, run_info, 
+                                         location_dict)
 
         # Add to running list of matches
         vertex_matches.append(vertex_match['location_ID'])
 
     return vertex_matches
+
+def permissive_vertex_search(chromosome, position, dist_to_splice,
+                             locations, cutoff, run_info):
+    """ Given a position, this function tries to find a vertex match within the
+        cutoff distance that also comes before the splice junction begins.
+        If no vertex is found, the function returns None. """
+
+    location_keys = list(filter(lambda t: t[0]==chromosome and
+                           abs(t[1] - position) + 1 < cutoff and
+                           abs(t[1] - position) + 1 < dist_to_splice,
+                           list(locations.keys())))
+
+    min_dist = cutoff
+    closest = None
+    for candidate_match in location_keys:
+        dist = abs(candidate_match[1] - position)
+        if dist < min_dist:
+            min_dist = dist
+            closest = locations[candidate_match]['location_ID']
+
+    if closest == None:
+        closest = create_vertex(chromosome, position, run_info, location_dict)
+        min_dist = "NA"
+
+    return closest, min_dist
+
+            
+def create_vertex(chromosome, position, run_info, location_dict):
+    """ Creates a novel vertex and adds it to the location data structure. """
+    run_info.vertex += 1
+    new_ID = "%s-%d" % (run_info.prefix, run_info.vertex)
+    new_vertex = {'location_ID': new_ID,
+                  'genome_build': run_info.build,
+                  'chromosome': chromosome,
+                  'position': position}
+    vertex_match = new_vertex
+    location_dict[(chromosome, position)] = new_vertex
+
+    return new_ID
 
 # TODO: validation of input options
 def check_inputs(options):
@@ -142,12 +176,17 @@ def check_inputs(options):
                           " database. The choices are: " + build_names)
     annot_builds = cursor.fetchall()
 
-def init_run_info(cursor, build, prefix):
+def init_run_info(cursor, genome_build, idprefix):
     """ Initializes a dictionary that keeps track of important run information
         such as the desired genome build, the prefix for novel identifiers,
         and the novel counters for the run. """
 
-    run_info = {'build': build, 'prefix':prefix}
+    run_info = dstruct.Struct()
+    run_info.build = genome_build
+    run_info.prefix = idprefix
+    run_info.cutoff_5p = 500
+    run_info.cutoff_3p = 300
+
     query = "SELECT * FROM counters WHERE category != 'genome_build'"
     cursor.execute(query)
 
@@ -182,6 +221,7 @@ def main():
     #v2 = search_for_vertex_at_pos(chrom, pos2, location_dict)["location_ID"]
 
     #edge_match = search_for_edge(v1, v2, "exon", edge_dict)
+    print(permissive_vertex_search("chr1", 1, 100, location_dict, 500, run_info))
 
 if __name__ == '__main__':
     main()
