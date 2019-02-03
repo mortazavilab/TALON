@@ -19,6 +19,8 @@ def get_args():
     parser = argparse.ArgumentParser(description=program_desc)
     parser.add_argument('--db', dest = 'database', metavar='FILE,', type=str,
                help='TALON database. Created using build_talon_annotation.py')
+    parser.add_argument('--build', dest = 'build', metavar='STRING,', type=str,
+               help='Genome build (i.e. hg38) to use. Must be in the database.')
 
     args = parser.parse_args()
     return args
@@ -39,6 +41,22 @@ def make_location_dict(genome_build, cursor):
 
     return(location_dict)
     
+def make_edge_dict(cursor):
+    """ Format of dict:
+            Key: vertex1_vertex2_type
+            Value: SQLite3 row from edge table
+    """
+    edge_dict = {}
+    query = """SELECT * FROM edge"""
+    cursor.execute(query)
+    for edge in cursor.fetchall():
+        vertex_1 = edge["v1"]
+        vertex_2 = edge["v2"]
+        edge_type = edge["edge_type"]
+        key = "%s_%s_%s" % (vertex_1, vertex_2, edge_type)
+        edge_dict[key] = edge
+
+    return edge_dict
 
 def search_for_vertex_at_pos(chromosome, position, location_dict):
     """ Given a chromosome and a position (1-based), this function queries the 
@@ -51,14 +69,18 @@ def search_for_vertex_at_pos(chromosome, position, location_dict):
     except:
         return None
         
-    #query = """SELECT * FROM location 
-    #               WHERE genome_build = ?
-    #               AND chromosome = ? 
-    #               AND position = ? """
-    
-    #cursor.execute(query, [genome_build, chromosome, pos])
-    #vertex_matches = cursor.fetchall()
     return vertex_matches
+
+def search_for_edge(v1, v2, edge_type, edge_dict):
+    """ """
+    query_key = "%d_%d_%s" % (v1, v2, edge_type)
+    print(v1)
+    print(v2)
+    print(query_key)
+    try:
+        return edge_dict[query_key]
+    except:
+        return None
 
 def search_for_all_transcript_vertices(position_pairs, cursor):
     """ Given a list of (chromosome, position) tuples, this function performs 
@@ -76,18 +98,41 @@ def search_for_all_transcript_vertices(position_pairs, cursor):
 
 
 # TODO: validation of input options
+def check_inputs(options):
+
+    # Make sure that the genome build exists in the provided TALON database.
+    conn = sqlite3.connect(options.database)
+    cursor = conn.cursor()
+    cursor.execute(""" SELECT DISTINCT name FROM genome_build """)
+    builds = cursor.fetchone()
+    if options.build not in builds:
+        build_names = ", ".join(list(annot_builds))
+        raise ValueError("Please specify a genome build that exists in the" +
+                          " database. The choices are: " + build_names)
+    annot_builds = cursor.fetchall()
 
 def main():
     """ Runs program """
 
     options = get_args()
+    check_inputs(options)
     conn = sqlite3.connect(options.database)
     conn.row_factory = sqlite3.Row
     cursor = conn.cursor()
 
-    make_location_dict("hg38", cursor)
-
+    location_dict = make_location_dict(options.build, cursor)
+    edge_dict = make_edge_dict(cursor)
     conn.close()
+    print(edge_dict)
+
+    chrom = "chr1"
+    pos1 = 500
+    pos2 = 600
+    v1 = search_for_vertex_at_pos(chrom, pos1, location_dict)["location_ID"]
+    v2 = search_for_vertex_at_pos(chrom, pos2, location_dict)["location_ID"]
+
+    edge_match = search_for_edge(v1, v2, "exon", edge_dict)
+    print(edge_match)
 
 if __name__ == '__main__':
     main()
