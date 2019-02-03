@@ -23,18 +23,41 @@ def get_args():
     args = parser.parse_args()
     return args
 
-def search_for_vertex_at_pos(genome_build, chromosome, pos, cursor):
-    """ Given a chromosome and a position (1-based), this function queries the 
-        location table in the provided database to determine whether a vertex 
-        fitting those criteria exists. Returns the row(s) if yes, and __ if no.
+def make_location_dict(genome_build, cursor):
+    """ Format of dict:
+            Key: chromosome_pos
+            Value: SQLite3 row from location table
     """
-    query = """SELECT * FROM location 
-                   WHERE genome_build = ?
-                   AND chromosome = ? 
-                   AND position = ? """
+    location_dict = {}
+    query = """SELECT * FROM location WHERE genome_build = ? """
+    cursor.execute(query, [genome_build])
+    for location in cursor.fetchall():
+        chromosome = location["chromosome"]
+        position = location["position"]
+        key = "%s_%d" % (chromosome, position)
+        location_dict[key] = location
+
+    return(location_dict)
     
-    cursor.execute(query, [genome_build, chromosome, pos])
-    vertex_matches = cursor.fetchall()
+
+def search_for_vertex_at_pos(chromosome, position, location_dict):
+    """ Given a chromosome and a position (1-based), this function queries the 
+        location dict to determine whether a vertex 
+        fitting those criteria exists. Returns the row if yes, and __ if no.
+    """
+    query_key = "%s_%d" % (chromosome, position)
+    try:
+        return location_dict[query_key]
+    except:
+        return None
+        
+    #query = """SELECT * FROM location 
+    #               WHERE genome_build = ?
+    #               AND chromosome = ? 
+    #               AND position = ? """
+    
+    #cursor.execute(query, [genome_build, chromosome, pos])
+    #vertex_matches = cursor.fetchall()
     return vertex_matches
 
 def search_for_all_transcript_vertices(position_pairs, cursor):
@@ -62,11 +85,7 @@ def main():
     conn.row_factory = sqlite3.Row
     cursor = conn.cursor()
 
-    
-    pairs = [("chr1",0), ("chr1", 1), ("chr1", 1000)]
-    search_for_all_transcript_vertices(pairs, cursor)
-    #search_for_vertex_at_pos("chr1", 1, cursor)
-    #search_for_vertex_at_pos("chr1", 0, cursor)
+    make_location_dict("hg38", cursor)
 
     conn.close()
 
