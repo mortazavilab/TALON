@@ -166,6 +166,7 @@ def permissive_vertex_search(chromosome, position, strand, sj_pos, pos_type,
         if abs(dist) <= abs(min_dist):
             min_dist = dist
             closest = locations[candidate_match]['location_ID']
+        # TODO: consider tiebreaker case.
         #elif abs(dist) == abs(min_dist)
         #    # Tiebreaker: 
 
@@ -185,10 +186,65 @@ def create_vertex(chromosome, position, run_info, location_dict):
                   'genome_build': run_info.build,
                   'chromosome': chromosome,
                   'position': position}
-    vertex_match = new_vertex
+
     location_dict[(chromosome, position)] = new_vertex
 
     return new_vertex
+
+def create_edge(vertex_1, vertex_2, edge_type, strand, edge_dict, run_info):
+    """ Creates a novel edge and adds it to the edge data structure. """
+    run_info.edge += 1
+    new_ID = "%s-%d" % (run_info.prefix, run_info.edge)
+    new_edge = {'edge_ID': new_ID,
+                'v1': vertex_1,
+                'v2': vertex_2,
+                'edge_type': edge_type,
+                'strand': strand }
+    
+    edge_dict[(vertex_1, vertex_2, edge_type)] = new_edge
+
+    return new_edge              
+
+def match_all_transcript_edges(vertices, strand, edge_dict, run_info):
+    """ Given a list of vertex IDs from the transcript in 5' to
+        3' end order, this function looks for a matching edge ID for each
+        position. If none exists, it creates one. """
+
+    edge_matches = []
+    edge_type = "exon"
+
+    for index_1 in range(0, len(vertices) - 1):
+        index_2 = index_1 + 1
+
+        if index_1 % 2 != 0:
+            edge_type = "intron"
+        else:
+            edge_type = "exon"
+       
+        vertex_1 = vertices[index_1]
+        vertex_2 = vertices[index_2]
+        print(vertex_1)
+        print(vertex_2)
+        print(edge_type)
+        print("-----------")
+        
+        edge_match = search_for_edge(vertex_1, vertex_2, edge_type, edge_dict)
+                                                
+        if edge_match == None:
+            # If no edge matches the position, one is created.
+            edge_match = create_edge(vertex_1, vertex_2, edge_type, strand, 
+                                     edge_dict, run_info)
+
+        # Add to running list of matches
+        edge_matches.append(edge_match['edge_ID'])
+
+    return edge_matches
+
+
+#def search_for_transcript_exact():
+#    """ Given the vertices that make up a query transcript, look for a match in 
+#        the transcript dict. Return None
+
 
 # TODO: validation of input options
 def check_inputs(options):
@@ -245,6 +301,11 @@ def main():
     transcript_dict = make_transcript_dict(cursor)
     conn.close()
 
+    chrom = "chr2"
+    vertex_IDs = [ 11, 12, 13, 14, 15, 16]
+    strand = "+"
+    edge_IDs = match_all_transcript_edges(vertex_IDs, strand,
+                                                        edge_dict, run_info)
 
 if __name__ == '__main__':
     main()
