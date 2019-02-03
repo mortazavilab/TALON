@@ -36,7 +36,7 @@ def make_location_dict(genome_build, cursor):
     for location in cursor.fetchall():
         chromosome = location["chromosome"]
         position = location["position"]
-        key = "%s_%d" % (chromosome, position)
+        key = (chromosome, position)
         location_dict[key] = location
 
     return(location_dict)
@@ -53,7 +53,7 @@ def make_edge_dict(cursor):
         vertex_1 = edge["v1"]
         vertex_2 = edge["v2"]
         edge_type = edge["edge_type"]
-        key = "%s_%s_%s" % (vertex_1, vertex_2, edge_type)
+        key = (vertex_1, vertex_2, edge_type)
         edge_dict[key] = edge
 
     return edge_dict
@@ -63,7 +63,7 @@ def search_for_vertex_at_pos(chromosome, position, location_dict):
         location dict to determine whether a vertex 
         fitting those criteria exists. Returns the row if yes, and __ if no.
     """
-    query_key = "%s_%d" % (chromosome, position)
+    query_key = (chromosome, position)
     try:
         return location_dict[query_key]
     except:
@@ -73,10 +73,7 @@ def search_for_vertex_at_pos(chromosome, position, location_dict):
 
 def search_for_edge(v1, v2, edge_type, edge_dict):
     """ """
-    query_key = "%d_%d_%s" % (v1, v2, edge_type)
-    print(v1)
-    print(v2)
-    print(query_key)
+    query_key = (v1, v2, edge_type)
     try:
         return edge_dict[query_key]
     except:
@@ -94,7 +91,6 @@ def search_for_all_transcript_vertices(position_pairs, cursor):
     for pair in position_pairs:
         cursor.execute(query, pair)
         vertex_matches = cursor.fetchall()
-        print(vertex_matches)
 
 
 # TODO: validation of input options
@@ -123,7 +119,6 @@ def main():
     location_dict = make_location_dict(options.build, cursor)
     edge_dict = make_edge_dict(cursor)
     conn.close()
-    print(edge_dict)
 
     chrom = "chr1"
     pos1 = 500
@@ -132,7 +127,6 @@ def main():
     v2 = search_for_vertex_at_pos(chrom, pos2, location_dict)["location_ID"]
 
     edge_match = search_for_edge(v1, v2, "exon", edge_dict)
-    print(edge_match)
 
 if __name__ == '__main__':
     main()

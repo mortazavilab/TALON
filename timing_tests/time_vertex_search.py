@@ -20,6 +20,9 @@ def main():
     conn.row_factory = sqlite3.Row
     cursor = conn.cursor()
     location_dict = talon.make_location_dict("hg38", cursor)
+    location_dict_size = int(sys.getsizeof(location_dict))/1000000
+    print("Size of location dict: %f MB" % location_dict_size)
+    print("------------------------------------------")
     fn = lambda: run_vertex_queries(location_dict, n)
 
     run_timetest(cursor, 1)

@@ -20,6 +20,10 @@ def main():
     conn.row_factory = sqlite3.Row
     cursor = conn.cursor()
     edge_dict = talon.make_edge_dict(cursor)
+    edge_dict_size = int(sys.getsizeof(edge_dict))/1000000
+    print("Size of edge dict: %f MB" % edge_dict_size)
+    print("------------------------------------------")
+
     fn = lambda: run_vertex_queries(edge_dict, n)
 
     run_timetest(cursor, 1)
