@@ -255,11 +255,48 @@ def search_for_transcript_suffix(edge_IDs, transcript_dict):
     except:
         return None                 
     
-def search_for_overlap_with_gene(start, end, strand, cursor):
+def search_for_overlap_with_gene(chromosome, start, end, strand, 
+                                 cursor, run_info):
     """ Given a start and an end value for an interval, query the database to
         determine whether the interval overlaps with a gene. If it overlaps
         more than one, prioritize same-strand first and foremost. """
-    pass
+    
+    min_start = min(start, end)
+    max_end = max(start, end)
+
+    query = """ SELECT g.gene_ID,
+                      v.vertex_ID,
+                      loc.chromosome,
+                      loc.position,
+                      g.strand 
+                   FROM genes as g
+                   LEFT JOIN vertex as v ON g.gene_ID = v.gene_ID 
+                   LEFT JOIN location as loc ON loc.location_ID = v.vertex_ID
+                   WHERE loc.genome_build = '%s' 
+                   AND loc.chromosome = '%s' 
+                   AND loc.position >= %d 
+                   AND loc.position <= %d """
+    cursor.execute(query % (run_info.build, chromosome, min_start, max_end))
+    matches = cursor.fetchall()
+
+    if len(matches) == 0:
+        return None
+    
+    # Among multiple matches, preferentially return the same-strand gene with 
+    # the closest match to the 3' end 
+    same_strand_matches = [ x for x in matches if x["strand"] == strand ]
+
+    if strand == "+" and len(same_strand_matches) > 0 or \
+        strand == "-" and len(same_strand_matches) == 0:
+        matches = sorted(same_strand_matches, key = lambda x: x["position"], 
+                         reverse = True )
+        return(matches[0]["gene_ID"])
+
+    else:   
+        matches = sorted(same_strand_matches, key = lambda x: x["position"],
+                         reverse = False )
+        return(matches[0].gene_ID)
+
 
 def search_for_transcript(edge_IDs, transcript_dict):
     """ Given the edge IDs that make up a query transcript (5' to 3' order), 
@@ -330,17 +367,20 @@ def main():
     location_dict = make_location_dict(options.build, cursor)
     edge_dict = make_edge_dict(cursor)
     transcript_dict = make_transcript_dict(cursor)
-    conn.close()
 
-    chrom = "chr2"
-    vertex_IDs = [ 11, 12, 13, 14, 15, 16]
+    chrom = "chr1"
+    #vertex_IDs = [ 11, 12, 13, 14, 15, 16]
     strand = "+"
     #edge_IDs = match_all_transcript_edges(vertex_IDs, strand,
     #                                                    edge_dict, run_info)
 
     #gene_ID, transcript_ID = search_for_transcript(edge_IDs, transcript_dict)
-    edge_IDs = [11,12,13]
-    search_for_transcript_suffix(edge_IDs, transcript_dict)
+    #edge_IDs = [11,12,13]
+    #search_for_transcript_suffix(edge_IDs, transcript_dict)
+    gene_ID = search_for_overlap_with_gene(chrom, 910, 1010, strand,
+                                 cursor, run_info)
+    print(gene_ID)
+    conn.close()
 
 if __name__ == '__main__':
     main()
