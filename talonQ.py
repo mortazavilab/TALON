@@ -237,6 +237,24 @@ def match_all_transcript_edges(vertices, strand, edge_dict, run_info):
 
     return edge_matches
 
+def search_for_transcript_suffix(edge_IDs, transcript_dict):
+    """ Given a list of edges in a query transcript, determine whether it is
+        a suffix for any transcript in the dict. We're looking for the gene ID
+        here rather than worrying about exactly which transcript it came from.
+    """
+  
+    if type(edge_IDs) is list:
+        edge_IDs = tuple(edge_IDs)
+    try:
+        suffix_match = list(filter(lambda t: edge_IDs == t[-len(edge_IDs):],
+                                     list(transcript_dict.keys())))[0]
+        transcript = transcript_dict[suffix_match]
+        gene_ID = transcript["gene_ID"]
+        return gene_ID
+
+    except:
+        return None                 
+    
 
 def search_for_transcript(edge_IDs, transcript_dict):
     """ Given the edge IDs that make up a query transcript (5' to 3' order), 
@@ -312,10 +330,12 @@ def main():
     chrom = "chr2"
     vertex_IDs = [ 11, 12, 13, 14, 15, 16]
     strand = "+"
-    edge_IDs = match_all_transcript_edges(vertex_IDs, strand,
-                                                        edge_dict, run_info)
+    #edge_IDs = match_all_transcript_edges(vertex_IDs, strand,
+    #                                                    edge_dict, run_info)
 
-    gene_ID, transcript_ID = search_for_transcript(edge_IDs, transcript_dict)
+    #gene_ID, transcript_ID = search_for_transcript(edge_IDs, transcript_dict)
+    edge_IDs = [11,12,13]
+    search_for_transcript_suffix(edge_IDs, transcript_dict)
 
 if __name__ == '__main__':
     main()
