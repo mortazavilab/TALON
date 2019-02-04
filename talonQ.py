@@ -38,7 +38,8 @@ def make_transcript_dict(cursor):
     query = """SELECT * FROM transcripts """
     cursor.execute(query)
     for transcript in cursor.fetchall():
-        transcript_path = tuple(transcript["path"].split(","))
+        transcript_path = transcript["path"].split(",")
+        transcript_path = tuple([ int(x) for x in transcript_path ])
         transcript_dict[transcript_path] = transcript
 
     return transcript_dict
@@ -223,10 +224,6 @@ def match_all_transcript_edges(vertices, strand, edge_dict, run_info):
        
         vertex_1 = vertices[index_1]
         vertex_2 = vertices[index_2]
-        print(vertex_1)
-        print(vertex_2)
-        print(edge_type)
-        print("-----------")
         
         edge_match = search_for_edge(vertex_1, vertex_2, edge_type, edge_dict)
                                                 
@@ -241,12 +238,23 @@ def match_all_transcript_edges(vertices, strand, edge_dict, run_info):
     return edge_matches
 
 
-#def search_for_transcript_exact():
-#    """ Given the vertices that make up a query transcript, look for a match in 
-#        the transcript dict. Return None
+def search_for_transcript(edge_IDs, transcript_dict):
+    """ Given the edge IDs that make up a query transcript (5' to 3' order), 
+        look for a match in the transcript dict. 
+        Return gene ID and transcript ID if found, and None if not. """
 
+    if type(edge_IDs) is list:
+        edge_IDs = tuple(edge_IDs)
 
-# TODO: validation of input options
+    try:
+        transcript = transcript_dict[edge_IDs]
+        gene_ID = transcript["gene_ID"]
+        transcript_ID = transcript["transcript_ID"]
+        return gene_ID, transcript_ID
+
+    except:
+        return None, None
+
 def check_inputs(options):
     """ Checks the input options provided by the user and makes sure that
         they are valid. Throw an error with descriptive help message if not."""
@@ -306,6 +314,8 @@ def main():
     strand = "+"
     edge_IDs = match_all_transcript_edges(vertex_IDs, strand,
                                                         edge_dict, run_info)
+
+    gene_ID, transcript_ID = search_for_transcript(edge_IDs, transcript_dict)
 
 if __name__ == '__main__':
     main()
