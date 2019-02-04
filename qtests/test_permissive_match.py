@@ -55,7 +55,7 @@ class TestPermissiveMatch(object):
                                                             location_dict,
                                                             cutoff, run_info)
 
-        assert vertex_match == 10
+        assert vertex_match == 8
         assert diff == -250
 
     def test_beyond_cutoff_distance(self):
@@ -115,9 +115,9 @@ class TestPermissiveMatch(object):
                                                             location_dict,
                                                             cutoff, run_info)
 
-        assert start_match == 15
+        assert start_match == 13
         assert start_diff == -20
-        assert end_match == 16
+        assert end_match == 14
         assert end_diff == 30
     
 

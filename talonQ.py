@@ -255,6 +255,11 @@ def search_for_transcript_suffix(edge_IDs, transcript_dict):
     except:
         return None                 
     
+def search_for_overlap_with_gene(start, end, strand, cursor):
+    """ Given a start and an end value for an interval, query the database to
+        determine whether the interval overlaps with a gene. If it overlaps
+        more than one, prioritize same-strand first and foremost. """
+    pass
 
 def search_for_transcript(edge_IDs, transcript_dict):
     """ Given the edge IDs that make up a query transcript (5' to 3' order), 

@@ -66,7 +66,8 @@ def add_gene_table(database):
     c = conn.cursor()
 
     # Add table and set primary key column, which will be the gene ID
-    c.execute('CREATE TABLE "genes" ("gene_ID" INTEGER PRIMARY KEY)')
+    c.execute("""CREATE TABLE "genes" ("gene_ID" INTEGER PRIMARY KEY,
+                                       "strand" TEXT)""")
 
     conn.commit()
     conn.close()
@@ -83,14 +84,6 @@ def add_transcript_table(database):
     conn = sqlite3.connect(database)
     c = conn.cursor()
 
-    # Add table and set keys
-    #command = """ CREATE TABLE IF NOT EXISTS transcripts (
-    #            transcript_ID INTEGER PRIMARY KEY,
-    #            gene_ID INTEGER,
-    #            path TEXT,
-
-    #            FOREIGN KEY (gene_ID) REFERENCES genes(gene_ID)
-    #); """
     command = """ CREATE TABLE IF NOT EXISTS transcripts (
                 transcript_ID INTEGER PRIMARY KEY,
                 gene_ID INTEGER,
@@ -130,6 +123,7 @@ def add_edge_table(database):
                 v1 INTEGER,
                 v2 INTEGER,
                 edge_type TEXT,
+                strand TEXT,
                 
                 PRIMARY KEY (edge_ID),
                 FOREIGN KEY (v1) REFERENCES vertex(vertex_ID),
@@ -172,24 +166,23 @@ def add_edgetype_table(database):
 def add_vertex_table(database):
     """ Add a table to the database to track vertices.
         Attributes are:
-        - Primary Key: ID (interally assigned by database)
+        - Vertex_ID: ID (interally assigned by database)
         - Gene ID
-        - Type
     """
 
     # Connecting to the database file
     conn = sqlite3.connect(database)
     c = conn.cursor()
 
-    # Create vertex type table first.
-    #add_vertextype_table(database)
 
     # Add table and set primary key column, which will be the transcript ID
     # Also include relationship to the gene table
     command = """ CREATE TABLE IF NOT EXISTS vertex (
-                vertex_ID INTEGER PRIMARY KEY,
+                vertex_ID INTEGER,
                 gene_ID INTEGER,
-                
+               
+                PRIMARY KEY(vertex_ID, gene_ID),
+                FOREIGN KEY(vertex_ID) REFERENCES location(location_ID), 
                 FOREIGN KEY (gene_ID) REFERENCES genes(gene_ID)
                 ); """
 
@@ -406,7 +399,6 @@ def add_location_table(database):
                   genome_build INTEGER,
                   chromosome text,
                   position INTEGER,
-                  strand TEXT,
 
                   PRIMARY KEY(location_ID, genome_build),
                   FOREIGN KEY(genome_build) REFERENCES genome_build(build_ID),
@@ -575,7 +567,7 @@ def add_genes(c, genes, annot_name):
         gene_counter += 1
 
         # Information for gene table
-        bulk_genes.append((db_gene_id,))
+        bulk_genes.append((db_gene_id, gene.strand))
 
         # Information for gene annotations
         attributes = gene.annotations
@@ -600,8 +592,8 @@ def bulk_update_genes(c, genes, gene_counter):
        into the database at the provided cursor (c).
     """
     # Insert entries into database in bulk
-    cols = " (" + ", ".join([str_wrap_double(x) for x in ["gene_id"]]) + ") "
-    g_command = 'INSERT INTO "genes"' + cols + "VALUES " + '(?)'
+    cols = " (" + ", ".join([str_wrap_double(x) for x in ["gene_id", "strand"]]) + ") "
+    g_command = 'INSERT INTO "genes"' + cols + "VALUES " + '(?,?)'
     c.executemany(g_command, genes)
 
     # Update counter
@@ -663,12 +655,10 @@ def add_transcripts(c, transcripts, annot_name, gene_id_map, genome_build):
             db_gene_id = "NULL"
 
         # Process exons to create vertices and edges 
-        #start_time = time.time()
         transcript_tuple = process_transcript(c, transcript, db_transcript_id, 
                                               db_gene_id, genome_build,
                                               annot_name, vertices, edges)
         bulk_transcripts.append(transcript_tuple)
-        #bulk_transcripts.append((db_transcript_id, db_gene_id, transcript_path))
 
         # Create annotation entries
         ignore = ["gene_id", "gene_name"]
@@ -727,8 +717,12 @@ def bulk_update_vertices(c, vertices):
     counter = vertices.pop("counter")
 
     # Separate vertex entries and locations
-    vertex_list = [ (x[0],x[1]) for x in vertices.values()]
-    location_list = [ (x[0],x[2],x[3],x[4],x[5]) for x in vertices.values()]
+    vertex_list = []
+    location_list = []
+    for vertex in list(vertices.values()):
+        gene_IDs = vertex[-1]
+        vertex_list += [ (vertex[0], x) for x in gene_IDs ]
+        location_list.append(vertex[0:4])
  
     # Bulk entry of vertices
     cols = " (" + ", ".join([str_wrap_double(x) for x in ["vertex_ID","gene_id"]]) + ") "
@@ -738,9 +732,9 @@ def bulk_update_vertices(c, vertices):
 
     # Bulk entry of locations
     cols = " (" + ", ".join([str_wrap_double(x) for x in ["location_ID",
-                   "genome_build", "chromosome", "position", "strand"]]) + ") "
+                   "genome_build", "chromosome", "position"]]) + ") "
     command = 'INSERT INTO "location"' + cols + "VALUES " + \
-                  '(?,?,?,?,?)'
+                  '(?,?,?,?)'
     c.executemany(command, location_list)
 
     # Counter update
@@ -758,9 +752,9 @@ def bulk_update_edges(c, edges):
     counter = edges.pop("counter")
 
     cols = " (" + ", ".join([str_wrap_double(x) for x in ["edge_ID","v1",
-                   "v2", "edge_type"]]) + ") "
+                   "v2", "edge_type", "strand"]]) + ") "
     command = 'INSERT INTO "edge"' + cols + "VALUES " + \
-                  '(?,?,?,?)'
+                  '(?,?,?,?,?)'
     c.executemany(command, edges.values())
 
     update_counter = 'UPDATE "counters" SET "count" = ? WHERE "category" = ?'
@@ -781,11 +775,11 @@ def process_transcript(c, transcript, transcript_id, gene_id, genome_build,
         left = exon.start
         right = exon.end
         v1, vertices = create_vertex(c, gene_id, genome_build,
-                                     exon.chromosome, left, strand, vertices)
+                                     exon.chromosome, left, vertices)
         transcript_vertices.append(v1)
 
         v2, vertices = create_vertex(c, gene_id, genome_build,
-                                     exon.chromosome, right, strand, vertices)
+                                     exon.chromosome, right, vertices)
         transcript_vertices.append(v2)
 
     # Iterate over vertices in order to create edges. If the transcript is on the
@@ -812,7 +806,7 @@ def process_transcript(c, transcript, transcript_id, gene_id, genome_build,
         elif prev_edge_type == "exon":
             edge_type = "intron"
 
-        edge_id, edges = create_edge(vertex_1, vertex_2, edge_type, edges)
+        edge_id, edges = create_edge(vertex_1, vertex_2, edge_type, strand, edges)
         transcript_edges.append(edge_id)
 
         if edge_type == "exon":
@@ -850,13 +844,13 @@ def add_exon_annotations_to_db(c, exon, exon_id, annot_name):
 
     return
             
-def create_edge(vertex_1, vertex_2, edge_type, edges):
+def create_edge(vertex_1, vertex_2, edge_type, strand, edges):
     """  
        Creates a new edge with the provided information, unless a duplicate
        already exists in the 'edges' dict.
     """
     # Check if the edge exists, and return the ID if it does
-    query = ",".join([str(vertex_1), str(vertex_2), edge_type])
+    query = ",".join([str(vertex_1), str(vertex_2), edge_type,strand])
     if query in edges.keys():
         existing_edge_id = edges[query][0]
         return existing_edge_id, edges
@@ -865,21 +859,21 @@ def create_edge(vertex_1, vertex_2, edge_type, edges):
     # Get ID number from counter
     edge_id = edges["counter"] + 1
     edges["counter"] += 1
-    new_edge = (edge_id, vertex_1, vertex_2, edge_type)
-    keyname = ",".join([str(vertex_1), str(vertex_2), edge_type])
+    new_edge = (edge_id, vertex_1, vertex_2, edge_type, strand)
+    keyname = ",".join([str(vertex_1), str(vertex_2), edge_type, strand])
     edges[keyname] = new_edge
 
     return edge_id, edges
 
-def create_vertex(c, gene_id, genome_build, chromosome, pos, strand, vertices):
+def create_vertex(c, gene_id, genome_build, chromosome, pos, vertices):
     """
        Creates a new vertex with the provided information, unless a duplicate 
        already exists in the database.
     """
-    # Check if the vertex exists
-    query = ",".join([str(gene_id), genome_build, chromosome, 
-                      str(pos), strand])
+    # Check if the vertex exists. If yes, add current gene ID to it
+    query = ",".join([genome_build, chromosome, str(pos)])
     if query in vertices.keys():
+        vertices[query][-1].append(gene_id)
         existing_vertex_id = vertices[query][0]
         return existing_vertex_id, vertices
 
@@ -887,10 +881,8 @@ def create_vertex(c, gene_id, genome_build, chromosome, pos, strand, vertices):
     # Get ID number from counter
     vertex_id = vertices["counter"] + 1
     vertices["counter"] += 1
-    new_vertex = (vertex_id, gene_id, genome_build, chromosome, pos,
-                  strand)
-    keyname = ",".join([str(gene_id), genome_build, chromosome, 
-                        str(pos), strand])
+    new_vertex = [vertex_id, genome_build, chromosome, pos, [gene_id]]
+    keyname = ",".join([genome_build, chromosome, str(pos)])
     vertices[keyname] = new_vertex
 
     return vertex_id, vertices

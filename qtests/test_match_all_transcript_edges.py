@@ -19,7 +19,7 @@ class TestMatchAllEdges(object):
         conn.close()
 
         chrom = "chr2"
-        vertex_IDs = [ 11, 12, 13, 14, 15, 16]
+        vertex_IDs = [ 9, 10, 11, 12, 13, 14]
         strand = "+"
         edge_IDs = talon.match_all_transcript_edges(vertex_IDs, strand,
                                                         edge_dict, run_info)
@@ -38,7 +38,7 @@ class TestMatchAllEdges(object):
         conn.close()
 
         chrom = "chr2"
-        vertex_IDs = [ 16, 15, 14, 13, 12, 11]
+        vertex_IDs = [ 14, 13, 12, 11, 10, 9]
         strand = "-"
 
         edge_IDs = talon.match_all_transcript_edges(vertex_IDs, strand,

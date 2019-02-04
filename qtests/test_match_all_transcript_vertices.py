@@ -24,9 +24,7 @@ class TestMatchAllVertices(object):
         vertex_IDs = talon.match_all_transcript_vertices(chrom, pos, 
                                                         location_dict, run_info)
 
-        # Make sure that no match got returned
-        # TODO: 7 should really be 5 once I update the db schema to remove strand
-        assert vertex_IDs == [ 2, 3, 4, 7 ] 
+        assert vertex_IDs == [ 2, 3, 4, 5 ] 
         assert run_info['vertex'] == orig_vertex_count
 
     def test_with_novel_location(self):
@@ -46,9 +44,8 @@ class TestMatchAllVertices(object):
                                                         location_dict, run_info)
 
         # Make sure that no match got returned
-        # TODO: 7 should really be 5 once I update the db schema to remove strand
         new_vertex_count = run_info['vertex']
-        assert vertex_IDs == [ "TALON-%d" % new_vertex_count, 3, 4, 7 ]
+        assert vertex_IDs == [ "TALON-%d" % new_vertex_count, 3, 4, 5 ]
        
         # Make sure the data structures got updated
         assert new_vertex_count == orig_vertex_count + 1
