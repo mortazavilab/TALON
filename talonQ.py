@@ -258,44 +258,98 @@ def search_for_transcript_suffix(edge_IDs, transcript_dict):
 def search_for_overlap_with_gene(chromosome, start, end, strand, 
                                  cursor, run_info):
     """ Given a start and an end value for an interval, query the database to
-        determine whether the interval overlaps with a gene. If it overlaps
-        more than one, prioritize same-strand first and foremost. """
-    
+        determine whether the interval overlaps with any genes. If it there is
+        more than one match, prioritize same-strand first and foremost. 
+        If there is more than one same-strand option, prioritize amount of
+        overlap. """
+
     min_start = min(start, end)
     max_end = max(start, end)
+    query_interval = [min_start, max_end]
 
-    query = """ SELECT g.gene_ID,
-                      v.vertex_ID,
-                      loc.chromosome,
-                      loc.position,
-                      g.strand 
-                   FROM genes as g
-                   LEFT JOIN vertex as v ON g.gene_ID = v.gene_ID 
-                   LEFT JOIN location as loc ON loc.location_ID = v.vertex_ID
-                   WHERE loc.genome_build = '%s' 
-                   AND loc.chromosome = '%s' 
-                   AND loc.position >= %d 
-                   AND loc.position <= %d """
-    cursor.execute(query % (run_info.build, chromosome, min_start, max_end))
+    query = """ SELECT gene_ID, 
+                    chromosome, 
+                    start, 
+                    end,
+                    strand    
+                FROM (SELECT g.gene_ID,
+                             loc.chromosome,
+                             MIN(loc.position) as start,
+                             MAX(loc.position) as end,
+                             g.strand
+                       FROM genes as g
+                       LEFT JOIN vertex as v ON g.gene_ID = v.gene_ID
+                       LEFT JOIN location as loc ON loc.location_ID = v.vertex_ID
+                       WHERE loc.genome_build = '%s'
+                       AND loc.chromosome = '%s'
+                       GROUP BY g.gene_ID)
+                 WHERE (start <= %d AND end >= %d) OR
+                       (start >= %d AND end <= %d) OR
+                       (start >= %d AND start <= %d) OR
+                       (end >= %d AND end <= %d);"""
+    #query = """ SELECT g.gene_ID,
+    #                  v.vertex_ID,
+    #                  loc.chromosome,
+    #                  loc.position,
+    #                  g.strand 
+    #               FROM genes as g
+    #               LEFT JOIN vertex as v ON g.gene_ID = v.gene_ID 
+    #               LEFT JOIN location as loc ON loc.location_ID = v.vertex_ID
+    #               WHERE loc.genome_build = '%s' 
+    #               AND loc.chromosome = '%s' 
+    #               AND loc.position >= %d 
+    #               AND loc.position <= %d """
+    cursor.execute(query % (run_info.build, chromosome, min_start, max_end,
+                            min_start, max_end, min_start, max_end, min_start, 
+                            max_end))
     matches = cursor.fetchall()
 
     if len(matches) == 0:
-        return None
+        return None, None
     
     # Among multiple matches, preferentially return the same-strand gene with 
-    # the closest match to the 3' end 
-    same_strand_matches = [ x for x in matches if x["strand"] == strand ]
+    # the greatest amount of overlap
+    same_strand_matches = len([ x for x in matches if x["strand"] == strand ])
 
-    if strand == "+" and len(same_strand_matches) > 0 or \
-        strand == "-" and len(same_strand_matches) == 0:
-        matches = sorted(same_strand_matches, key = lambda x: x["position"], 
-                         reverse = True )
-        return(matches[0]["gene_ID"])
+    if strand == "+" and same_strand_matches > 0 or \
+        strand == "-" and same_strand_matches == 0:
+
+        matches = [ x for x in matches if x["strand"] == "+" ]
+        best_match = get_best_match(matches, query_interval)
 
     else:   
-        matches = sorted(same_strand_matches, key = lambda x: x["position"],
-                         reverse = False )
-        return(matches[0].gene_ID)
+        matches = [ x for x in matches if x["strand"] == "-" ]
+        best_match = get_best_match(matches, query_interval)
+
+    return best_match['gene_ID'], best_match['strand']
+
+def get_best_match(matches, query_interval):
+    """ Given a set of gene matches and a query interval, return the match
+        that has the greatest amount of overlap with the query."""
+
+    max_overlap = 0
+    best_match = None
+
+    for match in matches:
+        match_interval = [ match['start'], match['end'] ]
+        overlap = get_overlap(query_interval, match_interval)
+        if overlap >= max_overlap:
+            max_overlap = overlap
+            best_match = match
+
+    return best_match            
+
+def get_overlap(a, b):
+    """ Computes the amount of overlap between two intervals.
+        Returns 0 if there is no overlap. The function treats the start and
+        ends of each interval as inclusive, meaning that if a = b = [10, 20],
+        the overlap reported would be 11, not 10.
+        Args:
+            a: First interval, formattted as a list
+            b: Second interval, formatted as a list
+    """
+    overlap = max(0, min(a[1], b[1]) - max(a[0], b[0]) + 1)
+    return overlap
 
 
 def search_for_transcript(edge_IDs, transcript_dict):
