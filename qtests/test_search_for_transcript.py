@@ -3,6 +3,7 @@ import sys
 import sqlite3
 sys.path.append("..")
 import talonQ as talon
+from helper_fns import *
 @pytest.mark.dbunit
 
 class TestSearchForTranscript(object):
@@ -16,7 +17,7 @@ class TestSearchForTranscript(object):
         transcript_dict = talon.make_transcript_dict(cursor)
         conn.close()
 
-        edges = [ 9, 11, 12, 13 ]
+        edges = [ 1, 3, 4, 5 ]
         gene_ID, transcript_ID = talon.search_for_transcript(edges, 
                                                              transcript_dict)
 
@@ -31,34 +32,16 @@ class TestSearchForTranscript(object):
         conn, cursor = get_db_cursor()
         build = "toy_build"
         transcript_dict = talon.make_transcript_dict(cursor)
-        conn.close()
 
-        edges = [ 9, 10, 11, 12, 13 ]
+        edges = [ 12, 13, 14, 15, 16 ]
         gene_ID, transcript_ID = talon.search_for_transcript(edges,
                                                              transcript_dict)
 
         # Make sure that correct match got returned
-        assert gene_ID == 3
-        assert transcript_ID == 3
+        correct_gene_ID = fetch_correct_ID("TG2", "gene", cursor)
+        correct_transcript_ID = fetch_correct_ID("TG2-001", "transcript", cursor)
 
-    #    conn, cursor = get_db_cursor()
-    #    build = "toy_build"
-    #    location_dict = talon.make_location_dict(build, cursor)
-
-    #    chrom = "chr1"
-    #    pos = 1
-    #    match = talon.search_for_vertex_at_pos(chrom, pos, location_dict)
-    #    conn.close()
-
-    #    # Make sure that match is correct and that we can access various 
-    #    # attributes using their names
-    #    assert match["genome_build"] == "toy_build"
-    #    assert match["chromosome"] == "chr1"
-    #    assert match["position"] == 1
-
-def get_db_cursor():
-    conn = sqlite3.connect("scratch/toy.db")
-    conn.row_factory = sqlite3.Row
-    cursor = conn.cursor()
-    return conn, cursor
+        assert gene_ID == correct_gene_ID
+        assert transcript_ID == correct_transcript_ID
+        conn.close()
 

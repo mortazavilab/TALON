@@ -261,7 +261,8 @@ def search_for_overlap_with_gene(chromosome, start, end, strand,
         determine whether the interval overlaps with any genes. If it there is
         more than one match, prioritize same-strand first and foremost. 
         If there is more than one same-strand option, prioritize amount of
-        overlap. """
+        overlap. Antisense matches may be returned if there is no sam strand
+        option. """
 
     min_start = min(start, end)
     max_end = max(start, end)
@@ -287,18 +288,7 @@ def search_for_overlap_with_gene(chromosome, start, end, strand,
                        (start >= %d AND end <= %d) OR
                        (start >= %d AND start <= %d) OR
                        (end >= %d AND end <= %d);"""
-    #query = """ SELECT g.gene_ID,
-    #                  v.vertex_ID,
-    #                  loc.chromosome,
-    #                  loc.position,
-    #                  g.strand 
-    #               FROM genes as g
-    #               LEFT JOIN vertex as v ON g.gene_ID = v.gene_ID 
-    #               LEFT JOIN location as loc ON loc.location_ID = v.vertex_ID
-    #               WHERE loc.genome_build = '%s' 
-    #               AND loc.chromosome = '%s' 
-    #               AND loc.position >= %d 
-    #               AND loc.position <= %d """
+
     cursor.execute(query % (run_info.build, chromosome, min_start, max_end,
                             min_start, max_end, min_start, max_end, min_start, 
                             max_end))

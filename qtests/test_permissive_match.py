@@ -4,6 +4,7 @@ import sqlite3
 sys.path.append("..")
 import talonQ as talon
 import dstruct
+from helper_fns import *
 @pytest.mark.dbunit
 
 class TestPermissiveMatch(object):
@@ -15,7 +16,6 @@ class TestPermissiveMatch(object):
         build = "toy_build"
         location_dict = talon.make_location_dict(build, cursor)
         run_info = talon.init_run_info(cursor, build, "TALON")
-        conn.close()
 
         chrom = "chr1"
         pos = [1, 1, 500, 600]
@@ -29,8 +29,9 @@ class TestPermissiveMatch(object):
                                                             "start", 
                                                             location_dict, 
                                                             cutoff, run_info)
-        assert vertex_match == 1
+        assert vertex_match == fetch_correct_vertex_ID(chrom, 1, cursor)
         assert diff == 0
+        conn.close()
 
     def test_match_at_cutoff_distance(self):
         """ Example where the correct match is exactly the length of the cutoff
@@ -40,7 +41,6 @@ class TestPermissiveMatch(object):
         build = "toy_build"
         location_dict = talon.make_location_dict(build, cursor)
         run_info = talon.init_run_info(cursor, build, "TALON")
-        conn.close()
 
         chrom = "chr1"
         pos = [1750, 1500, 1000, 900]
@@ -55,8 +55,9 @@ class TestPermissiveMatch(object):
                                                             location_dict,
                                                             cutoff, run_info)
 
-        assert vertex_match == 8
+        assert vertex_match == fetch_correct_vertex_ID(chrom, 2000, cursor)
         assert diff == -250
+        conn.close()
 
     def test_beyond_cutoff_distance(self):
         """ Example where the only nearby vertices are beyond the cutoff 
@@ -93,7 +94,6 @@ class TestPermissiveMatch(object):
         build = "toy_build"
         location_dict = talon.make_location_dict(build, cursor)
         run_info = talon.init_run_info(cursor, build, "TALON")
-        conn.close()
 
         chrom = "chr2"
         pos = [920, 970]
@@ -115,15 +115,9 @@ class TestPermissiveMatch(object):
                                                             location_dict,
                                                             cutoff, run_info)
 
-        assert start_match == 13
+        assert start_match == fetch_correct_vertex_ID(chrom, 900, cursor)
         assert start_diff == -20
-        assert end_match == 14
+        assert end_match == fetch_correct_vertex_ID(chrom, 1000, cursor)
         assert end_diff == 30
-    
-
-def get_db_cursor():
-    conn = sqlite3.connect("scratch/toy.db")
-    conn.row_factory = sqlite3.Row
-    cursor = conn.cursor()
-    return conn, cursor
+        conn.close()    
 

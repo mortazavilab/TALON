@@ -4,6 +4,7 @@ import sqlite3
 sys.path.append("..")
 import talonQ as talon
 import dstruct
+from helper_fns import *
 @pytest.mark.dbunit
 
 class TestMatchAllEdges(object):
@@ -18,13 +19,13 @@ class TestMatchAllEdges(object):
         run_info = talon.init_run_info(cursor, build, "TALON")
         conn.close()
 
-        chrom = "chr2"
-        vertex_IDs = [ 9, 10, 11, 12, 13, 14]
+        chrom = "chr1"
+        vertex_IDs = [ 1, 2, 3, 4, 5, 6]
         strand = "+"
         edge_IDs = talon.match_all_transcript_edges(vertex_IDs, strand,
                                                         edge_dict, run_info)
 
-        assert edge_IDs == [ 9, 10, 11, 12, 13 ] 
+        assert edge_IDs == [ 1, 2, 3, 4, 5 ] 
 
     def test_antisense(self):
         """ Example where all of the vertices are in the database, but the edges
@@ -50,10 +51,4 @@ class TestMatchAllEdges(object):
             expected_edges.append(edge_id)
 
         assert edge_IDs == expected_edges
-
-def get_db_cursor():
-    conn = sqlite3.connect("scratch/toy.db")
-    conn.row_factory = sqlite3.Row
-    cursor = conn.cursor()
-    return conn, cursor
 

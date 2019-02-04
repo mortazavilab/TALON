@@ -13,6 +13,18 @@ def fetch_correct_ID(name, feature_type, cursor):
 
     return(feature_ID)
 
+def fetch_correct_vertex_ID(chromosome, position, cursor):
+    """ Find the ID of a vertex from its position """
+    
+    query = """ SELECT location_ID FROM location
+                    WHERE chromosome = '%s'
+                    AND position = '%s' """
+
+    cursor.execute(query % (chromosome, position))
+    vertex_ID = cursor.fetchone()["location_ID"]
+
+    return(vertex_ID)
+
 def get_db_cursor():
     conn = sqlite3.connect("scratch/toy.db")
     conn.row_factory = sqlite3.Row
