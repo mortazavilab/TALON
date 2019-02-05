@@ -22,10 +22,11 @@ class TestMatchAllEdges(object):
         chrom = "chr1"
         vertex_IDs = [ 1, 2, 3, 4, 5, 6]
         strand = "+"
-        edge_IDs = talon.match_all_transcript_edges(vertex_IDs, strand,
+        edge_IDs, novelty = talon.match_all_transcript_edges(vertex_IDs, strand,
                                                         edge_dict, run_info)
 
         assert edge_IDs == [ 1, 2, 3, 4, 5 ] 
+        assert novelty == [ 0, 0, 0, 0, 0 ]
 
     def test_antisense(self):
         """ Example where all of the vertices are in the database, but the edges
@@ -42,7 +43,7 @@ class TestMatchAllEdges(object):
         vertex_IDs = [ 14, 13, 12, 11, 10, 9]
         strand = "-"
 
-        edge_IDs = talon.match_all_transcript_edges(vertex_IDs, strand,
+        edge_IDs, novelty = talon.match_all_transcript_edges(vertex_IDs, strand,
                                                         edge_dict, run_info)
         expected_edges = []
         for i in range(1,6):
@@ -51,4 +52,5 @@ class TestMatchAllEdges(object):
             expected_edges.append(edge_id)
 
         assert edge_IDs == expected_edges
+        assert novelty == [ 1, 1, 1, 1, 1 ]
 

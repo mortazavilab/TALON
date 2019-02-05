@@ -238,6 +238,7 @@ def match_all_transcript_edges(vertices, strand, edge_dict, run_info):
         position. If none exists, it creates one. """
 
     edge_matches = []
+    novelty = []
     edge_type = "exon"
 
     for index_1 in range(0, len(vertices) - 1):
@@ -257,11 +258,14 @@ def match_all_transcript_edges(vertices, strand, edge_dict, run_info):
             # If no edge matches the position, one is created.
             edge_match = create_edge(vertex_1, vertex_2, edge_type, strand, 
                                      edge_dict, run_info)
+            novelty.append(1)
+        else:
+            novelty.append(0)
 
         # Add to running list of matches
         edge_matches.append(edge_match['edge_ID'])
 
-    return edge_matches
+    return edge_matches, novelty
 
 def search_for_transcript_suffix(edge_IDs, transcript_dict):
     """ Given a list of edges in a query transcript, determine whether it is
