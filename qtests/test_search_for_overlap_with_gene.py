@@ -99,7 +99,7 @@ class TestSearchForOverlapWithGene(object):
         assert match_strand == strand
         conn.close()
 
-    def antisense_match(self):
+    def test_antisense_match(self):
         """ Example where interval overlaps one gene in the antisense direction.
         """
 
@@ -120,3 +120,27 @@ class TestSearchForOverlapWithGene(object):
         assert gene_ID == fetch_correct_ID("TG3", "gene", cursor)
         assert match_strand == "-"
         conn.close()
+
+    def test_2_genes_same_strand(self):
+        """ Example where query overlaps two genes. Must choose the one with 
+            more overlap """
+ 
+        conn, cursor = get_db_cursor()
+        build = "toy_build"
+        location_dict = talon.make_location_dict(build, cursor)
+        run_info = talon.init_run_info(cursor, build, "TALON")
+
+        chrom = "chr1"
+        pos = [800, 5050]
+        strand = "+"
+
+        gene_ID, match_strand = talon.search_for_overlap_with_gene(chrom, pos[0],
+                                                                   pos[1],
+                                                                   strand, cursor,
+                                                                   run_info)
+
+        assert gene_ID == fetch_correct_ID("TG1", "gene", cursor)
+        assert match_strand == "+"
+        conn.close() 
+
+
