@@ -96,41 +96,67 @@ def search_for_edge(vertex_1, vertex_2, edge_type, edge_dict):
     except:
         return None
 
-def match_all_transcript_vertices(chromosome, positions, location_dict, 
+def match_all_transcript_vertices(chromosome, positions, strand, location_dict, 
                                   run_info):
     """ Given a chromosome and a list of positions from the transcript in 5' to
         3' end order, this function looks for a matching vertex for each 
-        position. """ 
+        position. Also returns a list where each index indicates whether that
+        vertex is novel to the data structure (0 for known, 1 for novel) """ 
  
+    # Returned by function
     vertex_matches = []
- 
-    # Start and ends require permissive matching approach 
-    start = positions.pop(0)
-    end = positions.pop(-1)
+    novelty = []
+    diff_5p = None
+    diff_3p = None
 
-    # Remaining mid-transcript positions go through strict matching process
-    for position in positions:
-        vertex_match = search_for_vertex_at_pos(chromosome, position, 
-                                                location_dict)
+    # helpers
+    start = 0
+    end = len(positions) - 1
+
+    # Iterate over positions
+    for curr_index in range(0,len(positions)):
+        position = positions[curr_index]
+
+        # Start and ends require permissive matching approach
+        if curr_index == start:
+            sj_pos = positions[curr_index + 1]
+            pos_type = "start"
+            vertex_match, diff_5p = permissive_vertex_search(chromosome, position, 
+                                                    strand, sj_pos, pos_type,
+                                                    location_dict, run_info)
+        elif curr_index == end:
+            sj_pos = positions[curr_index - 1]
+            pos_type = "end"
+            vertex_match, diff_3p = permissive_vertex_search(chromosome, position,
+                                                    strand, sj_pos, pos_type,
+                                                    location_dict, run_info)
+
+        # Remaining mid-transcript positions go through strict matching process
+        else:
+            vertex_match = search_for_vertex_at_pos(chromosome, position, 
+                                                     location_dict)
         if vertex_match == None:
             # If no vertex matches the position, one is created.
             vertex_match = create_vertex(chromosome, position, run_info, 
                                          location_dict)
+            novelty.append(1)
+        else:
+            novelty.append(0)
 
         # Add to running list of matches
         vertex_matches.append(vertex_match['location_ID'])
 
-    return vertex_matches
+    return vertex_matches, novelty, diff_5p, diff_3p
 
 def permissive_vertex_search(chromosome, position, strand, sj_pos, pos_type,
-                             locations, cutoff, run_info):
+                             locations, run_info):
     """ Given a position, this function tries to find a vertex match within the
         cutoff distance that also comes before the splice junction begins.
         If no vertex is found, the function returns None. """
 
     # Try a strict match first
     if (chromosome, position) in locations:
-        match = locations[(chromosome, position)]['location_ID']
+        match = locations[(chromosome, position)]
         dist = 0
         return match, dist
 
@@ -138,6 +164,11 @@ def permissive_vertex_search(chromosome, position, strand, sj_pos, pos_type,
         raise ValueError("Please set pos_type to either 'start' or 'end'.") 
     if strand != "+" and strand != "-":
         raise ValueError("Invalid strand specified: %s" % strand)
+
+    if pos_type == "start": 
+        cutoff = run_info.cutoff_5p
+    else:
+        cutoff = run_info.cutoff_3p
 
     # If there is no strict match, look for vertices that are
     #     (1) On the correct chromosome
@@ -166,15 +197,10 @@ def permissive_vertex_search(chromosome, position, strand, sj_pos, pos_type,
 
         if abs(dist) <= abs(min_dist):
             min_dist = dist
-            closest = locations[candidate_match]['location_ID']
-        # TODO: consider tiebreaker case.
-        #elif abs(dist) == abs(min_dist)
-        #    # Tiebreaker: 
+            closest = locations[candidate_match]#['location_ID']
 
     if closest == None:
-        closest = create_vertex(chromosome, position, 
-                                run_info, locations)['location_ID']
-        min_dist = "NA"
+        min_dist = None
 
     return closest, min_dist
 
@@ -253,8 +279,30 @@ def search_for_transcript_suffix(edge_IDs, transcript_dict):
         return gene_ID
 
     except:
-        return None                 
+        return None
+
+def search_for_ISM_match(edge_IDs, transcript_dict):
+    """ Given a list of edges in a query transcript, determine whether it is an
+        incomplete splice match (ISM) of any transcript in the dict. Similarly
+        to the suffix case, we're looking for the gene ID here rather than 
+        worrying about exactly which transcript it came from. """               
+   
+    if type(edge_IDs) is list:
+        edge_IDs = tuple(edge_IDs)
     
+    ISM_matches = list(filter(lambda t: bytes(edge_IDs) in bytes(t),
+                              list(transcript_dict.keys())))
+    
+    if len(ISM_matches) == 0:
+        return None
+
+    else:
+        match = ISM_matches[0]
+        return transcript_dict[match]["gene_ID"]
+
+
+
+ 
 def search_for_overlap_with_gene(chromosome, start, end, strand, 
                                  cursor, run_info):
     """ Given a start and an end value for an interval, query the database to
@@ -421,9 +469,11 @@ def main():
     #gene_ID, transcript_ID = search_for_transcript(edge_IDs, transcript_dict)
     #edge_IDs = [11,12,13]
     #search_for_transcript_suffix(edge_IDs, transcript_dict)
-    gene_ID = search_for_overlap_with_gene(chrom, 910, 1010, strand,
-                                 cursor, run_info)
-    print(gene_ID)
+    #gene_ID = search_for_overlap_with_gene(chrom, 910, 1010, strand,
+    #                             cursor, run_info)
+
+    print(search_for_ISM_match([2,3], transcript_dict))
+
     conn.close()
 
 if __name__ == '__main__':

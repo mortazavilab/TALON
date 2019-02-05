@@ -18,14 +18,17 @@ class TestMatchAllVertices(object):
         location_dict = talon.make_location_dict(build, cursor)
         run_info = talon.init_run_info(cursor, build, "TALON")
         orig_vertex_count = run_info['vertex']
+        strand = "+"
         conn.close()
 
         chrom = "chr1"
         pos = [1, 100, 500, 600, 900, 1000]
-        vertex_IDs = talon.match_all_transcript_vertices(chrom, pos, 
-                                                        location_dict, run_info)
+        vertex_IDs, novelty, diff_5p, diff_3p = talon.match_all_transcript_vertices(chrom, pos, 
+                                                                  strand,
+                                                                  location_dict, 
+                                                                  run_info)
 
-        assert vertex_IDs == [ 2, 3, 4, 5 ] 
+        assert vertex_IDs == [1, 2, 3, 4, 5, 6] 
         assert run_info['vertex'] == orig_vertex_count
 
     def test_with_novel_location(self):
@@ -40,13 +43,16 @@ class TestMatchAllVertices(object):
         conn.close()
 
         chrom = "chr1"
+        strand = "+"
         pos = [1, 150, 500, 600, 900, 1000]
-        vertex_IDs = talon.match_all_transcript_vertices(chrom, pos,
-                                                        location_dict, run_info)
+        vertex_IDs, novelty, diff_5p, diff_3p = talon.match_all_transcript_vertices(chrom, pos, 
+                                                                  strand,
+                                                                  location_dict, 
+                                                                  run_info)
 
         # Make sure that no match got returned
         new_vertex_count = run_info['vertex']
-        assert vertex_IDs == [ "TALON-%d" % new_vertex_count, 3, 4, 5 ]
+        assert vertex_IDs == [ 1, "TALON-%d" % new_vertex_count, 3, 4, 5, 6 ]
        
         # Make sure the data structures got updated
         assert new_vertex_count == orig_vertex_count + 1
