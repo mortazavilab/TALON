@@ -4,6 +4,7 @@ import sqlite3
 sys.path.append("..")
 import talonQ as talon
 import dstruct
+from helper_fns import *
 @pytest.mark.dbunit
 
 class TestSearchForOverlapWithGene(object):
@@ -50,9 +51,9 @@ class TestSearchForOverlapWithGene(object):
                                                                    run_info)
 
 
-        conn.close()
-        assert gene_ID == 1
+        assert gene_ID == fetch_correct_ID("TG1", "gene", cursor)
         assert match_strand == strand
+        conn.close()
 
     def test_same_strand_match_with_two_genes(self):
         """ Example where interval overlaps two genes, one of which is on the 
@@ -72,9 +73,9 @@ class TestSearchForOverlapWithGene(object):
                                                                    strand, cursor, 
                                                                    run_info)
 
-        conn.close()
-        assert gene_ID == 2 
+        assert gene_ID == fetch_correct_ID("TG3", "gene", cursor)
         assert match_strand == strand
+        conn.close()
 
     def test_same_strand_match_left_overlap(self):
         """ Example where the overlap is on the same strand. Query start is to 
@@ -94,9 +95,9 @@ class TestSearchForOverlapWithGene(object):
                                                                    strand, cursor,
                                                                    run_info)
 
-        conn.close()
-        assert gene_ID == 2
+        assert gene_ID == fetch_correct_ID("TG3", "gene", cursor)
         assert match_strand == strand
+        conn.close()
 
     def antisense_match(self):
         """ Example where interval overlaps one gene in the antisense direction.
@@ -116,15 +117,6 @@ class TestSearchForOverlapWithGene(object):
                                                                    strand, cursor,
                                                                    run_info)
 
-        conn.close()
-        assert gene_ID == 2
+        assert gene_ID == fetch_correct_ID("TG3", "gene", cursor)
         assert match_strand == "-"
-
-
-
-def get_db_cursor():
-    conn = sqlite3.connect("scratch/toy.db")
-    conn.row_factory = sqlite3.Row
-    cursor = conn.cursor()
-    return conn, cursor
-
+        conn.close()

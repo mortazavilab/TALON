@@ -4,6 +4,7 @@ import sqlite3
 sys.path.append("..")
 import talonQ as talon
 import dstruct
+from helper_fns import *
 @pytest.mark.dbunit
 
 class TestMatchAllVertices(object):
@@ -51,9 +52,4 @@ class TestMatchAllVertices(object):
         assert new_vertex_count == orig_vertex_count + 1
         assert len(location_dict) == orig_n_locations + 1
 
-def get_db_cursor():
-    conn = sqlite3.connect("scratch/toy.db")
-    conn.row_factory = sqlite3.Row
-    cursor = conn.cursor()
-    return conn, cursor
 
