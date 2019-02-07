@@ -6,7 +6,7 @@ import talonQ as talon
 from helper_fns import *
 @pytest.mark.dbunit
 
-class TestSearchForTranscript(object):
+class TestSearchForISM(object):
 
     def test_find_no_match(self):
         """ Example where the toy transcript database contains no matches
@@ -18,30 +18,25 @@ class TestSearchForTranscript(object):
         conn.close()
 
         edges = ( 1, 3, 4, 5 )
-        gene_ID, transcript_ID = talon.search_for_transcript(edges, 
-                                                             transcript_dict)
+        gene_ID = talon.search_for_ISM(edges, transcript_dict)
 
         # Make sure that no match got returned
         assert gene_ID == None
-        assert transcript_ID == None
 
     def test_find_match(self):
-        """ Example where the toy transcript database contains exactly one match 
-            for the transcript.
+        """ Example where the toy transcript database contains exactly one  
+            ISM match for the transcript.
         """
         conn, cursor = get_db_cursor()
         build = "toy_build"
         transcript_dict = talon.make_transcript_dict(cursor)
 
-        edges = ( 12, 13, 14, 15, 16 )
-        gene_ID, transcript_ID = talon.search_for_transcript(edges,
-                                                             transcript_dict)
+        edges = ( 2, 3 )
+        gene_ID = talon.search_for_ISM((2,3), transcript_dict)
 
         # Make sure that correct match got returned
-        correct_gene_ID = fetch_correct_ID("TG2", "gene", cursor)
-        correct_transcript_ID = fetch_correct_ID("TG2-001", "transcript", cursor)
+        correct_gene_ID = fetch_correct_ID("TG1", "gene", cursor)
 
         assert gene_ID == correct_gene_ID
-        assert transcript_ID == correct_transcript_ID
         conn.close()
 

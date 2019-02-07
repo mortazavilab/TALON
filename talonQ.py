@@ -311,18 +311,15 @@ def search_for_transcript_suffix(edge_IDs, transcript_dict):
     except:
         return None
 
-def search_for_ISM_match(edge_IDs, transcript_dict):
+def search_for_ISM(edge_IDs, transcript_dict):
     """ Given a list of edges in a query transcript, determine whether it is an
         incomplete splice match (ISM) of any transcript in the dict. Similarly
         to the suffix case, we're looking for the gene ID here rather than 
         worrying about exactly which transcript it came from. """               
-   
-    if type(edge_IDs) is list:
-        edge_IDs = tuple(edge_IDs)
-    
+
     ISM_matches = list(filter(lambda t: bytes(edge_IDs) in bytes(t),
                               list(transcript_dict.keys())))
-    
+     
     if len(ISM_matches) == 0:
         return None
 
@@ -423,9 +420,6 @@ def search_for_transcript(edge_IDs, transcript_dict):
         look for a match in the transcript dict. 
         Return gene ID and transcript ID if found, and None if not. """
 
-    if type(edge_IDs) is list:
-        edge_IDs = tuple(edge_IDs)
-
     try:
         transcript = transcript_dict[edge_IDs]
         gene_ID = transcript["gene_ID"]
@@ -465,7 +459,7 @@ def identify_transcript():
     # what type of novelty the transcript has
     all_SJs_known = all_SJs_known(e_novelty)
     all_exons_known = all_exons_known(e_novelty)
-    ends_novel = sum([e_novelty[0],e_novelty[-1]) > 0
+    ends_novel = (e_novelty[0] + e_novelty[-1]) > 0
 
     if all_SJs_known:
         print("Transcript is either an FSM or an ISM")
@@ -537,11 +531,12 @@ def main():
 
     #gene_ID, transcript_ID = search_for_transcript(edge_IDs, transcript_dict)
     #edge_IDs = [11,12,13]
-    #search_for_transcript_suffix(edge_IDs, transcript_dict)
+    #search_for_ISM(edge_IDs, transcript_dict)
     #gene_ID = search_for_overlap_with_gene(chrom, 910, 1010, strand,
     #                             cursor, run_info)
 
-    print(search_for_ISM_match([2,3], transcript_dict))
+    #print(transcript_dict)
+    #print(search_for_ISM((2,3), transcript_dict))
 
     conn.close()
 
