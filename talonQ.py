@@ -435,6 +435,47 @@ def search_for_transcript(edge_IDs, transcript_dict):
     except:
         return None, None
 
+
+def identify_transcript():
+    """ Inputs:
+        Information about the query transcript
+          - chromosome
+          - list of positions
+          - strand
+        Data structures
+          - location_dict (position --> vertex)
+          - edge_dict (v1_v2_edgetype --> edge)
+          - possibly a gene dict
+          - transcript_dict
+          - run_info
+    """
+    transcript_novelty = set()
+    n_exons = (len(positions) + 1)/2.0
+ 
+    # Get vertex matches for the transcript positions
+    vertex_IDs, v_novelty = talon.match_all_transcript_vertices(chrom, pos,
+                                                               strand,
+                                                               location_dict,
+                                                               run_info)
+    # Get edge matches for transcript exons and introns based on the vertices
+    edge_IDs, e_novelty = talon.match_all_transcript_edges(vertex_IDs, strand,
+                                                           edge_dict, run_info)
+
+    # Check novelty of exons and splice jns. This will help us categorize 
+    # what type of novelty the transcript has
+    all_SJs_known = all_SJs_known(e_novelty)
+    all_exons_known = all_exons_known(e_novelty)
+    ends_novel = sum([e_novelty[0],e_novelty[-1]) > 0
+
+    if all_SJs_known:
+        print("Transcript is either an FSM or an ISM")
+    elif all_exons_known and not(all_SJs_known):
+        print("Transcript is definitely Novel in Catalog (NIC)")
+    elif not(all_exons_known) and not(all_SJs_known) and n_exons > 1:
+        print("Transcript is definitely Novel Not in Catalog (NNC)")
+    else:
+        print("Transcript is genomic and/or antisense")
+
 def check_inputs(options):
     """ Checks the input options provided by the user and makes sure that
         they are valid. Throw an error with descriptive help message if not."""
