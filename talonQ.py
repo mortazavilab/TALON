@@ -232,6 +232,32 @@ def create_edge(vertex_1, vertex_2, edge_type, strand, edge_dict, run_info):
 
     return new_edge              
 
+def all_exons_known(novelty):
+    """ Given a list in which each element represents the novelty (1) or
+        known-ness of a transcript edge (0), determine whether all of the
+        exons are known or not. Return True if all are known, and False
+        otherwise """
+
+    exons = novelty[::2]
+
+    if sum(exons) > 0:
+        return False
+    else:
+        return True
+
+def all_SJs_known(novelty):
+    """ Given a list in which each element represents the novelty (1) or 
+        known-ness of a transcript edge (0), determine whether all of the
+        introns are known or not. Return True if all are known, and False 
+        otherwise """
+
+    introns = novelty[1::2]
+    
+    if sum(introns) > 0:
+        return False
+    else:
+        return True
+
 def match_all_transcript_edges(vertices, strand, edge_dict, run_info):
     """ Given a list of vertex IDs from the transcript in 5' to
         3' end order, this function looks for a matching edge ID for each
@@ -303,8 +329,6 @@ def search_for_ISM_match(edge_IDs, transcript_dict):
     else:
         match = ISM_matches[0]
         return transcript_dict[match]["gene_ID"]
-
-
 
  
 def search_for_overlap_with_gene(chromosome, start, end, strand, 
