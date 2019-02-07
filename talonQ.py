@@ -295,14 +295,14 @@ def match_all_transcript_edges(vertices, strand, edge_dict, run_info):
 
 def search_for_transcript_suffix(edge_IDs, transcript_dict):
     """ Given a list of edges in a query transcript, determine whether it is
-        a suffix for any transcript in the dict. We're looking for the gene ID
-        here rather than worrying about exactly which transcript it came from.
-    """
-  
-    if type(edge_IDs) is list:
-        edge_IDs = tuple(edge_IDs)
+        a suffix for any transcript in the dict. It is OK for the final exon ID
+        to be different, but the final splice junction must match.
+        We're looking for the gene ID here rather than worrying about exactly 
+        which transcript it came from.
+    """  
+
     try:
-        suffix_match = list(filter(lambda t: edge_IDs == t[-len(edge_IDs):],
+        suffix_match = list(filter(lambda t: edge_IDs[0:-1] == t[-len(edge_IDs):-1],
                                      list(transcript_dict.keys())))[0]
         transcript = transcript_dict[suffix_match]
         gene_ID = transcript["gene_ID"]
@@ -310,6 +310,26 @@ def search_for_transcript_suffix(edge_IDs, transcript_dict):
 
     except:
         return None
+
+
+#def search_for_
+
+def search_without_transcript_ends(edge_IDs, transcript_dict):
+    """ Search for the body of the query transcript (i.e. leave out the 3' and 
+        5' exons). Number of edges in the query and match must be the same. 
+    """
+
+    try:
+        match = list(filter(lambda t: edge_IDs == t[1:-1],
+                                     list(transcript_dict.keys())))[0]
+        transcript = transcript_dict[match]
+        gene_ID = transcript["gene_ID"]
+        return gene_ID
+
+    except:
+        return None
+
+    
 
 def search_for_ISM(edge_IDs, transcript_dict):
     """ Given a list of edges in a query transcript, determine whether it is an
