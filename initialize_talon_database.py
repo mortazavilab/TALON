@@ -720,7 +720,7 @@ def bulk_update_vertices(c, vertices):
     vertex_list = []
     location_list = []
     for vertex in list(vertices.values()):
-        gene_IDs = vertex[-1]
+        gene_IDs = list(vertex[-1])
         vertex_list += [ (vertex[0], x) for x in gene_IDs ]
         location_list.append(vertex[0:4])
  
@@ -728,6 +728,7 @@ def bulk_update_vertices(c, vertices):
     cols = " (" + ", ".join([str_wrap_double(x) for x in ["vertex_ID","gene_id"]]) + ") "
     command = 'INSERT INTO "vertex"' + cols + "VALUES " + \
                   '(?,?)'
+
     c.executemany(command, vertex_list)
 
     # Bulk entry of locations
@@ -873,7 +874,7 @@ def create_vertex(c, gene_id, genome_build, chromosome, pos, vertices):
     # Check if the vertex exists. If yes, add current gene ID to it
     query = ",".join([genome_build, chromosome, str(pos)])
     if query in vertices.keys():
-        vertices[query][-1].append(gene_id)
+        vertices[query][-1].add(gene_id)
         existing_vertex_id = vertices[query][0]
         return existing_vertex_id, vertices
 
@@ -881,7 +882,9 @@ def create_vertex(c, gene_id, genome_build, chromosome, pos, vertices):
     # Get ID number from counter
     vertex_id = vertices["counter"] + 1
     vertices["counter"] += 1
-    new_vertex = [vertex_id, genome_build, chromosome, pos, [gene_id]]
+    genes = set()
+    genes.add(gene_id)
+    new_vertex = [vertex_id, genome_build, chromosome, pos, genes]
     keyname = ",".join([genome_build, chromosome, str(pos)])
     vertices[keyname] = new_vertex
 
