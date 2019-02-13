@@ -296,13 +296,14 @@ def match_all_transcript_edges(vertices, strand, edge_dict, run_info):
 def search_for_transcript_suffix(edge_IDs, transcript_dict):
     """ Given a list of edges in a query transcript, determine whether it is
         a suffix for any transcript in the dict. It is OK for the final exon ID
-        to be different, but the final splice junction must match.
+        to be different (and the first one in case there is a 5' end difference), 
+        but the splice junctions must match.
         We're looking for the gene ID here rather than worrying about exactly 
         which transcript it came from.
     """  
 
     try:
-        suffix_match = list(filter(lambda t: edge_IDs[0:-1] == t[-len(edge_IDs):-1],
+        suffix_match = list(filter(lambda t: edge_IDs[1:-1] == t[-len(edge_IDs) + 1:-1],
                                      list(transcript_dict.keys())))[0]
         transcript = transcript_dict[suffix_match]
         gene_ID = transcript["gene_ID"]
@@ -312,7 +313,25 @@ def search_for_transcript_suffix(edge_IDs, transcript_dict):
         return None
 
 
-#def search_for_
+def search_for_transcript_prefix(edge_IDs, transcript_dict):
+    """ Given a list of edges in a query transcript, determine whether it is
+        a prefix for any transcript in the dict. It is OK for the first and 
+        last exon IDs to be different, but the splice junctions must match.
+        We're looking for the gene ID here rather than worrying about exactly
+        which transcript it came from (since in some cases it could be more 
+        than one).
+    """
+
+    print(edge_IDs[1:-1])
+    try:
+        prefix_match = list(filter(lambda t: edge_IDs[1:-1] == t[1:len(edge_IDs)-1],
+                                     list(transcript_dict.keys())))[0]
+        transcript = transcript_dict[prefix_match]
+        gene_ID = transcript["gene_ID"]
+        return gene_ID
+
+    except:
+        return None
 
 def search_without_transcript_ends(edge_IDs, transcript_dict):
     """ Search for the body of the query transcript (i.e. leave out the 3' and 
@@ -450,7 +469,8 @@ def search_for_transcript(edge_IDs, transcript_dict):
         return None, None
 
 
-def identify_transcript():
+def identify_transcript(chrom, positions, strand, location_dict, edge_dict,
+                        transcript_dict, run_info):
     """ Inputs:
         Information about the query transcript
           - chromosome
@@ -467,7 +487,7 @@ def identify_transcript():
     n_exons = (len(positions) + 1)/2.0
  
     # Get vertex matches for the transcript positions
-    vertex_IDs, v_novelty = talon.match_all_transcript_vertices(chrom, pos,
+    vertex_IDs, v_novelty = talon.match_all_transcript_vertices(chrom, positions,
                                                                strand,
                                                                location_dict,
                                                                run_info)
@@ -483,6 +503,8 @@ def identify_transcript():
 
     if all_SJs_known:
         print("Transcript is either an FSM or an ISM")
+        # handle this case
+        return "FSM/ISM"
     elif all_exons_known and not(all_SJs_known):
         print("Transcript is definitely Novel in Catalog (NIC)")
     elif not(all_exons_known) and not(all_SJs_known) and n_exons > 1:
@@ -543,9 +565,9 @@ def main():
     edge_dict = make_edge_dict(cursor)
     transcript_dict = make_transcript_dict(cursor)
 
-    chrom = "chr1"
+    #chrom = "chr1"
     #vertex_IDs = [ 11, 12, 13, 14, 15, 16]
-    strand = "+"
+    #strand = "+"
     #edge_IDs = match_all_transcript_edges(vertex_IDs, strand,
     #                                                    edge_dict, run_info)
 
