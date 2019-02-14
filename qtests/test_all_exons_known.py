@@ -32,4 +32,8 @@ class TestAllexonssKnown(object):
         # Make sure that no match got returned
         assert talon.all_exons_known(novelty) == False 
 
+    def test_monoexonic(self):
+        """ Monoexonic known exon """
+        novelty = [0]
 
+        assert talon.all_exons_known(novelty) == False

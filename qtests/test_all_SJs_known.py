@@ -32,4 +32,8 @@ class TestAllSJsKnown(object):
         # Make sure that no match got returned
         assert talon.all_SJs_known(novelty) == False 
 
+    def test_no_introns(self):
+        """ A monoexonic transcript """
+        novelty = [0]
 
+        assert talon.all_SJs_known(novelty) == None

@@ -238,6 +238,9 @@ def all_exons_known(novelty):
         exons are known or not. Return True if all are known, and False
         otherwise """
 
+    if len(novelty) == 1:
+        return novelty[0] == 1
+
     exons = novelty[::2]
 
     if sum(exons) > 0:
@@ -251,8 +254,11 @@ def all_SJs_known(novelty):
         introns are known or not. Return True if all are known, and False 
         otherwise """
 
+    if len(novelty) == 1:
+        return None
+
     introns = novelty[1::2]
-    
+        
     if sum(introns) > 0:
         return False
     else:
@@ -468,20 +474,43 @@ def search_for_transcript(edge_IDs, transcript_dict):
     except:
         return None, None
 
+def process_FSM_or_ISM(edge_IDs, vertex_IDs, transcript_dict, run_info ):
+    """ Given a transcript that is known to be a full splice match (FSM) or an
+        incomplete splice match (ISM) on the basis of its junctions,
+        find the best gene and transcript match for it. Also delineate its 
+        type(s) of novelty, which will later be added to the database. 
+        In the case of an ISM, a novel transcript will be created."""
+
+    # Look for FSM first, partly on account of monoexonic transcripts
+    talon.search_for_transcript(edge_IDs, transcript_dict)
+
+        # If not an FSM, look for suffix ISM
+
+        # If that doesn't match, look for prefix ISM
+
+        # If that doesn't match, look for internal ISM
+
+        # If none of these options match, throw an error
 
 def identify_transcript(chrom, positions, strand, location_dict, edge_dict,
                         transcript_dict, run_info):
     """ Inputs:
-        Information about the query transcript
+        - Information about the query transcript
           - chromosome
           - list of positions
           - strand
-        Data structures
+        - Data structures
           - location_dict (position --> vertex)
           - edge_dict (v1_v2_edgetype --> edge)
           - possibly a gene dict
           - transcript_dict
           - run_info
+
+       Outputs:
+          - Assigned gene ID
+          - Assigned transcript ID
+          - 'observed' entry (to be added to database) 
+          - novelty entries (to be added to database)
     """
     transcript_novelty = set()
     n_exons = (len(positions) + 1)/2.0
@@ -503,7 +532,11 @@ def identify_transcript(chrom, positions, strand, location_dict, edge_dict,
 
     if all_SJs_known:
         print("Transcript is either an FSM or an ISM")
-        # handle this case
+        gene_ID, transcript_ID, observed, novelty = process_FSM_or_ISM(edge_IDs, 
+                                                                       vertex_IDs,
+                                                                       transcript_dict,
+                                                                       run_info)
+        
         return "FSM/ISM"
     elif all_exons_known and not(all_SJs_known):
         print("Transcript is definitely Novel in Catalog (NIC)")
