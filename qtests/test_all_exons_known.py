@@ -13,7 +13,7 @@ class TestAllexonssKnown(object):
         novelty = [0, 0, 0, 0, 0,0 ,0]      
 
         # Make sure that no match got returned
-        assert talon.all_exons_known(novelty) == True
+        assert talon.check_all_exons_known(novelty) == True
 
     def test_find_true_with_novel_exons(self):
         """ Example where all of the exons are known, but the introns are not.
@@ -22,7 +22,7 @@ class TestAllexonssKnown(object):
         novelty = [0, 1, 0, 1, 0, 1, 0]
 
         # Make sure that no match got returned
-        assert talon.all_exons_known(novelty) == True
+        assert talon.check_all_exons_known(novelty) == True
    
     def test_find_false(self):
         """ Example with novel exons
@@ -30,10 +30,10 @@ class TestAllexonssKnown(object):
         novelty = [1, 0, 1, 0, 1, 0 ,1]
 
         # Make sure that no match got returned
-        assert talon.all_exons_known(novelty) == False 
+        assert talon.check_all_exons_known(novelty) == False 
 
     def test_monoexonic(self):
         """ Monoexonic known exon """
         novelty = [0]
 
-        assert talon.all_exons_known(novelty) == False
+        assert talon.check_all_exons_known(novelty) == False

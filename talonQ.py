@@ -146,7 +146,7 @@ def match_all_transcript_vertices(chromosome, positions, strand, location_dict,
         # Add to running list of matches
         vertex_matches.append(vertex_match['location_ID'])
 
-    return vertex_matches, novelty, diff_5p, diff_3p
+    return tuple(vertex_matches), tuple(novelty), diff_5p, diff_3p
 
 def permissive_vertex_search(chromosome, position, strand, sj_pos, pos_type,
                              locations, run_info):
@@ -235,11 +235,11 @@ def create_edge(vertex_1, vertex_2, edge_type, strand, edge_dict, run_info):
 def create_transcript(gene_ID, edge_IDs, vertex_IDs, transcript_dict, run_info):
     """Creates a novel transcript and adds it to the transcript data structure.
     """
-    run_info.transcript += 1
-    new_ID = "%s-%d" % (run_info.prefix, run_info.transcript)
+    run_info.transcripts += 1
+    new_ID = "%s-%d" % (run_info.prefix, run_info.transcripts)
     new_transcript = {'transcript_ID': new_ID,
                       'gene_ID': gene_ID,
-                      'path': ",".join([edge_IDs]),
+                      'path': ",".join(map(str, edge_IDs)),
                       'start_vertex': vertex_IDs[0],
                       'end_vertex': vertex_IDs[-1]}
 
@@ -247,7 +247,7 @@ def create_transcript(gene_ID, edge_IDs, vertex_IDs, transcript_dict, run_info):
 
     return new_transcript
 
-def all_exons_known(novelty):
+def check_all_exons_known(novelty):
     """ Given a list in which each element represents the novelty (1) or
         known-ness of a transcript edge (0), determine whether all of the
         exons are known or not. Return True if all are known, and False
@@ -263,7 +263,7 @@ def all_exons_known(novelty):
     else:
         return True
 
-def all_SJs_known(novelty):
+def check_all_SJs_known(novelty):
     """ Given a list in which each element represents the novelty (1) or 
         known-ness of a transcript edge (0), determine whether all of the
         introns are known or not. Return True if all are known, and False 
@@ -312,7 +312,7 @@ def match_all_transcript_edges(vertices, strand, edge_dict, run_info):
         # Add to running list of matches
         edge_matches.append(edge_match['edge_ID'])
 
-    return edge_matches, novelty
+    return tuple(edge_matches), tuple(novelty)
 
 def search_for_transcript_suffix(edge_IDs, transcript_dict):
     """ Given a list of edges in a query transcript, determine whether it is
@@ -343,7 +343,6 @@ def search_for_transcript_prefix(edge_IDs, transcript_dict):
         than one).
     """
 
-    print(edge_IDs[1:-1])
     try:
         prefix_match = list(filter(lambda t: edge_IDs[1:-1] == t[1:len(edge_IDs)-1],
                                      list(transcript_dict.keys())))[0]
@@ -358,17 +357,16 @@ def search_without_transcript_ends(edge_IDs, transcript_dict):
     """ Search for the body of the query transcript (i.e. leave out the 3' and 
         5' exons). Number of edges in the query and match must be the same. 
     """
-
+  
     try:
         matches = list(filter(lambda t: edge_IDs[1:-1] == t[1:-1],
                                      list(transcript_dict.keys())))
         transcripts = [ transcript_dict[match] for match in matches ]
-        gene_ID = transcript["gene_ID"]
+        gene_ID = transcripts[0]["gene_ID"]
         return gene_ID, transcripts
 
     except:
-        return None
-
+        return None,None
     
 
 def search_for_ISM(edge_IDs, transcript_dict):
@@ -486,13 +484,48 @@ def search_for_transcript(edge_IDs, transcript_dict):
     try:
         transcript = transcript_dict[edge_IDs]
         gene_ID = transcript["gene_ID"]
-        #transcript_ID = transcript["transcript_ID"]
         return gene_ID, transcript
 
     except:
         return None, None
 
-def process_FSM_or_ISM(edge_IDs, vertex_IDs, vertex_novelties, transcript_dict, 
+def process_FSM(edge_IDs, vertex_IDs, vertex_novelties, transcript_dict,
+                       run_info ):
+    """ Given a transcript, try to find an FSM gene and transcript match for it. 
+        Also delineate its type(s) of 5' and 3' novelty if applicable, which 
+        will later be added to the database. In the case of an FSM with end 
+        novelty, a novel transcript will be created. Returns None if no FSM
+        matches are found."""
+
+    novelty = []
+
+    # Look for exact FSM first
+    gene_ID, transcript_match = search_for_transcript(edge_IDs, transcript_dict)
+    if transcript_match != None:
+        transcript_ID = transcript_match['transcript_ID']
+        return gene_ID, transcript_ID, None
+    
+    # Next, look for FSM with different ends. This triggers a novel transcript
+    # that has novel 5' or 3' ends
+    gene_ID, transcript_matches = search_without_transcript_ends(edge_IDs,
+                                                               transcript_dict)
+    if transcript_matches != None:
+        # Create a new transcript
+        novel_transcript = create_transcript(gene_ID, edge_IDs, vertex_IDs,
+                                             transcript_dict, run_info)
+
+        transcript_IDs = ",".join([str(match[0]) for match in transcript_matches])
+        novelty.append((novel_transcript['transcript_ID'],"FSM", transcript_IDs))
+        if vertex_novelties[0] == 1:
+            novelty.append(((novel_transcript["transcript_ID"],"5p", None)))
+        if vertex_novelties[-1] == 1:
+            novelty.append(((novel_transcript["transcript_ID"],"3p", None)))
+                
+        return gene_ID, novel_transcript["transcript_ID"], novelty
+
+    return None,None,None
+
+def process_ISM(edge_IDs, vertex_IDs, vertex_novelties, transcript_dict, 
                        run_info ):
     """ Given a transcript that is known to be a full splice match (FSM) or an
         incomplete splice match (ISM) on the basis of its junctions,
@@ -500,60 +533,50 @@ def process_FSM_or_ISM(edge_IDs, vertex_IDs, vertex_novelties, transcript_dict,
         type(s) of novelty, which will later be added to the database. 
         In the case of an ISM, a novel transcript will be created."""
 
-    # Look for exact FSM first
-    gene_ID, transcript_match = search_for_transcript(edge_IDs, transcript_dict)
-    if transcript_match != None:
-        transcript_ID = transcript_match[0]
-        return gene_ID, transcript_ID, None
+    novelty = []
 
-    # ---- Beyond this point, we will be creating a novel transcript ---- #
+    
+    #gene_ID, transcript_matches = search_for_ISM(edge_IDs, transcript_dict)
+    #    if transcript_matches != None:
 
-    # Next, look for FSM with different ends. This triggers a novel transcript
-    # that has novel 5' or 3' ends
-    gene_ID, transcript_matches = search_without_transcript_ends(edge_IDs, 
-                                                               transcript_dict)
-    if transcript_matches != None:
-        transcript_IDs = ",".join([match[0] for match in transcript_matches])
-        novelty = [("FSM", transcript_IDs)]
+            # Create a new transcript
+    #        novel_transcript = create_transcript(gene_ID, edge_IDs, vertex_IDs,
+                                                 #transcript_dict, run_info)
 
-    # Now look for incomplete splice matches
-    else:
-        gene_ID, transcript_matches = search_for_ISM(edge_IDs, transcript_dict)
-        if transcript_matches != None:
-            novelty = [("ISM", transcript_IDs)]
-
-            # Look for suffix ISM
-            gene_ID, transcript_matches = search_for_transcript_suffix(edge_IDs, 
-                                                               transcript_dict)
-            if transcript_matches != None:
-                transcript_IDs = ",".join([match[0] for match in transcript_matches])
-                novelty.append(("ISM_suffix", transcript_IDs))
-
-            # Look for prefix ISM
-            gene_ID, transcript_matches = search_for_transcript_prefix(edge_IDs,
-                                                               transcript_dict)
-            if transcript_matches != None:
-                transcript_IDs = ",".join([match[0] for match in transcript_matches])
-                novelty.append(("ISM_prefix", transcript_IDs))
-            
-        else:
+    #    else:
             # If transcript is not an ISM, throw an error
-            raise ValueError("Transcript is supposedly an FSM or ISM, " + \
-                                 "but no match was found")
+    #        raise ValueError("Transcript is supposedly an FSM or ISM, " + \
+                                # "but no match was found")
+    #        novelty = [(novel_transcript["transcript_ID"], "ISM", 
+    #                    transcript_IDs)]
+
+        # Look for suffix ISM
+    #    gene_ID, transcript_matches = search_for_transcript_suffix(edge_IDs, 
+                                         #                      transcript_dict)
+    #    if transcript_matches != None:
+    #        transcript_IDs = ",".join([match[0] for match in transcript_matches])
+    #        novelty.append(((novel_transcript["transcript_ID"], "ISM_suffix", 
+    #                         transcript_IDs)))
+
+        # Look for prefix ISM
+    #    gene_ID, transcript_matches = search_for_transcript_prefix(edge_IDs,
+                                          #                     transcript_dict)
+    #    if transcript_matches != None:
+    #        transcript_IDs = ",".join([match[0] for match in transcript_matches])
+    #        novelty.append(((novel_transcript["transcript_ID"],
+    #                         "ISM_prefix", transcript_IDs))
+            
 
     # Check on ends:
-    if vertex_novelties[0] == 1:
-        novelty.append(("5p", None))
-    if vertex_novelties[-1] == 1:
-        novelty.append(("novelty", "3p", None))
+    #if vertex_novelties[0] == 1:
+    #    novelty.append(((novel_transcript["transcript_ID"],"5p", None))
+    #if vertex_novelties[-1] == 1:
+    #    novelty.append(((novel_transcript["transcript_ID"],"3p", None))
 
-    # Create a new transcript
-    novel_transcript = create_transcript(gene_ID, edge_IDs, vertex_IDs, 
-                                         transcript_dict, run_info)
-    return gene_ID, novel_transcript[0], novelty
+    #return gene_ID, novel_transcript["transcript_ID"], novelty
     
 
-def identify_transcript(chrom, positions, strand, location_dict, edge_dict,
+def identify_transcript(read_ID, chrom, positions, strand, location_dict, edge_dict,
                         transcript_dict, run_info):
     """ Inputs:
         - Information about the query transcript
@@ -577,18 +600,21 @@ def identify_transcript(chrom, positions, strand, location_dict, edge_dict,
     n_exons = (len(positions) + 1)/2.0
  
     # Get vertex matches for the transcript positions
-    vertex_matches, novelty, diff_5p, diff_3p = talon.match_all_transcript_vertices(chrom, positions,
-                                                               strand,
-                                                               location_dict,
-                                                               run_info)
+    vertex_IDs, v_novelty, diff_5p, diff_3p = match_all_transcript_vertices(
+                                                                 chrom, 
+                                                                 positions,
+                                                                 strand,
+                                                                 location_dict,
+                                                                 run_info)
+
     # Get edge matches for transcript exons and introns based on the vertices
-    edge_IDs, e_novelty = talon.match_all_transcript_edges(vertex_IDs, strand,
-                                                           edge_dict, run_info)
+    edge_IDs, e_novelty = match_all_transcript_edges(vertex_IDs, strand,
+                                                     edge_dict, run_info)
 
     # Check novelty of exons and splice jns. This will help us categorize 
     # what type of novelty the transcript has
-    all_SJs_known = all_SJs_known(e_novelty)
-    all_exons_known = all_exons_known(e_novelty)
+    all_SJs_known = check_all_SJs_known(e_novelty)
+    all_exons_known = check_all_exons_known(e_novelty)
     ends_novel = (e_novelty[0] + e_novelty[-1]) > 0
 
     if len(edge_IDs) == 1:
@@ -597,10 +623,12 @@ def identify_transcript(chrom, positions, strand, location_dict, edge_dict,
 
     elif all_SJs_known:
         print("Transcript is either an FSM or an ISM")
-        gene_ID, transcript_ID, observed, novelty = process_FSM_or_ISM(edge_IDs, vertex_IDs, vertex_novelties, transcript_dict,
-                       run_info) 
+        gene_ID, transcript_ID, novelty = process_FSM(edge_IDs, vertex_IDs, 
+                                                             v_novelty, 
+                                                             transcript_dict,
+                                                             run_info) 
         
-        return "FSM/ISM"
+        return gene_ID, transcript_ID, novelty
     elif all_exons_known and not(all_SJs_known):
         print("Transcript is definitely Novel in Catalog (NIC)")
     elif not(all_exons_known) and not(all_SJs_known) and n_exons > 1:
@@ -661,21 +689,26 @@ def main():
     edge_dict = make_edge_dict(cursor)
     transcript_dict = make_transcript_dict(cursor)
 
-    #chrom = "chr1"
-    #vertex_IDs = [ 11, 12, 13, 14, 15, 16]
-    #strand = "+"
-    #edge_IDs = match_all_transcript_edges(vertex_IDs, strand,
-    #                                                    edge_dict, run_info)
 
-    #gene_ID, transcript_ID = search_for_transcript(edge_IDs, transcript_dict)
-    #edge_IDs = [11,12,13]
-    #search_for_ISM(edge_IDs, transcript_dict)
-    #gene_ID = search_for_overlap_with_gene(chrom, 910, 1010, strand,
-    #                             cursor, run_info)
+    chrom = "chr1"
+    strand = "+"
+    read_ID = "toy_read"
+    positions = ( 1, 100, 500, 600, 900, 1500 )
+    #gene_ID, transcript_ID, novelty = identify_transcript(read_ID,
+    #                                           chrom, positions, strand,
+    #                                           location_dict, edge_dict,
+    #                                           transcript_dict, run_info)
 
-    #print(transcript_dict)
-    #print(search_for_ISM((2,3), transcript_dict))
+    edge_IDs = (1, 2, 3, 4, 500) # Last edge is novel
+    vertex_IDs = (1, 2, 3, 4, 5, 500) # Last vertex is novel
+    v_novelty = (0, 0, 0, 0, 0, 1)
 
+    print(transcript_dict)
+    gene_ID, transcript_ID, novelty = process_FSM(edge_IDs, vertex_IDs,
+                                                      v_novelty, transcript_dict,
+                                                      run_info)
+    print(gene_ID)
+    print(novelty)
     conn.close()
 
 if __name__ == '__main__':

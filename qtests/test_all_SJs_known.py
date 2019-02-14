@@ -13,7 +13,7 @@ class TestAllSJsKnown(object):
         novelty = [0, 0, 0, 0, 0,0 ,0]      
 
         # Make sure that no match got returned
-        assert talon.all_SJs_known(novelty) == True
+        assert talon.check_all_SJs_known(novelty) == True
 
     def test_find_true_with_novel_exons(self):
         """ Example where all of the introns are known, but the exons are not.
@@ -22,7 +22,7 @@ class TestAllSJsKnown(object):
         novelty = [1, 0, 1, 0, 1, 0 ,1]
 
         # Make sure that no match got returned
-        assert talon.all_SJs_known(novelty) == True
+        assert talon.check_all_SJs_known(novelty) == True
    
     def test_find_false(self):
         """ Example with novel introns
@@ -30,10 +30,10 @@ class TestAllSJsKnown(object):
         novelty = [0, 1, 0, 1, 0, 1, 0]
 
         # Make sure that no match got returned
-        assert talon.all_SJs_known(novelty) == False 
+        assert talon.check_all_SJs_known(novelty) == False 
 
     def test_no_introns(self):
         """ A monoexonic transcript """
         novelty = [0]
 
-        assert talon.all_SJs_known(novelty) == None
+        assert talon.check_all_SJs_known(novelty) == None

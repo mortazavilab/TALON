@@ -25,8 +25,8 @@ class TestMatchAllEdges(object):
         edge_IDs, novelty = talon.match_all_transcript_edges(vertex_IDs, strand,
                                                         edge_dict, run_info)
 
-        assert edge_IDs == [ 1, 2, 3, 4, 5 ] 
-        assert novelty == [ 0, 0, 0, 0, 0 ]
+        assert edge_IDs == ( 1, 2, 3, 4, 5 ) 
+        assert novelty == ( 0, 0, 0, 0, 0 )
 
     def test_antisense(self):
         """ Example where all of the vertices are in the database, but the edges
@@ -51,6 +51,6 @@ class TestMatchAllEdges(object):
             edge_id = "TALON-%d" % num
             expected_edges.append(edge_id)
 
-        assert edge_IDs == expected_edges
-        assert novelty == [ 1, 1, 1, 1, 1 ]
+        assert edge_IDs == tuple(expected_edges)
+        assert novelty == ( 1, 1, 1, 1, 1 )
 

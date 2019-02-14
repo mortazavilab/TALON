@@ -28,7 +28,7 @@ class TestMatchAllVertices(object):
                                                                   location_dict, 
                                                                   run_info)
 
-        assert vertex_IDs == [1, 2, 3, 4, 5, 6] 
+        assert vertex_IDs == (1, 2, 3, 4, 5, 6) 
         assert run_info['vertex'] == orig_vertex_count
 
     def test_with_novel_location(self):
@@ -52,7 +52,7 @@ class TestMatchAllVertices(object):
 
         # Make sure that no match got returned
         new_vertex_count = run_info['vertex']
-        assert vertex_IDs == [ 1, "TALON-%d" % new_vertex_count, 3, 4, 5, 6 ]
+        assert vertex_IDs == ( 1, "TALON-%d" % new_vertex_count, 3, 4, 5, 6 )
        
         # Make sure the data structures got updated
         assert new_vertex_count == orig_vertex_count + 1
