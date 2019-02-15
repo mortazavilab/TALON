@@ -57,3 +57,20 @@ class TestSearchForSuffix(object):
 
         conn.close()
 
+    def test_find_monoexon_match(self):
+        """ Input is a single exon that matches the end of an existing transcript
+        """
+        conn, cursor = get_db_cursor()
+        build = "toy_build"
+        transcript_dict = talon.make_transcript_dict(cursor)
+
+        edges = ( 16, )
+        gene_ID, matches = talon.search_for_transcript_suffix(edges, 
+                                                              transcript_dict)
+
+        # Make sure that correct match got returned
+        correct_gene_ID = fetch_correct_ID("TG2", "gene", cursor)
+
+        assert gene_ID == correct_gene_ID
+        conn.close()
+

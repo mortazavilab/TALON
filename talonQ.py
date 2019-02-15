@@ -319,37 +319,40 @@ def search_for_transcript_suffix(edge_IDs, transcript_dict):
         a suffix for any transcript in the dict. It is OK for the final exon ID
         to be different (and the first one in case there is a 5' end difference), 
         but the splice junctions must match.
-        We're looking for the gene ID here rather than worrying about exactly 
-        which transcript it came from.
     """  
 
-    try:
+    if len(edge_IDs) > 1:
         suffix_matches = list(filter(lambda t: edge_IDs[1:-1] == t[-len(edge_IDs) + 1:-1],
                                      list(transcript_dict.keys())))
-        gene_ID = transcript_dict[suffix_matches[0]]["gene_ID"]
-        return gene_ID, suffix_matches
+    else:
+        suffix_matches = list(filter(lambda t: edge_IDs[0] == t[-1],
+                                     list(transcript_dict.keys())))
 
-    except:
+    if len(suffix_matches) == 0:
         return None, None
 
+    gene_ID = transcript_dict[suffix_matches[0]]["gene_ID"]
+    return gene_ID, suffix_matches
 
 def search_for_transcript_prefix(edge_IDs, transcript_dict):
     """ Given a list of edges in a query transcript, determine whether it is
         a prefix for any transcript in the dict. It is OK for the first and 
         last exon IDs to be different, but the splice junctions must match.
-        We're looking for the gene ID here rather than worrying about exactly
-        which transcript it came from (since in some cases it could be more 
-        than one).
     """
 
-    try:
+    if len(edge_IDs) > 1:
         prefix_matches = list(filter(lambda t: edge_IDs[1:-1] == t[1:len(edge_IDs)-1],
                                      list(transcript_dict.keys())))
-        gene_ID = transcript_dict[prefix_matches[0]]["gene_ID"]
-        return gene_ID, prefix_matches
+    else: 
+        prefix_matches = list(filter(lambda t: edge_IDs[0] == t[0],
+                                     list(transcript_dict.keys())))
 
-    except:
+    if len(prefix_matches) == 0:
         return None, None
+
+    gene_ID = transcript_dict[prefix_matches[0]]["gene_ID"]
+    return gene_ID, prefix_matches
+
 
 def search_without_transcript_ends(edge_IDs, transcript_dict):
     """ Search for the body of the query transcript (i.e. leave out the 3' and 
@@ -373,11 +376,16 @@ def search_for_ISM(edge_IDs, transcript_dict):
         to the suffix case, we're looking for the gene ID here rather than 
         worrying about exactly which transcript it came from. """               
 
-    edge_IDs = edge_IDs[1:-1]
 
-    ISM_matches = list(filter(lambda t: bytes(edge_IDs) in bytes(t),
+    if len(edge_IDs) > 1:
+        edge_IDs = edge_IDs[1:-1]
+        ISM_matches = list(filter(lambda t: bytes(edge_IDs) in bytes(t),
+                              list(transcript_dict.keys())))
+    else:
+        ISM_matches = list(filter(lambda t: bytes(edge_IDs) in bytes(t),
                               list(transcript_dict.keys())))
      
+
     if len(ISM_matches) == 0:
         return None, None
 
@@ -502,6 +510,11 @@ def process_FSM(edge_IDs, vertex_IDs, vertex_novelties, transcript_dict,
     if transcript_match != None:
         transcript_ID = transcript_match['transcript_ID']
         return gene_ID, transcript_ID, None
+
+    # At this point, return None for a monoexonic transcript, because different
+    # ends are not allowed
+    if len(edge_IDs) == 1:
+        return None, None, None
     
     # Next, look for FSM with different ends. This triggers a novel transcript
     # that has novel 5' or 3' ends
@@ -616,8 +629,8 @@ def identify_transcript(read_ID, chrom, positions, strand, location_dict, edge_d
     all_exons_known = check_all_exons_known(e_novelty)
     ends_novel = (e_novelty[0] + e_novelty[-1]) > 0
 
-    # Monoexonic case: if exon is known, look for FSM or ISM
-
+    # Look for FSM or ISM. This includes monoexonic cases where the exon is 
+    # known
     if all_SJs_known or (n_exons == 1 and all_exons_known):
         print("Transcript is either an FSM or an ISM")
         # Look for FSM first
@@ -633,7 +646,7 @@ def identify_transcript(read_ID, chrom, positions, strand, location_dict, edge_d
                                                              run_info)        
         return gene_ID, transcript_ID, novelty
 
-    elif all_exons_known and not(all_SJs_known):
+    elif all_exons_known and not(all_SJs_known) and n_exons > 1:
         print("Transcript is definitely Novel in Catalog (NIC)")
     elif not(all_exons_known) and not(all_SJs_known) and n_exons > 1:
         print("Transcript is definitely Novel Not in Catalog (NNC)")

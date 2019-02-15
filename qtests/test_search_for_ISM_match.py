@@ -40,3 +40,19 @@ class TestSearchForISM(object):
         assert gene_ID == correct_gene_ID
         conn.close()
 
+    def test_find_monoexon_match(self):
+        """ Input is a sinlge exon that matches part of an existing transcript
+        """
+        conn, cursor = get_db_cursor()
+        build = "toy_build"
+        transcript_dict = talon.make_transcript_dict(cursor)
+
+        edges = ( 14, )
+        gene_ID, matches = talon.search_for_ISM(edges, transcript_dict)
+
+        # Make sure that correct match got returned
+        correct_gene_ID = fetch_correct_ID("TG2", "gene", cursor)
+
+        assert gene_ID == correct_gene_ID
+        conn.close()
+
