@@ -36,4 +36,4 @@ class TestAllexonssKnown(object):
         """ Monoexonic known exon """
         novelty = [0]
 
-        assert talon.check_all_exons_known(novelty) == False
+        assert talon.check_all_exons_known(novelty) == True

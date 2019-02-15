@@ -254,7 +254,7 @@ def check_all_exons_known(novelty):
         otherwise """
 
     if len(novelty) == 1:
-        return novelty[0] == 1
+        return novelty[0] == 0
 
     exons = novelty[::2]
 
@@ -549,7 +549,7 @@ def process_ISM(edge_IDs, vertex_IDs, vertex_novelties, transcript_dict,
     if prefix_matches != None:
         prefix_ISM = True
 
-    # Create a new transcript. Must wait until hereto do it because otherwise 
+    # Create a new transcript. Must wait until here to do it because otherwise 
     # the transcript can find suffix or prefix matches to itself!
     novel_transcript = create_transcript(gene_ID, edge_IDs, vertex_IDs,
                                          transcript_dict, run_info)
@@ -616,18 +616,23 @@ def identify_transcript(read_ID, chrom, positions, strand, location_dict, edge_d
     all_exons_known = check_all_exons_known(e_novelty)
     ends_novel = (e_novelty[0] + e_novelty[-1]) > 0
 
-    if len(edge_IDs) == 1:
-        # Handle monoexonic case. Check for full monoexonic match
-        pass
+    # Monoexonic case: if exon is known, look for FSM or ISM
 
-    elif all_SJs_known:
+    if all_SJs_known or (n_exons == 1 and all_exons_known):
         print("Transcript is either an FSM or an ISM")
+        # Look for FSM first
         gene_ID, transcript_ID, novelty = process_FSM(edge_IDs, vertex_IDs, 
                                                              v_novelty, 
                                                              transcript_dict,
                                                              run_info) 
-        
+        if gene_ID == None:
+            # Look for ISM
+            gene_ID, transcript_ID, novelty = process_ISM(edge_IDs, vertex_IDs,
+                                                             v_novelty,
+                                                             transcript_dict,
+                                                             run_info)        
         return gene_ID, transcript_ID, novelty
+
     elif all_exons_known and not(all_SJs_known):
         print("Transcript is definitely Novel in Catalog (NIC)")
     elif not(all_exons_known) and not(all_SJs_known) and n_exons > 1:
