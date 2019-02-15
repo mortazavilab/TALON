@@ -18,7 +18,7 @@ class TestSearchForPrefix(object):
         conn.close()
 
         edges = ( 14, 15, 16 )
-        gene_ID = talon.search_for_transcript_prefix(edges, transcript_dict)
+        gene_ID, transcripts = talon.search_for_transcript_prefix(edges, transcript_dict)
 
         # Make sure that no match got returned
         assert gene_ID == None
@@ -33,12 +33,12 @@ class TestSearchForPrefix(object):
         transcript_dict = talon.make_transcript_dict(cursor)
 
         edges = ( 12, 13, 14 )
-        gene_ID = talon.search_for_transcript_prefix(edges, transcript_dict)
+        gene_ID, transcripts = talon.search_for_transcript_prefix(edges, transcript_dict)
 
         # Make sure that correct match got returned
         correct_gene_ID = fetch_correct_ID("TG2", "gene", cursor)
         assert gene_ID == correct_gene_ID
-
+        assert transcripts == [(12, 13, 14, 15, 16)]
         conn.close()
 
     def test_find_match_with_diff_5(self):
@@ -49,7 +49,7 @@ class TestSearchForPrefix(object):
         transcript_dict = talon.make_transcript_dict(cursor)
 
         edges = ( 200, 13, 14 )
-        gene_ID = talon.search_for_transcript_prefix(edges, transcript_dict)
+        gene_ID, transcripts = talon.search_for_transcript_prefix(edges, transcript_dict)
 
         # Make sure that correct match got returned
         correct_gene_ID = fetch_correct_ID("TG2", "gene", cursor)

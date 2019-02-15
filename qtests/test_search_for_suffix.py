@@ -18,7 +18,7 @@ class TestSearchForSuffix(object):
         conn.close()
 
         edges = ( 1, 2, 3 )
-        gene_ID = talon.search_for_transcript_suffix(edges, transcript_dict)
+        gene_ID, transcripts = talon.search_for_transcript_suffix(edges, transcript_dict)
 
         # Make sure that no match got returned
         assert gene_ID == None
@@ -32,11 +32,12 @@ class TestSearchForSuffix(object):
         transcript_dict = talon.make_transcript_dict(cursor)
 
         edges = ( 14, 15, 16 )
-        gene_ID = talon.search_for_transcript_suffix(edges, transcript_dict)
+        gene_ID, transcripts = talon.search_for_transcript_suffix(edges, transcript_dict)
 
         # Make sure that correct match got returned
         correct_gene_ID = fetch_correct_ID("TG2", "gene", cursor)
         assert gene_ID == correct_gene_ID
+        assert transcripts == [(12, 13, 14, 15, 16)]
 
         conn.close()
 
@@ -48,11 +49,11 @@ class TestSearchForSuffix(object):
         transcript_dict = talon.make_transcript_dict(cursor)
 
         edges = ( 14, 15, 200 )
-        gene_ID = talon.search_for_transcript_suffix(edges, transcript_dict)
+        gene_ID, transcripts = talon.search_for_transcript_suffix(edges, transcript_dict)
 
         # Make sure that correct match got returned
         correct_gene_ID = fetch_correct_ID("TG2", "gene", cursor)
-        assert gene_ID == correct_gene_ID
+        assert gene_ID  == correct_gene_ID
 
         conn.close()
 
