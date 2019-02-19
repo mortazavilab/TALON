@@ -27,6 +27,11 @@ def get_args():
     args = parser.parse_args()
     return args
 
+def str_wrap_double(s):
+    """ Adds double quotes around the input string """
+    s = str(s)
+    return '"' + s + '"'
+
 def make_transcript_dict(cursor):
     """ Format of dict:
             Key: tuple consisting of edges in transcript path
@@ -95,6 +100,46 @@ def make_vertex_2_gene_dict(cursor):
             vertex2gene[vertex].add((gene, strand))
 
     return vertex2gene
+
+def make_temp_novel_gene_table(cursor, build):
+    """ Attaches a temporary database with a table that has the following fields:
+            - gene_ID
+            - chromosome
+            - start
+            - end
+            - strand
+        The purpose is to track novel genes from this run in order to match
+        transcripts to them when other forms of gene assignment have failed.
+    """
+    #conn = sqlite3.connect(":memory:")
+    #cursor = conn.cursor()
+
+    command = """ CREATE TEMPORARY TABLE IF NOT EXISTS temp_gene AS 
+                  SELECT gene_ID,
+                    chromosome,
+                    start,
+                    end,
+                    strand
+                   FROM (SELECT g.gene_ID,
+                             loc.chromosome,
+                             MIN(loc.position) as start,
+                             MAX(loc.position) as end,
+                             g.strand
+                       FROM genes as g
+                       LEFT JOIN vertex as v ON g.gene_ID = v.gene_ID
+                       LEFT JOIN location as loc ON loc.location_ID = v.vertex_ID
+                       WHERE loc.genome_build = '%s'
+                       GROUP BY g.gene_ID); """
+
+    #command = """ CREATE TABLE IF NOT EXISTS temp_gene (
+    #            gene_ID INTEGER,
+    #            chromosome TEXT,
+    #            start INTEGER,
+    #            end TEXT,
+    #            strand TEXT
+    #            ); """
+    cursor.execute(command % (build))
+    return
 
 def search_for_vertex_at_pos(chromosome, position, location_dict):
     """ Given a chromosome and a position (1-based), this function queries the 
@@ -250,6 +295,19 @@ def create_edge(vertex_1, vertex_2, edge_type, strand, edge_dict, run_info):
     edge_dict[(vertex_1, vertex_2, edge_type)] = new_edge
 
     return new_edge
+
+def create_gene(chromosome, start, end, strand, memory_cursor, run_info):
+    """ Create a novel gene and add it to the temporary table.
+    """
+    run_info.genes += 1
+    new_ID = "%s-%d" % (run_info.prefix, run_info.genes)
+
+    new_gene = ( new_ID, chromosome, min(start, end), max(start, end), strand )
+    cols = " (" + ", ".join([str_wrap_double(x) for x in ["gene_ID", 
+           "chromosome", "start", "end", "strand"]]) + ") "
+    command = 'INSERT INTO temp_gene ' + cols + ' VALUES ' + '(?,?,?,?,?)'
+    memory_cursor.execute(command, new_gene)
+    return new_ID
 
 def create_transcript(gene_ID, edge_IDs, vertex_IDs, transcript_dict, run_info):
     """Creates a novel transcript and adds it to the transcript data structure.
@@ -420,36 +478,49 @@ def search_for_overlap_with_gene(chromosome, start, end, strand,
         determine whether the interval overlaps with any genes. If it there is
         more than one match, prioritize same-strand first and foremost. 
         If there is more than one same-strand option, prioritize amount of
-        overlap. Antisense matches may be returned if there is no sam strand
-        option. """
+        overlap. Antisense matches may be returned if there is no same strand
+        match. """
 
     min_start = min(start, end)
     max_end = max(start, end)
     query_interval = [min_start, max_end]
 
-    query = """ SELECT gene_ID, 
-                    chromosome, 
-                    start, 
-                    end,
-                    strand    
-                FROM (SELECT g.gene_ID,
-                             loc.chromosome,
-                             MIN(loc.position) as start,
-                             MAX(loc.position) as end,
-                             g.strand
-                       FROM genes as g
-                       LEFT JOIN vertex as v ON g.gene_ID = v.gene_ID
-                       LEFT JOIN location as loc ON loc.location_ID = v.vertex_ID
-                       WHERE loc.genome_build = '%s'
-                       AND loc.chromosome = '%s'
-                       GROUP BY g.gene_ID)
-                 WHERE (start <= %d AND end >= %d) OR
-                       (start >= %d AND end <= %d) OR
-                       (start >= %d AND start <= %d) OR
-                       (end >= %d AND end <= %d);"""
+    query = """ SELECT gene_ID,
+                       chromosome,
+                       MIN(start) AS start,
+                       MAX(end) AS end,
+                       strand
+                FROM temp_gene
+                WHERE (chromosome = '%s') AND
+                      ((start <= %d AND end >= %d) OR
+                      (start >= %d AND end <= %d) OR
+                      (start >= %d AND start <= %d) OR
+                      (end >= %d AND end <= %d))
+                 GROUP BY gene_ID;"""    
 
-    cursor.execute(query % (run_info.build, chromosome, min_start, max_end,
-                            min_start, max_end, min_start, max_end, min_start, 
+    #query = """ SELECT gene_ID, 
+    #                chromosome, 
+    #                start, 
+    #                end,
+    #                strand    
+    #            FROM (SELECT g.gene_ID,
+    #                         loc.chromosome,
+    #                         MIN(loc.position) as start,
+    #                         MAX(loc.position) as end,
+    #                         g.strand
+    #                   FROM genes as g
+    #                   LEFT JOIN vertex as v ON g.gene_ID = v.gene_ID
+    #                   LEFT JOIN location as loc ON loc.location_ID = v.vertex_ID
+    #                   WHERE loc.genome_build = '%s'
+    #                   AND loc.chromosome = '%s'
+    #                   GROUP BY g.gene_ID)
+    #             WHERE (start <= %d AND end >= %d) OR
+    #                   (start >= %d AND end <= %d) OR
+    #                   (start >= %d AND start <= %d) OR
+    #                   (end >= %d AND end <= %d);"""
+
+    cursor.execute(query % (chromosome, min_start, max_end,
+                            min_start, max_end, min_start, max_end, min_start,
                             max_end))
     matches = cursor.fetchall()
 
@@ -642,8 +713,35 @@ def process_NIC(edge_IDs, vertex_IDs, vertex_novelties, strand, transcript_dict,
         vertex2gene[vertex_IDs[-1]] = (gene_ID, strand)
     return gene_ID, novel_transcript["transcript_ID"], novelty    
 
-    print(gene_ID)
-    exit() 
+
+def find_antisense_match(vertex_IDs, strand, vertex2gene):
+    """ For a transcript with known vertices but not known edges, find the
+        gene that it is antisense to for annotation purposes, if one exists"""
+
+    gene_matches = []
+    for vertex in vertex_IDs[1:-1]:
+        curr_matches = vertex2gene[vertex]
+
+        # Make sure the gene is on the opposite strand
+        gene_matches += [ x[0] for x in curr_matches if x[1] != strand ]
+
+    # Now count up how often we see each gene
+    gene_tally = dict((x,gene_matches.count(x)) for x in set(gene_matches))
+
+    # For the main assignment, pick the gene that is observed the most
+    anti_gene_ID = max(gene_tally, key=gene_tally.get)
+
+    # Create a novel gene
+    #gene_ID = create_novel_gene() 
+    #gene_novelty = [(gene_ID, "antisense", anti_gene_ID)]
+
+    # Create a novel transcript
+    #novel_transcript = create_transcript(gene_ID, edge_IDs, vertex_IDs,
+    #                                     transcript_dict, run_info)
+    #transcript_ID = novel_transcript["transcript_ID"]
+    #transcript_novelty = [(novel_transcript["transcript_ID"], "antisense", None)]
+
+    return anti_gene_ID
 
 def identify_transcript(read_ID, chrom, positions, strand, location_dict, edge_dict,
                         transcript_dict, vertex_2_gene, run_info):
@@ -716,14 +814,19 @@ def identify_transcript(read_ID, chrom, positions, strand, location_dict, edge_d
         gene_ID, transcript_ID, novelty = talon.process_NIC(edge_IDs, vertex_IDs,
                                                       v_novelty, transcript_dict,
                                                       vertex2gene, run_info)
-        # Determine which gene the transcript should belong to by  
-
     
+    # Antisense transcript with splice junctions matching known gene
+    elif splice_vertices_known and n_exons > 1:
+        # TODO: need to create novel gene and novel transcript. Need gene data struct for that. 
+        gene_ID, transcript_ID, gene_novelty, novelty = talon.process_antisense_NIC(edge_IDs, vertex_IDs,
+                                                                              v_novelty, transcript_dict,
+                                                                              vertex2gene, run_info)
 
     # Novel not in catalog transcripts contain new splice donors/acceptors
     # and contain at least one splice junction. They may belong to an existing
     # gene, but not necessarily.
     elif not(splice_vertices_known) and n_exons > 1:
+      
         print("Transcript is definitely Novel Not in Catalog (NNC)")
     else:
         print("Transcript is genomic and/or antisense")
@@ -776,6 +879,12 @@ def main():
     cursor = conn.cursor()
 
     # Prepare data structures from the information stored in the database
+    make_temp_novel_gene_table(cursor, "toy_build")
+    query = "SELECT * FROM temp_gene"
+    cursor.execute(query)
+
+    
+    exit()
     run_info = init_run_info(cursor, options.build, options.idprefix)
     location_dict = make_location_dict(options.build, cursor)
     edge_dict = make_edge_dict(cursor)

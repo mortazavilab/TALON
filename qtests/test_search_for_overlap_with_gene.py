@@ -14,6 +14,7 @@ class TestSearchForOverlapWithGene(object):
         """
         conn, cursor = get_db_cursor()
         build = "toy_build"
+        talon.make_temp_novel_gene_table(cursor, "toy_build")
         location_dict = talon.make_location_dict(build, cursor)
         run_info = talon.init_run_info(cursor, build, "TALON")
 
@@ -38,6 +39,7 @@ class TestSearchForOverlapWithGene(object):
         """ Example where the interval overlaps exactly one gene """
         conn, cursor = get_db_cursor()
         build = "toy_build"
+        talon.make_temp_novel_gene_table(cursor, "toy_build")
         location_dict = talon.make_location_dict(build, cursor)
         run_info = talon.init_run_info(cursor, build, "TALON")
 
@@ -61,6 +63,7 @@ class TestSearchForOverlapWithGene(object):
         
         conn, cursor = get_db_cursor()
         build = "toy_build"
+        talon.make_temp_novel_gene_table(cursor, "toy_build")
         location_dict = talon.make_location_dict(build, cursor)
         run_info = talon.init_run_info(cursor, build, "TALON")
 
@@ -83,6 +86,7 @@ class TestSearchForOverlapWithGene(object):
 
         conn, cursor = get_db_cursor()
         build = "toy_build"
+        talon.make_temp_novel_gene_table(cursor, "toy_build")
         location_dict = talon.make_location_dict(build, cursor)
         run_info = talon.init_run_info(cursor, build, "TALON")
 
@@ -105,6 +109,7 @@ class TestSearchForOverlapWithGene(object):
 
         conn, cursor = get_db_cursor()
         build = "toy_build"
+        talon.make_temp_novel_gene_table(cursor, "toy_build")
         location_dict = talon.make_location_dict(build, cursor)
         run_info = talon.init_run_info(cursor, build, "TALON")
 
@@ -126,7 +131,8 @@ class TestSearchForOverlapWithGene(object):
             more overlap """
  
         conn, cursor = get_db_cursor()
-        build = "toy_build"
+        build = "toy_build" 
+        talon.make_temp_novel_gene_table(cursor, "toy_build")
         location_dict = talon.make_location_dict(build, cursor)
         run_info = talon.init_run_info(cursor, build, "TALON")
 
