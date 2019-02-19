@@ -77,6 +77,25 @@ def make_edge_dict(cursor):
 
     return edge_dict
 
+def make_vertex_2_gene_dict(cursor):
+    """ Create a dictionary that maps vertices to the genes that they belong to.
+    """
+    vertex2gene = {}
+    query = """SELECT * FROM vertex LEFT JOIN genes ON vertex.gene_ID = genes.gene_ID"""
+    cursor.execute(query)
+    for vertex_line in cursor.fetchall():
+        vertex = vertex_line["vertex_ID"]
+        gene = vertex_line["gene_ID"]
+        strand = vertex_line["strand"]
+
+        if vertex in vertex2gene:
+            vertex2gene[vertex].add((gene, strand))
+        else:
+            vertex2gene[vertex] = set()
+            vertex2gene[vertex].add((gene, strand))
+
+    return vertex2gene
+
 def search_for_vertex_at_pos(chromosome, position, location_dict):
     """ Given a chromosome and a position (1-based), this function queries the 
         location dict to determine whether a vertex 
@@ -587,9 +606,47 @@ def process_ISM(edge_IDs, vertex_IDs, vertex_novelties, transcript_dict,
 
     return gene_ID, novel_transcript["transcript_ID"], novelty
     
+def process_NIC(edge_IDs, vertex_IDs, vertex_novelties, strand, transcript_dict, vertex2gene, run_info):
+    """ For a transcript that has been determined to be novel in catalog, find
+        the proper gene match (documenting fusion event if applicable). To do 
+        this, look up each vertex in the vertex2gene dict, and keep track of all
+        same-strand genes. """
+
+    gene_matches = []
+    for vertex in vertex_IDs[1:-1]:
+        curr_matches = vertex2gene[vertex]
+
+        # Make sure the gene is on the correct strand
+        gene_matches += [ x[0] for x in curr_matches if x[1] == strand ]
+
+    # Now count up how often we see each gene
+    gene_tally = dict((x,gene_matches.count(x)) for x in set(gene_matches))
+
+    # TODO: deal with fusions
+
+    # For the main assignment, pick the gene that is observed the most
+    gene_ID = max(gene_tally, key=gene_tally.get)
+
+    # Create a new transcript of that gene
+    novel_transcript = create_transcript(gene_ID, edge_IDs, vertex_IDs,
+                                         transcript_dict, run_info)
+    novelty = [(novel_transcript["transcript_ID"], "NIC", None)]
+
+    # Deal with novelty on the ends
+    # Check on ends:
+    if vertex_novelties[0] == 1:
+        novelty.append(((novel_transcript["transcript_ID"],"5p", None)))
+        vertex2gene[vertex_IDs[0]] = (gene_ID, strand)
+    if vertex_novelties[-1] == 1:
+        novelty.append(((novel_transcript["transcript_ID"],"3p", None)))
+        vertex2gene[vertex_IDs[-1]] = (gene_ID, strand)
+    return gene_ID, novel_transcript["transcript_ID"], novelty    
+
+    print(gene_ID)
+    exit() 
 
 def identify_transcript(read_ID, chrom, positions, strand, location_dict, edge_dict,
-                        transcript_dict, run_info):
+                        transcript_dict, vertex_2_gene, run_info):
     """ Inputs:
         - Information about the query transcript
           - chromosome
@@ -600,6 +657,7 @@ def identify_transcript(read_ID, chrom, positions, strand, location_dict, edge_d
           - edge_dict (v1_v2_edgetype --> edge)
           - possibly a gene dict
           - transcript_dict
+          - vertex2gene (maps vertices to the gene(s) they are part of)
           - run_info
 
        Outputs:
@@ -626,7 +684,7 @@ def identify_transcript(read_ID, chrom, positions, strand, location_dict, edge_d
     # Check novelty of exons and splice jns. This will help us categorize 
     # what type of novelty the transcript has
     all_SJs_known = check_all_SJs_known(e_novelty)
-    all_exons_known = check_all_exons_known(e_novelty)
+    splice_vertices_known = (sum(v_novelty[1:-1]) == 0)
     ends_novel = (e_novelty[0] + e_novelty[-1]) > 0
 
     # Look for FSM or ISM. This includes monoexonic cases where the exon is 
@@ -646,9 +704,26 @@ def identify_transcript(read_ID, chrom, positions, strand, location_dict, edge_d
                                                              run_info)        
         return gene_ID, transcript_ID, novelty
 
-    elif all_exons_known and not(all_SJs_known) and n_exons > 1:
+    # Novel in catalog transcripts have known splice donors and acceptors,
+    # but new connections between them. 
+
+    # If we're only checking vertices here, then it is possible to get 
+    # antisense transcripts that have splice junctions
+    elif splice_vertices_known and n_exons > 1 and sum(e_novelty[1:-1] == 0):
         print("Transcript is definitely Novel in Catalog (NIC)")
-    elif not(all_exons_known) and not(all_SJs_known) and n_exons > 1:
+        # Theoretically these exons could come from different genes, so I
+        # need to be prepared to handle that.
+        gene_ID, transcript_ID, novelty = talon.process_NIC(edge_IDs, vertex_IDs,
+                                                      v_novelty, transcript_dict,
+                                                      vertex2gene, run_info)
+        # Determine which gene the transcript should belong to by  
+
+    
+
+    # Novel not in catalog transcripts contain new splice donors/acceptors
+    # and contain at least one splice junction. They may belong to an existing
+    # gene, but not necessarily.
+    elif not(splice_vertices_known) and n_exons > 1:
         print("Transcript is definitely Novel Not in Catalog (NNC)")
     else:
         print("Transcript is genomic and/or antisense")
@@ -705,22 +780,23 @@ def main():
     location_dict = make_location_dict(options.build, cursor)
     edge_dict = make_edge_dict(cursor)
     transcript_dict = make_transcript_dict(cursor)
+    vertex2gene = make_vertex_2_gene_dict(cursor)
 
+    # TODO: process input sam files
 
-    chrom = "chr1"
+    #chrom = "chr1"
     strand = "+"
-    read_ID = "toy_read"
-    positions = ( 1, 100, 500, 600, 900, 1500 )
+    #read_ID = "toy_read"
+    #positions = ( 1, 100, 500, 600, 900, 1500 )
     #gene_ID, transcript_ID, novelty = identify_transcript(read_ID,
     #                                           chrom, positions, strand,
     #                                           location_dict, edge_dict,
     #                                           transcript_dict, run_info)
 
-    edge_IDs = (3, 4, 5) # Last edge is novel
-    vertex_IDs = (3, 4, 5, 6) # Last vertex is novel
-    v_novelty = (0, 0, 0, 0)
-
-    gene_ID, transcript_ID, novelty = process_ISM(edge_IDs, vertex_IDs, v_novelty, transcript_dict, run_info)
+    edge_IDs = (1, 200, 5)
+    vertex_IDs = (1, 2, 5, 6)
+    v_novelties = (0, 0, 0, 0)
+    gene_ID, transcript_ID, novelty = process_NIC(edge_IDs, vertex_IDs, v_novelties, strand, transcript_dict, vertex2gene, run_info)
                                                   
     print(gene_ID)
     print(transcript_ID)
