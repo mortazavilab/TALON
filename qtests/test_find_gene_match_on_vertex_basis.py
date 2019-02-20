@@ -14,7 +14,7 @@ class TestIdentifyGeneOnVertexBasis(object):
         conn, cursor = get_db_cursor()
         build = "toy_build"
         talon.make_temp_novel_gene_table(cursor, "toy_build")
-        run_info = talon.init_run_info(cursor, build, "TALON")
+        run_info = talon.init_run_info(cursor, build)
         vertex2gene = talon.make_vertex_2_gene_dict(cursor)
 
         vertex_IDs = (1, 2, 3, 4, 5, 6)
@@ -32,7 +32,7 @@ class TestIdentifyGeneOnVertexBasis(object):
         conn, cursor = get_db_cursor()
         build = "toy_build"
         talon.make_temp_novel_gene_table(cursor, "toy_build")
-        run_info = talon.init_run_info(cursor, build, "TALON")
+        run_info = talon.init_run_info(cursor, build)
         vertex2gene = talon.make_vertex_2_gene_dict(cursor)
 
         vertex_IDs = (1, 200, 3, 4, 5, 6)
@@ -49,7 +49,7 @@ class TestIdentifyGeneOnVertexBasis(object):
         conn, cursor = get_db_cursor()
         build = "toy_build"
         talon.make_temp_novel_gene_table(cursor, "toy_build")
-        run_info = talon.init_run_info(cursor, build, "TALON")
+        run_info = talon.init_run_info(cursor, build)
         vertex2gene = talon.make_vertex_2_gene_dict(cursor)
 
         vertex_IDs = (1000, 2000, 3000, 4000)

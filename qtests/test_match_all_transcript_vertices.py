@@ -16,7 +16,7 @@ class TestMatchAllVertices(object):
         conn, cursor = get_db_cursor()
         build = "toy_build"
         location_dict = talon.make_location_dict(build, cursor)
-        run_info = talon.init_run_info(cursor, build, "TALON")
+        run_info = talon.init_run_info(cursor, build)
         orig_vertex_count = run_info['vertex']
         strand = "+"
         conn.close()
@@ -37,7 +37,7 @@ class TestMatchAllVertices(object):
         conn, cursor = get_db_cursor()
         build = "toy_build"
         location_dict = talon.make_location_dict(build, cursor)
-        run_info = talon.init_run_info(cursor, build, "TALON")
+        run_info = talon.init_run_info(cursor, build)
         orig_vertex_count = run_info['vertex']
         orig_n_locations = len(location_dict)
         conn.close()
@@ -52,7 +52,7 @@ class TestMatchAllVertices(object):
 
         # Make sure that no match got returned
         new_vertex_count = run_info['vertex']
-        assert vertex_IDs == ( 1, "TALON-%d" % new_vertex_count, 3, 4, 5, 6 )
+        assert vertex_IDs == ( 1, new_vertex_count, 3, 4, 5, 6 )
        
         # Make sure the data structures got updated
         assert new_vertex_count == orig_vertex_count + 1

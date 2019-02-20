@@ -264,7 +264,7 @@ def permissive_vertex_search(chromosome, position, strand, sj_pos, pos_type,
 def create_vertex(chromosome, position, run_info, location_dict):
     """ Creates a novel vertex and adds it to the location data structure. """
     run_info.vertex += 1
-    new_ID = "%s-%d" % (run_info.prefix, run_info.vertex)
+    new_ID = run_info.vertex
     new_vertex = {'location_ID': new_ID,
                   'genome_build': run_info.build,
                   'chromosome': chromosome,
@@ -277,7 +277,7 @@ def create_vertex(chromosome, position, run_info, location_dict):
 def create_edge(vertex_1, vertex_2, edge_type, strand, edge_dict, run_info):
     """ Creates a novel edge and adds it to the edge data structure. """
     run_info.edge += 1
-    new_ID = "%s-%d" % (run_info.prefix, run_info.edge)
+    new_ID = run_info.edge
     new_edge = {'edge_ID': new_ID,
                 'v1': vertex_1,
                 'v2': vertex_2,
@@ -292,7 +292,7 @@ def create_gene(chromosome, start, end, strand, memory_cursor, run_info):
     """ Create a novel gene and add it to the temporary table.
     """
     run_info.genes += 1
-    new_ID = "%s-%d" % (run_info.prefix, run_info.genes)
+    new_ID = run_info.genes
 
     new_gene = ( new_ID, chromosome, min(start, end), max(start, end), strand )
     cols = " (" + ", ".join([str_wrap_double(x) for x in ["gene_ID", 
@@ -305,7 +305,7 @@ def create_transcript(gene_ID, edge_IDs, vertex_IDs, transcript_dict, run_info):
     """Creates a novel transcript and adds it to the transcript data structure.
     """
     run_info.transcripts += 1
-    new_ID = "%s-%d" % (run_info.prefix, run_info.transcripts)
+    new_ID = run_info.transcripts
     new_transcript = {'transcript_ID': new_ID,
                       'gene_ID': gene_ID,
                       'path': ",".join(map(str, edge_IDs)),
@@ -879,17 +879,24 @@ def check_inputs(options):
                           " database. The choices are: " + build_names)
     annot_builds = cursor.fetchall()
 
-def init_run_info(cursor, genome_build, idprefix):
+def init_run_info(cursor, genome_build):
     """ Initializes a dictionary that keeps track of important run information
         such as the desired genome build, the prefix for novel identifiers,
         and the novel counters for the run. """
 
     run_info = dstruct.Struct()
     run_info.build = genome_build
-    run_info.prefix = idprefix
-    run_info.cutoff_5p = 500
-    run_info.cutoff_3p = 300
 
+    # Fetch information from run_info table
+    cursor.execute("""SELECT * FROM run_info""")
+    for info in cursor.fetchall():
+        info_name = info['item']
+        value = info['value']
+        if info_name != "idprefix":
+            value = int(value)
+        run_info[info_name] = value
+
+    # Fetch counters
     query = "SELECT * FROM counters WHERE category != 'genome_build'"
     cursor.execute(query)
 

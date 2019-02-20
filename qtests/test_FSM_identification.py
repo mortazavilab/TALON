@@ -15,7 +15,7 @@ class TestIdentifyFSM(object):
         build = "toy_build"
         edge_dict = talon.make_edge_dict(cursor)
         location_dict = talon.make_location_dict(build, cursor)
-        run_info = talon.init_run_info(cursor, build, "TALON")        
+        run_info = talon.init_run_info(cursor, build)        
         transcript_dict = talon.make_transcript_dict(cursor)
 
         edge_IDs = (1, 2, 3, 4, 5)
@@ -41,7 +41,7 @@ class TestIdentifyFSM(object):
         build = "toy_build"
         edge_dict = talon.make_edge_dict(cursor)
         location_dict = talon.make_location_dict(build, cursor)
-        run_info = talon.init_run_info(cursor, build, "TALON")
+        run_info = talon.init_run_info(cursor, build)
         transcript_dict = talon.make_transcript_dict(cursor)
 
         edge_IDs = (1, 2, 3, 4, 500) # Last edge is novel
@@ -55,8 +55,6 @@ class TestIdentifyFSM(object):
         correct_gene_ID = fetch_correct_ID("TG1", "gene", cursor)
         correct_transcript_ID = fetch_correct_ID("TG1-001", "transcript", cursor)
         assert gene_ID == correct_gene_ID
-        #assert novelty == [('TALON-5', 'FSM', str(correct_gene_ID)), 
-        #                   ('TALON-5', '3p', None)]
         conn.close()
 
     def test_no_match(self):
@@ -66,7 +64,7 @@ class TestIdentifyFSM(object):
         build = "toy_build"
         edge_dict = talon.make_edge_dict(cursor)
         location_dict = talon.make_location_dict(build, cursor)
-        run_info = talon.init_run_info(cursor, build, "TALON")
+        run_info = talon.init_run_info(cursor, build)
         transcript_dict = talon.make_transcript_dict(cursor)
 
         edge_IDs = (3, 4, 5) 

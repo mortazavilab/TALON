@@ -16,7 +16,7 @@ class TestIdentifyFSM(object):
         talon.make_temp_novel_gene_table(cursor, build)
         edge_dict = talon.make_edge_dict(cursor)
         location_dict = talon.make_location_dict(build, cursor)
-        run_info = talon.init_run_info(cursor, build, "TALON")        
+        run_info = talon.init_run_info(cursor, build)        
         transcript_dict = talon.make_transcript_dict(cursor)
         vertex_2_gene = talon.make_vertex_2_gene_dict(cursor)
 
@@ -46,7 +46,7 @@ class TestIdentifyFSM(object):
         talon.make_temp_novel_gene_table(cursor, build)
         edge_dict = talon.make_edge_dict(cursor)
         location_dict = talon.make_location_dict(build, cursor)
-        run_info = talon.init_run_info(cursor, build, "TALON")
+        run_info = talon.init_run_info(cursor, build)
         transcript_dict = talon.make_transcript_dict(cursor)
         vertex_2_gene = talon.make_vertex_2_gene_dict(cursor)
 
@@ -75,7 +75,7 @@ class TestIdentifyFSM(object):
         talon.make_temp_novel_gene_table(cursor, build)
         edge_dict = talon.make_edge_dict(cursor)
         location_dict = talon.make_location_dict(build, cursor)
-        run_info = talon.init_run_info(cursor, build, "TALON")
+        run_info = talon.init_run_info(cursor, build)
         transcript_dict = talon.make_transcript_dict(cursor)
         vertex_2_gene = talon.make_vertex_2_gene_dict(cursor)
 
@@ -103,7 +103,7 @@ class TestIdentifyFSM(object):
         talon.make_temp_novel_gene_table(cursor, build)
         edge_dict = talon.make_edge_dict(cursor)
         location_dict = talon.make_location_dict(build, cursor)
-        run_info = talon.init_run_info(cursor, build, "TALON")
+        run_info = talon.init_run_info(cursor, build)
         transcript_dict = talon.make_transcript_dict(cursor)
         vertex_2_gene = talon.make_vertex_2_gene_dict(cursor)
 
@@ -131,7 +131,7 @@ class TestIdentifyFSM(object):
         talon.make_temp_novel_gene_table(cursor, build)
         edge_dict = talon.make_edge_dict(cursor)
         location_dict = talon.make_location_dict(build, cursor)
-        run_info = talon.init_run_info(cursor, build, "TALON")
+        run_info = talon.init_run_info(cursor, build)
         transcript_dict = talon.make_transcript_dict(cursor)
         vertex_2_gene = talon.make_vertex_2_gene_dict(cursor)
 
@@ -159,7 +159,7 @@ class TestIdentifyFSM(object):
         talon.make_temp_novel_gene_table(cursor, build)
         edge_dict = talon.make_edge_dict(cursor)
         location_dict = talon.make_location_dict(build, cursor)
-        run_info = talon.init_run_info(cursor, build, "TALON")
+        run_info = talon.init_run_info(cursor, build)
         transcript_dict = talon.make_transcript_dict(cursor)
         vertex_2_gene = talon.make_vertex_2_gene_dict(cursor)
 
@@ -188,7 +188,7 @@ class TestIdentifyFSM(object):
         talon.make_temp_novel_gene_table(cursor, build)
         edge_dict = talon.make_edge_dict(cursor)
         location_dict = talon.make_location_dict(build, cursor)
-        run_info = talon.init_run_info(cursor, build, "TALON")
+        run_info = talon.init_run_info(cursor, build)
         transcript_dict = talon.make_transcript_dict(cursor)
         vertex_2_gene = talon.make_vertex_2_gene_dict(cursor)
 
@@ -216,7 +216,7 @@ class TestIdentifyFSM(object):
         talon.make_temp_novel_gene_table(cursor, build)
         edge_dict = talon.make_edge_dict(cursor)
         location_dict = talon.make_location_dict(build, cursor)
-        run_info = talon.init_run_info(cursor, build, "TALON")
+        run_info = talon.init_run_info(cursor, build)
         transcript_dict = talon.make_transcript_dict(cursor)
         vertex_2_gene = talon.make_vertex_2_gene_dict(cursor)
 
@@ -244,7 +244,7 @@ class TestIdentifyFSM(object):
         talon.make_temp_novel_gene_table(cursor, build)
         edge_dict = talon.make_edge_dict(cursor)
         location_dict = talon.make_location_dict(build, cursor)
-        run_info = talon.init_run_info(cursor, build, "TALON")
+        run_info = talon.init_run_info(cursor, build)
         transcript_dict = talon.make_transcript_dict(cursor)
         vertex_2_gene = talon.make_vertex_2_gene_dict(cursor)
 

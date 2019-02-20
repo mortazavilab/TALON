@@ -30,6 +30,16 @@ def getOptions():
     parser.add_option("--l", dest = "min_length",
         help = "Minimum required transcript length (default = 300 bp) ",
         type = "int", default = 300)
+    parser.add_option("--idprefix", dest = "idprefix",
+        help = "Prefix for naming novel discoveries in eventual TALON runs",
+        type = "string", default = "TALON")
+    parser.add_option("--5p", dest = "cutoff_5p",
+        help = "Maximum allowable distance (bp) at the 5' end during annotation ",
+        type = "int", default = "500")
+    parser.add_option("--3p", dest = "cutoff_3p",
+        help = "Maximum allowable distance (bp) at the 3' end during annotation ",
+        type = "int", default = "300")
+
     parser.add_option("--o", dest = "outprefix",
         help = "Outprefix for the annotation files",
         metavar = "FILE", type = "string")
@@ -55,6 +65,33 @@ def create_database(path):
         conn.close()
 
     return
+
+def init_run_info(database, idprefix, min_length, cutoff_5p, cutoff_3p):
+    """ Initializes a table that keeps track of important run information
+        such as the prefix for novel identifiers and the 5 prime and 3 prime 
+        distance cutoffs. Affects how downstream TALON runs are done"""
+
+    # Connecting to the database file
+    conn = sqlite3.connect(database)
+    c = conn.cursor()
+
+    # Add table and set primary key column, which will be the gene ID
+    c.execute("""CREATE TABLE "run_info" ("item" TEXT PRIMARY KEY,
+                                          "value" TEXT)""")
+    # Add rows
+    cols = " (" + ", ".join([str_wrap_double(x) for x in ["item", "value"]]) + ") "
+    c.execute('INSERT INTO run_info ' + cols + ' VALUES ' + '(?,?)',
+             ('idprefix', idprefix))
+    c.execute('INSERT INTO run_info ' + cols + ' VALUES ' + '(?,?)', 
+             ('cutoff_5p', cutoff_5p))
+    c.execute('INSERT INTO run_info ' + cols + ' VALUES ' + '(?,?)',
+               ('cutoff_3p', cutoff_3p))
+    c.execute('INSERT INTO run_info ' + cols + ' VALUES ' + '(?,?)',
+               ('min_length', min_length))
+
+    conn.commit()
+    conn.close()
+    return 
 
 def add_gene_table(database):
     """ Add a table to the database to track genes. Attributes are:
@@ -339,8 +376,6 @@ def add_counter_table(database):
         format(tn=table_name, idf="category", cn="count"))
     c.execute("INSERT INTO {tn} ({idf}, {cn}) VALUES ('observed', 0)".\
         format(tn=table_name, idf="category", cn="count"))
-    #c.execute("INSERT INTO {tn} ({idf}, {cn}) VALUES ('observed_transcript_end', 0)".\
-    #    format(tn=table_name, idf="category", cn="count"))
 
     conn.commit()
     conn.close()
@@ -911,6 +946,9 @@ def main():
     annot_name = options.annot_name
     genome_build = options.genome_build
     min_length = int(options.min_length)
+    idprefix = options.idprefix
+    cutoff_5p = options.cutoff_5p
+    cutoff_3p = options.cutoff_3p
 
     # Initialize database
     db_name = outprefix + ".db"
@@ -931,6 +969,7 @@ def main():
     add_dataset_table(db_name)
     add_abundance_table(db_name)
     add_observed_table(db_name)
+    init_run_info(db_name, idprefix, min_length, cutoff_5p, cutoff_3p)
 
     # Read in genes, transcripts, and edges from GTF file
     genes, transcripts, exons = read_gtf_file(gtf_file)

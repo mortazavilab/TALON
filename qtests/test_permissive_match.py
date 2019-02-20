@@ -15,7 +15,7 @@ class TestPermissiveMatch(object):
         conn, cursor = get_db_cursor()
         build = "toy_build"
         location_dict = talon.make_location_dict(build, cursor)
-        run_info = talon.init_run_info(cursor, build, "TALON")
+        run_info = talon.init_run_info(cursor, build)
 
         chrom = "chr1"
         pos = [1, 1, 500, 600]
@@ -40,7 +40,7 @@ class TestPermissiveMatch(object):
         conn, cursor = get_db_cursor()
         build = "toy_build"
         location_dict = talon.make_location_dict(build, cursor)
-        run_info = talon.init_run_info(cursor, build, "TALON")
+        run_info = talon.init_run_info(cursor, build)
 
         chrom = "chr1"
         pos = [1750, 1500, 1000, 900]
@@ -66,7 +66,7 @@ class TestPermissiveMatch(object):
         conn, cursor = get_db_cursor()
         build = "toy_build"
         location_dict = talon.make_location_dict(build, cursor)
-        run_info = talon.init_run_info(cursor, build, "TALON")
+        run_info = talon.init_run_info(cursor, build)
         conn.close()
 
         chrom = "chr1"
@@ -91,7 +91,7 @@ class TestPermissiveMatch(object):
         conn, cursor = get_db_cursor()
         build = "toy_build"
         location_dict = talon.make_location_dict(build, cursor)
-        run_info = talon.init_run_info(cursor, build, "TALON")
+        run_info = talon.init_run_info(cursor, build)
 
         chrom = "chr2"
         pos = [920, 970]
@@ -128,7 +128,7 @@ class TestPermissiveMatch(object):
         conn, cursor = get_db_cursor()
         build = "toy_build"
         location_dict = talon.make_location_dict(build, cursor)
-        run_info = talon.init_run_info(cursor, build, "TALON")
+        run_info = talon.init_run_info(cursor, build)
 
         chrom = "chr1"
         pos = [550, 610]

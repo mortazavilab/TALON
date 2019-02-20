@@ -16,7 +16,7 @@ class TestMatchAllEdges(object):
         conn, cursor = get_db_cursor()
         build = "toy_build"
         edge_dict = talon.make_edge_dict(cursor)
-        run_info = talon.init_run_info(cursor, build, "TALON")
+        run_info = talon.init_run_info(cursor, build)
         conn.close()
 
         chrom = "chr1"
@@ -35,7 +35,7 @@ class TestMatchAllEdges(object):
         conn, cursor = get_db_cursor()
         build = "toy_build"
         edge_dict = talon.make_edge_dict(cursor)
-        run_info = talon.init_run_info(cursor, build, "TALON")
+        run_info = talon.init_run_info(cursor, build)
         orig_n_edges = len(edge_dict)
         conn.close()
 
@@ -48,7 +48,7 @@ class TestMatchAllEdges(object):
         expected_edges = []
         for i in range(1,6):
             num = orig_n_edges + i
-            edge_id = "TALON-%d" % num
+            edge_id = num
             expected_edges.append(edge_id)
 
         assert edge_IDs == tuple(expected_edges)

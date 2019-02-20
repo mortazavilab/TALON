@@ -16,7 +16,7 @@ class TestSearchForOverlapWithGene(object):
         build = "toy_build"
         talon.make_temp_novel_gene_table(cursor, "toy_build")
         location_dict = talon.make_location_dict(build, cursor)
-        run_info = talon.init_run_info(cursor, build, "TALON")
+        run_info = talon.init_run_info(cursor, build)
 
         chrom = "chr1"
         pos = [3000, 4000]
@@ -41,7 +41,7 @@ class TestSearchForOverlapWithGene(object):
         build = "toy_build"
         talon.make_temp_novel_gene_table(cursor, "toy_build")
         location_dict = talon.make_location_dict(build, cursor)
-        run_info = talon.init_run_info(cursor, build, "TALON")
+        run_info = talon.init_run_info(cursor, build)
 
         chrom = "chr1"
         pos = [0, 1500]
@@ -65,7 +65,7 @@ class TestSearchForOverlapWithGene(object):
         build = "toy_build"
         talon.make_temp_novel_gene_table(cursor, "toy_build")
         location_dict = talon.make_location_dict(build, cursor)
-        run_info = talon.init_run_info(cursor, build, "TALON")
+        run_info = talon.init_run_info(cursor, build)
 
         chrom = "chr1"
         pos = [1500, 910]
@@ -88,7 +88,7 @@ class TestSearchForOverlapWithGene(object):
         build = "toy_build"
         talon.make_temp_novel_gene_table(cursor, "toy_build")
         location_dict = talon.make_location_dict(build, cursor)
-        run_info = talon.init_run_info(cursor, build, "TALON")
+        run_info = talon.init_run_info(cursor, build)
 
         chrom = "chr1"
         pos = [550, 1700]
@@ -111,7 +111,7 @@ class TestSearchForOverlapWithGene(object):
         build = "toy_build"
         talon.make_temp_novel_gene_table(cursor, "toy_build")
         location_dict = talon.make_location_dict(build, cursor)
-        run_info = talon.init_run_info(cursor, build, "TALON")
+        run_info = talon.init_run_info(cursor, build)
 
         chrom = "chr1"
         pos = [1400, 2100]
@@ -134,7 +134,7 @@ class TestSearchForOverlapWithGene(object):
         build = "toy_build" 
         talon.make_temp_novel_gene_table(cursor, "toy_build")
         location_dict = talon.make_location_dict(build, cursor)
-        run_info = talon.init_run_info(cursor, build, "TALON")
+        run_info = talon.init_run_info(cursor, build)
 
         chrom = "chr1"
         pos = [800, 5050]
