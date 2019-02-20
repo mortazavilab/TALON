@@ -60,22 +60,22 @@ class TestIdentifyISM(object):
         """ Monoexonic ISM """
         
         conn, cursor = get_db_cursor()
-        #build = "toy_build"
-        #edge_dict = talon.make_edge_dict(cursor)
-        #location_dict = talon.make_location_dict(build, cursor)
-        #run_info = talon.init_run_info(cursor, build, "TALON")
-        #transcript_dict = talon.make_transcript_dict(cursor)
+        build = "toy_build"
+        edge_dict = talon.make_edge_dict(cursor)
+        location_dict = talon.make_location_dict(build, cursor)
+        run_info = talon.init_run_info(cursor, build, "TALON")
+        transcript_dict = talon.make_transcript_dict(cursor)
 
-        #edge_IDs = (5)
-        #vertex_IDs = (5, 6)
-        #v_novelty = (0, 0)
+        edge_IDs = (5,)
+        vertex_IDs = (5, 6)
+        v_novelty = (0, 0)
 
-        #gene_ID, transcript_ID, novelty = talon.process_ISM(edge_IDs, vertex_IDs,
-        #                                              v_novelty, transcript_dict,
-        #                                              run_info)
+        gene_ID, transcript_ID, novelty = talon.process_ISM(edge_IDs, vertex_IDs,
+                                                            transcript_dict,
+                                                            run_info)
 
-        #correct_gene_ID = fetch_correct_ID("TG1", "gene", cursor)
-        #assert gene_ID == correct_gene_ID
+        correct_gene_ID = fetch_correct_ID("TG1", "gene", cursor)
+        assert gene_ID == correct_gene_ID
         #assert novelty == [('TALON-5', 'ISM', '1'), ('TALON-5', 'ISM_suffix', '1')]
         conn.close()
 

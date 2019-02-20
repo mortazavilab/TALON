@@ -30,7 +30,7 @@ class TestIdentifyFSM(object):
         correct_transcript_ID = fetch_correct_ID("TG1-001", "transcript", cursor)
         assert gene_ID == correct_gene_ID
         assert transcript_ID == correct_transcript_ID
-        assert novelty == None
+        assert novelty == []
         conn.close()
 
     def test_FSM_end_diff(self):
