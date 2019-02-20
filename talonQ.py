@@ -664,11 +664,11 @@ def process_NIC(edge_IDs, vertex_IDs, strand, transcript_dict, vertex_2_gene, ru
         same-strand genes. """
 
     gene_matches = []
-    for vertex in vertex_IDs[1:-1]:
+    for vertex in vertex_IDs:
         curr_matches = vertex_2_gene[vertex]
 
         # Make sure the gene is on the correct strand
-        gene_matches += [ x[0] for x in curr_matches if x[1] == strand ]
+        gene_matches += [ x[0] for x in list(curr_matches) if x[1] == strand ]
 
     # Now count up how often we see each gene
     gene_tally = dict((x,gene_matches.count(x)) for x in set(gene_matches))
@@ -724,7 +724,7 @@ def update_vertex_2_gene(gene_ID, vertex_IDs, strand, vertex_2_gene):
     return
             
 
-def identify_transcript(chrom, positions, strand, location_dict, edge_dict,
+def identify_transcript(chrom, positions, strand, cursor, location_dict, edge_dict,
                         transcript_dict, vertex_2_gene, run_info):
     """ Inputs:
         - Information about the query transcript
@@ -747,7 +747,7 @@ def identify_transcript(chrom, positions, strand, location_dict, edge_dict,
     """
     gene_novelty = []
     transcript_novelty = []
-    n_exons = (len(positions) + 1)/2.0
+    n_exons = len(positions)/2.0
  
     # Get vertex matches for the transcript positions
     vertex_IDs, v_novelty, diff_5p, diff_3p = match_all_transcript_vertices(
@@ -764,9 +764,12 @@ def identify_transcript(chrom, positions, strand, location_dict, edge_dict,
     # Check novelty of exons and splice jns. This will help us categorize 
     # what type of novelty the transcript has
     all_SJs_known = check_all_SJs_known(e_novelty)
+    all_exons_known = check_all_exons_known(e_novelty)
     splice_vertices_known = (sum(v_novelty[1:-1]) == 0)
     all_exons_novel = (reduce(operator.mul, e_novelty, 1) == 1)
 
+    print(all_exons_known)
+    print(n_exons)
     # Look for FSM or ISM. This includes monoexonic cases where the exon is 
     # known
     if all_SJs_known or (n_exons == 1 and all_exons_known):
@@ -786,9 +789,12 @@ def identify_transcript(chrom, positions, strand, location_dict, edge_dict,
     # but new connections between them. 
     elif splice_vertices_known and n_exons > 1 and not(all_exons_novel):
         print("Transcript is definitely Novel in Catalog (NIC)")
-        gene_ID, transcript_ID, transcript_novelty = talon.process_NIC(edge_IDs, vertex_IDs,
-                                                      v_novelty, transcript_dict,
-                                                      vertex_2_gene, run_info)
+        gene_ID, transcript_ID, transcript_novelty = process_NIC(edge_IDs, 
+                                                                 vertex_IDs, 
+                                                                 strand, 
+                                                                 transcript_dict, 
+                                                                 vertex_2_gene, 
+                                                                 run_info)
     
     # Antisense transcript with splice junctions matching known gene
     elif splice_vertices_known and n_exons > 1:
@@ -798,7 +804,7 @@ def identify_transcript(chrom, positions, strand, location_dict, edge_dict,
             anti_strand = "+"
         anti_gene_ID = find_gene_match_on_vertex_basis(vertex_IDs, anti_strand, 
                                                        vertex_2_gene)
-        gene_ID = create_gene(chromosome, positions[0], positions[-1], 
+        gene_ID = create_gene(chrom, positions[0], positions[-1], 
                               strand, cursor, run_info) 
         transcript_ID = create_transcript(gene_ID, edge_IDs, vertex_IDs,
                                          transcript_dict, run_info)["transcript_ID"]
@@ -917,14 +923,15 @@ def main():
 
     # TODO: process input sam files
 
-    chrom = "chr2"
+    chrom = "chr1"
     strand = "+"
     read_ID = "toy_read"
-    positions = ( 1, 100, 500, 600, 900, 1500 )
+    positions = ( 1, 100, 900, 1000 )
 
 
-    annotation = identify_transcript(chrom, positions, strand, location_dict, edge_dict,
-                        transcript_dict, vertex_2_gene, run_info)
+    annotation = identify_transcript(chrom, positions, strand, cursor, 
+                                     location_dict, edge_dict, transcript_dict, 
+                                     vertex_2_gene, run_info)
     print(annotation)
     conn.close()
 
