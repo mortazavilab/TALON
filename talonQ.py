@@ -8,6 +8,7 @@
 import argparse
 import sqlite3
 import dstruct
+import operator
 
 def get_args():
     """ Fetches the arguments for the program """
@@ -111,9 +112,6 @@ def make_temp_novel_gene_table(cursor, build):
         The purpose is to track novel genes from this run in order to match
         transcripts to them when other forms of gene assignment have failed.
     """
-    #conn = sqlite3.connect(":memory:")
-    #cursor = conn.cursor()
-
     command = """ CREATE TEMPORARY TABLE IF NOT EXISTS temp_gene AS 
                   SELECT gene_ID,
                     chromosome,
@@ -131,13 +129,6 @@ def make_temp_novel_gene_table(cursor, build):
                        WHERE loc.genome_build = '%s'
                        GROUP BY g.gene_ID); """
 
-    #command = """ CREATE TABLE IF NOT EXISTS temp_gene (
-    #            gene_ID INTEGER,
-    #            chromosome TEXT,
-    #            start INTEGER,
-    #            end TEXT,
-    #            strand TEXT
-    #            ); """
     cursor.execute(command % (build))
     return
 
@@ -585,8 +576,7 @@ def search_for_transcript(edge_IDs, transcript_dict):
     except:
         return None, None
 
-def process_FSM(edge_IDs, vertex_IDs, vertex_novelties, transcript_dict,
-                       run_info ):
+def process_FSM(edge_IDs, vertex_IDs, transcript_dict, run_info ):
     """ Given a transcript, try to find an FSM gene and transcript match for it. 
         Also delineate its type(s) of 5' and 3' novelty if applicable, which 
         will later be added to the database. In the case of an FSM with end 
@@ -617,17 +607,12 @@ def process_FSM(edge_IDs, vertex_IDs, vertex_novelties, transcript_dict,
 
         transcript_IDs = ",".join([str(match[0]) for match in transcript_matches])
         novelty.append((novel_transcript['transcript_ID'],"FSM", transcript_IDs))
-        if vertex_novelties[0] == 1:
-            novelty.append(((novel_transcript["transcript_ID"],"5p", None)))
-        if vertex_novelties[-1] == 1:
-            novelty.append(((novel_transcript["transcript_ID"],"3p", None)))
                 
         return gene_ID, novel_transcript["transcript_ID"], novelty
 
     return None,None,None
 
-def process_ISM(edge_IDs, vertex_IDs, vertex_novelties, transcript_dict, 
-                       run_info ):
+def process_ISM(edge_IDs, vertex_IDs, transcript_dict, run_info ):
     """ Given a transcript, find the best gene and transcript match for it. 
         Also delineate its type(s) of novelty, which will later be added to 
         the database. If the transcript is identified as an ISM, a novel 
@@ -669,15 +654,9 @@ def process_ISM(edge_IDs, vertex_IDs, vertex_novelties, transcript_dict,
         novelty.append(((novel_transcript["transcript_ID"], "ISM_prefix",
                          prefix_IDs)))
 
-    # Check on ends:
-    if vertex_novelties[0] == 1:
-        novelty.append(((novel_transcript["transcript_ID"],"5p", None)))
-    if vertex_novelties[-1] == 1:
-        novelty.append(((novel_transcript["transcript_ID"],"3p", None)))
-
     return gene_ID, novel_transcript["transcript_ID"], novelty
     
-def process_NIC(edge_IDs, vertex_IDs, vertex_novelties, strand, transcript_dict, vertex2gene, run_info):
+def process_NIC(edge_IDs, vertex_IDs, strand, transcript_dict, vertex2gene, run_info):
     """ For a transcript that has been determined to be novel in catalog, find
         the proper gene match (documenting fusion event if applicable). To do 
         this, look up each vertex in the vertex2gene dict, and keep track of all
@@ -703,45 +682,46 @@ def process_NIC(edge_IDs, vertex_IDs, vertex_novelties, strand, transcript_dict,
                                          transcript_dict, run_info)
     novelty = [(novel_transcript["transcript_ID"], "NIC", None)]
 
-    # Deal with novelty on the ends
-    # Check on ends:
-    if vertex_novelties[0] == 1:
-        novelty.append(((novel_transcript["transcript_ID"],"5p", None)))
-        vertex2gene[vertex_IDs[0]] = (gene_ID, strand)
-    if vertex_novelties[-1] == 1:
-        novelty.append(((novel_transcript["transcript_ID"],"3p", None)))
-        vertex2gene[vertex_IDs[-1]] = (gene_ID, strand)
     return gene_ID, novel_transcript["transcript_ID"], novelty    
 
 
-def find_antisense_match(vertex_IDs, strand, vertex2gene):
-    """ For a transcript with known vertices but not known edges, find the
-        gene that it is antisense to for annotation purposes, if one exists"""
+def find_gene_match_on_vertex_basis(vertex_IDs, strand, vertex2gene):
+    """ Use vertices in a transcript to try to pinpoint the gene it belongs to.
+    """
 
     gene_matches = []
-    for vertex in vertex_IDs[1:-1]:
-        curr_matches = vertex2gene[vertex]
+    for vertex in vertex_IDs: 
+        if vertex in vertex2gene:
+            curr_matches = vertex2gene[vertex]
 
-        # Make sure the gene is on the opposite strand
-        gene_matches += [ x[0] for x in curr_matches if x[1] != strand ]
+            # Make sure the gene is on the correct strand
+            gene_matches += [ x[0] for x in curr_matches if x[1] == strand ]
+
+    if len(gene_matches) == 0:
+        return None
 
     # Now count up how often we see each gene
     gene_tally = dict((x,gene_matches.count(x)) for x in set(gene_matches))
+    
+    # TODO: deal with fusions
 
     # For the main assignment, pick the gene that is observed the most
-    anti_gene_ID = max(gene_tally, key=gene_tally.get)
+    gene_ID = max(gene_tally, key=gene_tally.get)
 
-    # Create a novel gene
-    #gene_ID = create_novel_gene() 
-    #gene_novelty = [(gene_ID, "antisense", anti_gene_ID)]
+    return gene_ID
 
-    # Create a novel transcript
-    #novel_transcript = create_transcript(gene_ID, edge_IDs, vertex_IDs,
-    #                                     transcript_dict, run_info)
-    #transcript_ID = novel_transcript["transcript_ID"]
-    #transcript_novelty = [(novel_transcript["transcript_ID"], "antisense", None)]
+def update_vertex2gene(gene_IDs, vertex_IDs, strand, vertex2gene):
+    """ Add all vertices with gene pairings to vertex2gene dict """
 
-    return anti_gene_ID
+    for vertex in vertex_IDs:
+        if vertex in vertex2gene:
+            vertex2gene[vertex].add((gene, strand))
+        else:
+            vertex2gene[vertex] = set()
+            vertex2gene[vertex].add((gene, strand))
+
+    return
+            
 
 def identify_transcript(read_ID, chrom, positions, strand, location_dict, edge_dict,
                         transcript_dict, vertex_2_gene, run_info):
@@ -784,6 +764,7 @@ def identify_transcript(read_ID, chrom, positions, strand, location_dict, edge_d
     all_SJs_known = check_all_SJs_known(e_novelty)
     splice_vertices_known = (sum(v_novelty[1:-1]) == 0)
     ends_novel = (e_novelty[0] + e_novelty[-1]) > 0
+    all_exons_novel = (reduce(operator.mul, e_novelty, 1) == 1)
 
     # Look for FSM or ISM. This includes monoexonic cases where the exon is 
     # known
@@ -800,36 +781,87 @@ def identify_transcript(read_ID, chrom, positions, strand, location_dict, edge_d
                                                              v_novelty,
                                                              transcript_dict,
                                                              run_info)        
-        return gene_ID, transcript_ID, novelty
 
     # Novel in catalog transcripts have known splice donors and acceptors,
     # but new connections between them. 
-
-    # If we're only checking vertices here, then it is possible to get 
-    # antisense transcripts that have splice junctions
     elif splice_vertices_known and n_exons > 1 and sum(e_novelty[1:-1] == 0):
         print("Transcript is definitely Novel in Catalog (NIC)")
-        # Theoretically these exons could come from different genes, so I
-        # need to be prepared to handle that.
         gene_ID, transcript_ID, novelty = talon.process_NIC(edge_IDs, vertex_IDs,
                                                       v_novelty, transcript_dict,
                                                       vertex2gene, run_info)
     
     # Antisense transcript with splice junctions matching known gene
     elif splice_vertices_known and n_exons > 1:
-        # TODO: need to create novel gene and novel transcript. Need gene data struct for that. 
-        gene_ID, transcript_ID, gene_novelty, novelty = talon.process_antisense_NIC(edge_IDs, vertex_IDs,
-                                                                              v_novelty, transcript_dict,
-                                                                              vertex2gene, run_info)
+        if strand == "+":
+            anti_strand = "-"
+        else:
+            anti_strand = "+"
+        anti_gene_ID = find_gene_match_on_vertex_basis(vertex_IDs, anti_strand, 
+                                                       vertex2gene)
+        gene_ID = create_gene(chromosome, positions[0], positions[-1], 
+                              strand, cursor, run_info) 
+        transcript_ID = create_transcript(gene_ID, edge_IDs, vertex_IDs,
+                                         transcript_dict, run_info)["transcript_ID"]
+
+        gene_novelty = [(gene_ID, "antisense", anti_gene_ID)]
+        transcript_novelty = [(transcript_ID, "antisense", anti_gene_ID)]
 
     # Novel not in catalog transcripts contain new splice donors/acceptors
     # and contain at least one splice junction. They may belong to an existing
     # gene, but not necessarily.
-    elif not(splice_vertices_known) and n_exons > 1:
-      
+    elif not(splice_vertices_known) and n_exons > 1 and not(all_exons_novel): 
         print("Transcript is definitely Novel Not in Catalog (NNC)")
+        gene_ID = find_gene_match_on_vertex_basis(vertex_IDs, strand, vertex2gene)
+        transcript_ID = create_transcript(gene_ID, edge_IDs, vertex_IDs,
+                                         transcript_dict, run_info)["transcript_ID"]
+        transcript_novelty = [(transcript_ID, "NNC", None)]
+
+    # Transcripts that don't match the previous categories end up here
     else:
         print("Transcript is genomic and/or antisense")
+
+        gene_novelty = []
+        transcript_novelty = []
+        gene_ID, match_strand = search_for_overlap_with_gene(chrom, pos[0],
+                                                             pos[1], strand, 
+                                                             cursor, run_info)
+        if gene_ID == None:
+            gene_ID = create_gene(chromosome, positions[0], positions[-1],
+                              strand, cursor, run_info)
+            gene_novelty.append((gene_ID, "intergenic", None))
+
+        elif match_strand != strand:
+            anti_gene_ID = gene_ID
+            gene_ID = create_gene(chromosome, positions[0], positions[-1],
+                              strand, cursor, run_info)
+            gene_novelty.append((gene_ID, "antisense", anti_gene_ID))         
+
+        transcript_ID = create_transcript(gene_ID, edge_IDs, vertex_IDs,
+                                         transcript_dict, run_info)["transcript_ID"]
+        if match_strand != strand:
+            transcript_novelty.append((transcript_ID, "antisense", anti_gene_ID))
+        else:
+            transcript_novelty.append((transcript_ID, "genomic", None)) 
+       
+    # Add all novel vertices to vertex2gene now that we have the gene ID
+    update_vertex2gene(gene_IDs, vertex_IDs, strand, vertex2gene)
+ 
+    # Process 5' and 3' end novelty on relevant transcripts
+    if vertex_novelties[0] == 1:
+        novelty.append(((novel_transcript["transcript_ID"],"5p", None)))
+    if vertex_novelties[-1] == 1:
+        novelty.append(((novel_transcript["transcript_ID"],"3p", None)))
+
+    # Package up information for output
+    annotations = {'gene_ID': gene_ID,
+                   'transcript_ID': transcript_ID,
+                   'gene_novelty': gene_novelty,
+                   'transcript_novelty': transcript_novelty,
+                   'start_vertex': vertex_IDs[0],
+                   'end_vertex': vertex_IDs[-1],
+                   'start_delta': diff_5p,
+                   'end_delta': diff_3p}
+    return annotations
 
 def check_inputs(options):
     """ Checks the input options provided by the user and makes sure that

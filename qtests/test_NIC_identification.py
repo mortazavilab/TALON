@@ -26,7 +26,7 @@ class TestIdentifyNIC(object):
         v_novelty = (0, 0, 0, 0)
 
         gene_ID, transcript_ID, novelty = talon.process_NIC(edge_IDs, vertex_IDs,
-                                                      v_novelty, strand, transcript_dict,
+                                                      strand, transcript_dict,
                                                       vertex2gene, run_info)
 
         correct_gene_ID = fetch_correct_ID("TG1", "gene", cursor)
@@ -54,10 +54,13 @@ class TestIdentifyNIC(object):
         edge_IDs = (500, 200, 100) # Just arbitrary novel IDs
         vertex_IDs = (6, 5, 2, 1)
         strand = "-"
+        anti_strand = "+"
         v_novelty = (0, 0, 0, 0)
 
         # Find antisense match
-        anti_gene_ID = talon.find_antisense_match(vertex_IDs, strand, vertex2gene)
+        anti_gene_ID = talon.find_gene_match_on_vertex_basis(vertex_IDs, 
+                                                             anti_strand,
+                                                             vertex2gene)
 
         correct_gene_ID = fetch_correct_ID("TG1", "gene", cursor)
         assert anti_gene_ID == correct_gene_ID
