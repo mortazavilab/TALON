@@ -768,8 +768,6 @@ def identify_transcript(chrom, positions, strand, cursor, location_dict, edge_di
     splice_vertices_known = (sum(v_novelty[1:-1]) == 0)
     all_exons_novel = (reduce(operator.mul, e_novelty, 1) == 1)
 
-    print(all_exons_known)
-    print(n_exons)
     # Look for FSM or ISM. This includes monoexonic cases where the exon is 
     # known
     if all_SJs_known or (n_exons == 1 and all_exons_known):
@@ -810,7 +808,7 @@ def identify_transcript(chrom, positions, strand, cursor, location_dict, edge_di
                                          transcript_dict, run_info)["transcript_ID"]
 
         gene_novelty = [(gene_ID, "antisense", anti_gene_ID)]
-        transcript_novelty = [(transcript_ID, "antisense", anti_gene_ID)]
+        transcript_novelty = [(transcript_ID, "antisense", None)]
 
     # Novel not in catalog transcripts contain new splice donors/acceptors
     # and contain at least one splice junction. They may belong to an existing
@@ -825,8 +823,8 @@ def identify_transcript(chrom, positions, strand, cursor, location_dict, edge_di
     # Transcripts that don't match the previous categories end up here
     else:
         print("Transcript is genomic and/or antisense")
-        gene_ID, match_strand = search_for_overlap_with_gene(chrom, pos[0],
-                                                             pos[1], strand, 
+        gene_ID, match_strand = search_for_overlap_with_gene(chrom, positions[0],
+                                                             positions[1], strand, 
                                                              cursor, run_info)
         if gene_ID == None:
             gene_ID = create_gene(chromosome, positions[0], positions[-1],
@@ -837,7 +835,7 @@ def identify_transcript(chrom, positions, strand, cursor, location_dict, edge_di
             anti_gene_ID = gene_ID
             gene_ID = create_gene(chromosome, positions[0], positions[-1],
                               strand, cursor, run_info)
-            gene_novelty.append((gene_ID, "antisense", anti_gene_ID))         
+            gene_novelty.append((gene_ID, "antisense", None))         
 
         transcript_ID = create_transcript(gene_ID, edge_IDs, vertex_IDs,
                                          transcript_dict, run_info)["transcript_ID"]
@@ -926,7 +924,7 @@ def main():
     chrom = "chr1"
     strand = "+"
     read_ID = "toy_read"
-    positions = ( 1, 100, 900, 1000 )
+    positions = ( 1, 990)
 
 
     annotation = identify_transcript(chrom, positions, strand, cursor, 

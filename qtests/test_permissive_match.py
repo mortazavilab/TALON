@@ -120,3 +120,37 @@ class TestPermissiveMatch(object):
         assert end_diff == 30
         conn.close()    
 
+    def test_monexonic_edge_case(self):
+        """ Case I observed during testing where start and end accidentally 
+            ended up being assigned to the same vertex """
+        # TODO: solve this case. It isn't working right now.
+     
+        conn, cursor = get_db_cursor()
+        build = "toy_build"
+        location_dict = talon.make_location_dict(build, cursor)
+        run_info = talon.init_run_info(cursor, build, "TALON")
+
+        chrom = "chr1"
+        pos = [550, 610]
+        start = pos[0]
+        splice_pos = pos[1]
+        run_info.cutoff_5p = 500
+        run_info.cutoff_3p = 500
+        strand = "+"
+
+        start_match, start_diff = talon.permissive_vertex_search(chrom, start,
+                                                            strand, splice_pos,
+                                                            "start",
+                                                            location_dict,
+                                                            run_info)
+
+        end = pos[1]
+        splice_pos = pos[0]
+        end_match, end_diff = talon.permissive_vertex_search(chrom, end,
+                                                            strand, splice_pos,
+                                                            "end",
+                                                            location_dict,
+                                                            run_info)      
+
+        #assert start_match['location_ID'] == 3
+        #assert end_match['location_ID'] == 4
