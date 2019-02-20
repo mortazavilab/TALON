@@ -19,13 +19,26 @@ def get_args():
                       identifiers based on a database-bound annotation. 
                       Novel events are assigned new identifiers."""
     parser = argparse.ArgumentParser(description=program_desc)
+
+    parser.add_argument("--f", dest = "config_file",
+        help = "Dataset config file: dataset name, sample description, " + \
+               "platform, sam file (comma-delimited)", type = "string")
     parser.add_argument('--db', dest = 'database', metavar='FILE,', type=str,
-               help='TALON database. Created using build_talon_annotation.py')
+        help='TALON database. Created using build_talon_annotation.py')
     parser.add_argument('--build', dest = 'build', metavar='STRING,', type=str,
-               help='Genome build (i.e. hg38) to use. Must be in the database.')
+        help='Genome build (i.e. hg38) to use. Must be in the database.')
     parser.add_argument('--idprefix', dest = 'idprefix', metavar='STRING,', 
-               type=str, default = "TALON",
-               help='Optional: a prefix to use when creating novel IDs')
+        help='Optional: a prefix to use when creating novel IDs', type=str, 
+        default = "TALON")
+    parser.add_argument("--cov", "-c", dest = "min_coverage",
+        help = "Minimum alignment coverage in order to use a SAM entry. Default = 0.9",
+        type = "string", default = 0.9)
+    parser.add_argument("--identity", "-i", dest = "min_identity",
+        help = "Minimum alignment identity in order to use a SAM entry. Default = 0",
+        type = "string", default = 0)
+    parser.add_argument("--o", dest = "outprefix", help = "Prefix for output files",
+        metavar = "FILE", type = "string")
+
     args = parser.parse_args()
     return args
 
