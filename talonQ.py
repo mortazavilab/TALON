@@ -10,6 +10,7 @@ from functools import reduce
 import sqlite3
 import dstruct
 import operator
+import warnings
 
 def get_args():
     """ Fetches the arguments for the program """
@@ -22,22 +23,22 @@ def get_args():
 
     parser.add_argument("--f", dest = "config_file",
         help = "Dataset config file: dataset name, sample description, " + \
-               "platform, sam file (comma-delimited)", type = "string")
-    parser.add_argument('--db', dest = 'database', metavar='FILE,', type=str,
+               "platform, sam file (comma-delimited)", type = str)
+    parser.add_argument('--db', dest = 'database', metavar='FILE,', type = str,
         help='TALON database. Created using build_talon_annotation.py')
-    parser.add_argument('--build', dest = 'build', metavar='STRING,', type=str,
+    parser.add_argument('--build', dest = 'build', metavar='STRING,', type = str,
         help='Genome build (i.e. hg38) to use. Must be in the database.')
     parser.add_argument('--idprefix', dest = 'idprefix', metavar='STRING,', 
         help='Optional: a prefix to use when creating novel IDs', type=str, 
         default = "TALON")
     parser.add_argument("--cov", "-c", dest = "min_coverage",
         help = "Minimum alignment coverage in order to use a SAM entry. Default = 0.9",
-        type = "string", default = 0.9)
+        type = str, default = 0.9)
     parser.add_argument("--identity", "-i", dest = "min_identity",
         help = "Minimum alignment identity in order to use a SAM entry. Default = 0",
-        type = "string", default = 0)
+        type = str, default = 0)
     parser.add_argument("--o", dest = "outprefix", help = "Prefix for output files",
-        metavar = "FILE", type = "string")
+        type = str)
 
     args = parser.parse_args()
     return args
@@ -880,17 +881,58 @@ def identify_transcript(chrom, positions, strand, cursor, location_dict, edge_di
 def check_inputs(options):
     """ Checks the input options provided by the user and makes sure that
         they are valid. Throw an error with descriptive help message if not."""
+    # TODO: add tests to suite
 
     # Make sure that the genome build exists in the provided TALON database.
     conn = sqlite3.connect(options.database)
     cursor = conn.cursor()
     cursor.execute(""" SELECT DISTINCT name FROM genome_build """)
-    builds = cursor.fetchone()
+    builds = [ str(x[0]) for x in cursor.fetchall() ]
     if options.build not in builds:
         build_names = ", ".join(list(annot_builds))
         raise ValueError("Please specify a genome build that exists in the" +
                           " database. The choices are: " + build_names)
-    annot_builds = cursor.fetchall()
+
+    # Make sure that each input dataset is not already in the database, and
+    # also make sure that each dataset name is unique
+    sam_files = []
+    dataset_metadata = []
+    curr_datasets = []
+
+    cursor.execute(""" SELECT dataset_name FROM dataset """)
+    existing_datasets = [ str(x[0]) for x in cursor.fetchall() ]
+
+    with open(config_file, 'r') as f:
+        for line in f:
+            line = line.strip().split(',')
+            curr_sam = line[3]
+            if len(line) != 4:
+                raise ValueError('Incorrect number of comma-separated fields'+ \
+                                 ' in config file. There should be four: ' + \
+                                 '(dataset name, sample description, ' + \
+                                 'platform, associated sam file).')
+
+            metadata = (line[0], line[1], line[2])
+            dataname = metadata[0]
+            if dataname in existing_datasets:
+                warnings.warn("Ignoring dataset with name '" + dataname + \
+                              "' because it is already in the database.")
+            elif dataname in curr_datasets:
+                warnings.warn("Skipping duplicated instance of dataset '" + \
+                               dataname + "'.")
+            elif curr_sam in sam_files:
+                warnings.warn("Skipping duplicated instance of sam file '" + \
+                               curr_sam  + "'.")
+            else:
+                dataset_metadata.append(metadata)
+                curr_datasets.append(dataname)
+                if not curr_sam.endswith(".sam"):
+                    raise ValueError('Last field in config file must be a .sam file')
+                sam_files.append(curr_sam)      
+
+    conn.close()
+    return sam_files, dataset_metadata
+
 
 def init_run_info(cursor, genome_build):
     """ Initializes a dictionary that keeps track of important run information
@@ -919,38 +961,89 @@ def init_run_info(cursor, genome_build):
 
     return run_info
 
+def prepare_data_structures(cursor, build):
+    """ Initializes data structures needed for the run and organizes them
+        in a dictionary for more ease of use when passing them between functions
+    """
+
+    make_temp_novel_gene_table(cursor, build)
+    run_info = init_run_info(cursor, build)
+    location_dict = make_location_dict(build, cursor)
+    edge_dict = make_edge_dict(cursor)
+    transcript_dict = make_transcript_dict(cursor)
+    vertex_2_gene = make_vertex_2_gene_dict(cursor)
+   
+    struct_collection = dstruct.Struct() 
+    struct_collection['run_info'] = run_info
+    struct_collection['location_dict'] = location_dict
+    struct_collection['edge_dict'] = edge_dict
+    struct_collection['transcript_dict'] = transcript_dict
+    struct_collection['vertex_2_gene'] = vertex_2_gene 
+
+    return struct_collection
+
+def process_all_sam_files(sam_files, dataset_list, min_coverage, min_identity,
+                          struct_collection, outprefix):
+    """ Iterates over the provided sam files. """
+
+    novel_datasets = []
+    all_observed_transcripts = []
+    all_gene_annotations = []
+    all_transcript_annotations = []
+    all_abundance = []
+    all_ignored_reads = []
+
+    for sam, d_metadata in zip(sam_files, dataset_list):
+
+        # Create annotation entry for this dataset
+        struct_collection.run_info['datasets'] += 1
+        d_id = struct_collection.run_info['datasets']     
+        novel_datasets += [(d_id, d_metadata[0], d_metadata[1], d_metadata[2])]
+
+        # Now process the current sam file
+        observed_transcripts, gene_annotations, transcript_annotations, \
+        abundance, ignored_reads = annotate_sam_transcripts(sam, min_coverage, 
+                                                            min_identity,
+                                                            struct_collection) 
+        # Consolidate the outputs
+        all_observed_transcripts += observed_transcripts
+        all_gene_annotations += gene_annotations
+        all_transcript_annotations += transcript_annotations
+        all_abundance += abundance
+        all_ignored_reads += ignored_reads
+
+    return
  
 def main():
     """ Runs program """
 
     options = get_args()
-    check_inputs(options)
+    sam_files, dataset_list = check_inputs(options)
 
     # Fire up the database connection
-    conn = sqlite3.connect(options.database)
+    database = options.database
+    conn = sqlite3.connect(database)
     conn.row_factory = sqlite3.Row
     cursor = conn.cursor()
 
-    # Prepare data structures from the information stored in the database
-    make_temp_novel_gene_table(cursor, "toy_build")
-    run_info = init_run_info(cursor, options.build, options.idprefix)
-    location_dict = make_location_dict(options.build, cursor)
-    edge_dict = make_edge_dict(cursor)
-    transcript_dict = make_transcript_dict(cursor)
-    vertex_2_gene = make_vertex_2_gene_dict(cursor)
+    # Input parameters
+    build = options.build
+    min_coverage = float(options.min_coverage)
+    min_identity = float(options.min_identity)
+    outprefix = options.outprefix
 
-    # TODO: process input sam files
+    # Prepare data structures from the database content
+    print("Processing annotation...")
+    struct_collection = prepare_data_structures(cursor, build)
 
-    chrom = "chr1"
-    strand = "+"
-    read_ID = "toy_read"
-    positions = ( 1, 990)
+    # TODO: Read and annotate input sam files. Also, write output files.
+    process_all_sam_files(sam_files, dataset_list, min_coverage, min_identity,
+                          struct_collection, outprefix)
+    
+    # TODO: Update database
 
 
-    annotation = identify_transcript(chrom, positions, strand, cursor, 
-                                     location_dict, edge_dict, transcript_dict, 
-                                     vertex_2_gene, run_info)
-    print(annotation)
+
     conn.close()
 
 if __name__ == '__main__':
