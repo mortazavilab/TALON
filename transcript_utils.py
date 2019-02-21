@@ -97,3 +97,44 @@ def compute_transcript_end(start, cigar):
             end += ct
 
     return end - 1
+
+def compute_jI(start, cigar):
+    """ If the input sam file doesn't have the custom STARlong-derived jI tag,
+        we need to compute it. This is done by stepping through the CIGAR 
+        string, where introns are represented by the N operation.
+
+        start: The start position of the transcript with respect to the
+               forward strand
+        cigar: SAM CIGAR string describing match operations to the reference
+               genome
+        Returns: jI string representation of intron start and end positions.
+
+        Example jI strings:
+            no introns: jI:B:i,-1
+            two introns: jI:B:i,167936516,167951806,167951862,167966628
+    """
+
+    operations, counts = split_cigar(cigar)
+    jI = ["jI:B:i"]
+    genomePos = start
+
+    # Iterate over cigar operations
+    for op,ct in zip(operations, counts):
+        if op == "N":
+            # This is an intron
+            intronStart = genomePos
+            intronEnd = genomePos + ct - 1
+
+            jI.append(str(intronStart))
+            jI.append(str(intronEnd))
+
+        if op not in ["S", "I"]:
+            genomePos += ct
+
+    # If the transcript has no introns, add -1 to the tag
+    if len(jI) == 1:
+        jI.append("-1")
+
+    jIstr = ",".join(jI)
+    return jIstr
+

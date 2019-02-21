@@ -9,6 +9,7 @@ try:
        ["python", "../initialize_talon_database.py",
         "--f", "input_files/toy_transcript/toy_annot.gtf",
         "--a",  "toy_annot",
+        "--l", "0",
         "--g",  "toy_build", "--o", "scratch/toy"])
 except Exception as e:
     print(e)

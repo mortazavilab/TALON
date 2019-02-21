@@ -11,6 +11,7 @@ import sqlite3
 import dstruct
 import operator
 import warnings
+import transcript_utils as tutils
 
 def get_args():
     """ Fetches the arguments for the program """
@@ -28,9 +29,6 @@ def get_args():
         help='TALON database. Created using build_talon_annotation.py')
     parser.add_argument('--build', dest = 'build', metavar='STRING,', type = str,
         help='Genome build (i.e. hg38) to use. Must be in the database.')
-    parser.add_argument('--idprefix', dest = 'idprefix', metavar='STRING,', 
-        help='Optional: a prefix to use when creating novel IDs', type=str, 
-        default = "TALON")
     parser.add_argument("--cov", "-c", dest = "min_coverage",
         help = "Minimum alignment coverage in order to use a SAM entry. Default = 0.9",
         type = str, default = 0.9)
@@ -902,7 +900,7 @@ def check_inputs(options):
     cursor.execute(""" SELECT dataset_name FROM dataset """)
     existing_datasets = [ str(x[0]) for x in cursor.fetchall() ]
 
-    with open(config_file, 'r') as f:
+    with open(options.config_file, 'r') as f:
         for line in f:
             line = line.strip().split(',')
             curr_sam = line[3]
@@ -934,13 +932,15 @@ def check_inputs(options):
     return sam_files, dataset_metadata
 
 
-def init_run_info(cursor, genome_build):
+def init_run_info(cursor, genome_build, min_coverage = 0.9, min_identity = 0):
     """ Initializes a dictionary that keeps track of important run information
         such as the desired genome build, the prefix for novel identifiers,
         and the novel counters for the run. """
 
     run_info = dstruct.Struct()
     run_info.build = genome_build
+    run_info.min_coverage = min_coverage
+    run_info.min_identity = min_identity
 
     # Fetch information from run_info table
     cursor.execute("""SELECT * FROM run_info""")
@@ -961,13 +961,13 @@ def init_run_info(cursor, genome_build):
 
     return run_info
 
-def prepare_data_structures(cursor, build):
+def prepare_data_structures(cursor, build, min_coverage, min_identity):
     """ Initializes data structures needed for the run and organizes them
         in a dictionary for more ease of use when passing them between functions
     """
 
     make_temp_novel_gene_table(cursor, build)
-    run_info = init_run_info(cursor, build)
+    run_info = init_run_info(cursor, build, min_coverage, min_identity)
     location_dict = make_location_dict(build, cursor)
     edge_dict = make_edge_dict(cursor)
     transcript_dict = make_transcript_dict(cursor)
@@ -982,8 +982,7 @@ def prepare_data_structures(cursor, build):
 
     return struct_collection
 
-def process_all_sam_files(sam_files, dataset_list, min_coverage, min_identity,
-                          struct_collection, outprefix):
+def process_all_sam_files(sam_files, dataset_list, struct_collection, outprefix):
     """ Iterates over the provided sam files. """
 
     novel_datasets = []
@@ -993,18 +992,32 @@ def process_all_sam_files(sam_files, dataset_list, min_coverage, min_identity,
     all_abundance = []
     all_ignored_reads = []
 
+    # Initialize QC output file
+    qc_file = outprefix + "_talon_QC.log"
+    o = open(qc_file, 'w')
+    o.write("# TALON run filtering settings:\n")
+    o.write("# Fraction read aligned: " + \
+            str(struct_collection.run_info.min_coverage) + "\n")
+    o.write("# Min read identity to reference: " + \
+            str(struct_collection.run_info.min_identity) + "\n")
+    o.write("# Min transcript length: " + \
+            str(struct_collection.run_info.min_length) + "\n")
+    o.write("-------------------------------------------\n")
+    o.write("\t".join(["dataset", "read_ID", "passed_QC", "primary_mapped", 
+                       "read_length", "fraction_aligned", "identity"]) + "\n")
+
     for sam, d_metadata in zip(sam_files, dataset_list):
 
         # Create annotation entry for this dataset
-        struct_collection.run_info['datasets'] += 1
-        d_id = struct_collection.run_info['datasets']     
+        struct_collection.run_info['dataset'] += 1
+        d_id = struct_collection.run_info['dataset']     
         novel_datasets += [(d_id, d_metadata[0], d_metadata[1], d_metadata[2])]
 
         # Now process the current sam file
         observed_transcripts, gene_annotations, transcript_annotations, \
-        abundance, ignored_reads = annotate_sam_transcripts(sam, min_coverage, 
-                                                            min_identity,
-                                                            struct_collection) 
+        abundance, ignored_reads = annotate_sam_transcripts(sam, d_id, 
+                                   struct_collection, o)
+ 
         # Consolidate the outputs
         all_observed_transcripts += observed_transcripts
         all_gene_annotations += gene_annotations
@@ -1012,7 +1025,69 @@ def process_all_sam_files(sam_files, dataset_list, min_coverage, min_identity,
         all_abundance += abundance
         all_ignored_reads += ignored_reads
 
+    o.close()
+
     return
+
+def annotate_sam_transcripts(sam_file, dataset, struct_collection, QC_file):
+    """ Process sma transcripts and annotate the ones that pass QC """
+    
+    with open(sam_file) as sam:
+        for line in sam:
+            line = line.strip()
+
+            # Ignore header
+            if line.startswith("@"):
+                continue
+
+            # Check whether we should try annotating this read or not
+            qc_metrics = check_read_quality(line, struct_collection)
+            passed_qc = qc_metrics[1]
+            QC_file.write("\t".join([str(x) for x in [dataset] + qc_metrics]) \
+                          + "\n")
+
+            if not passed_qc:
+                continue
+
+            exit() 
+
+
+def check_read_quality(sam_read, struct_collection):
+    """ Process an individual sam read and return quality attributes. """
+
+    sam = sam_read.split("\t")
+    read_ID = sam[0]
+    flag = sam[1]
+    cigar = sam[5]
+    seq = sam[9]
+    read_length = len(seq)
+
+    # Only use uniquely mapped transcripts
+    if flag not in ["0", "16"]:
+        return [read_ID, 0, 0, read_length, "NA", "NA"]
+
+    # Only use reads that are greater than or equal to length threshold
+    if read_length < struct_collection.run_info.min_length:
+        return [read_ID, 0, 1, read_length, "NA", "NA"]
+
+    # Locate the MD field of the sam transcript
+    try:
+        md_index = [i for i, s in enumerate(sam) if s.startswith('MD:Z:')][0]
+    except:
+        raise ValueError("SAM transcript %s lacks an MD tag" % read_ID)
+
+    # Only use reads where alignment coverage and identity exceed
+    # cutoffs
+    coverage = tutils.compute_alignment_coverage(cigar)
+    identity = tutils.compute_alignment_identity(sam[md_index], seq)   
+ 
+    if coverage < struct_collection.run_info.min_coverage or \
+       identity < struct_collection.run_info.min_identity:
+        return [read_ID, 0, 1, read_length, coverage, identity]
+
+    # At this point, the read has passed the quality control
+    return [read_ID, 1, 1, read_length, coverage, identity]
+    
  
 def main():
     """ Runs program """
@@ -1034,11 +1109,12 @@ def main():
 
     # Prepare data structures from the database content
     print("Processing annotation...")
-    struct_collection = prepare_data_structures(cursor, build)
+    struct_collection = prepare_data_structures(cursor, build, min_coverage, 
+                                                min_identity)
 
     # TODO: Read and annotate input sam files. Also, write output files.
-    process_all_sam_files(sam_files, dataset_list, min_coverage, min_identity,
-                          struct_collection, outprefix)
+    print("Processing SAM files...")
+    process_all_sam_files(sam_files, dataset_list, struct_collection, outprefix)
     
     # TODO: Update database
 
