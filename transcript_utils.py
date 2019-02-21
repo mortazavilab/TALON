@@ -138,3 +138,33 @@ def compute_jI(start, cigar):
     jIstr = ",".join(jI)
     return jIstr
 
+def get_introns(fields, start, cigar):
+    """ Locates the jI field in a list of SAM fields or computes
+        it from the CIGAR string and start position if it isn't found.
+
+        Example jI strings:
+            no introns: jI:B:i,-1
+            two introns: jI:B:i,167936516,167951806,167951862,167966628
+        Args:
+            fields: List containing fields from a sam entry.
+            start: The start position of the transcript with respect to the
+            forward strand
+            cigar: SAM CIGAR string describing match operations to the reference
+            genome
+        Returns:
+            intron_list: intron starts and ends in a list (sorted order)
+    """
+    indices = [i for i, s in enumerate(fields) if 'jI:B:i' in s]
+
+    if len(indices) == 1:
+        jI = fields[indices[0]]
+    elif len(indices) == 0:
+        jI = compute_jI(start, cigar)
+    else:
+        raise ValueError('SAM entry contains more than one jI:B:i field')
+
+    intron_list = [int(x) for x in jI.split(",")[1:]]
+    if intron_list[0] == -1:
+        return []
+    else:
+        return intron_list

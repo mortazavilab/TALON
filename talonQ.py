@@ -982,7 +982,8 @@ def prepare_data_structures(cursor, build, min_coverage, min_identity):
 
     return struct_collection
 
-def process_all_sam_files(sam_files, dataset_list, struct_collection, outprefix):
+def process_all_sam_files(sam_files, dataset_list, cursor, struct_collection, 
+                          outprefix):
     """ Iterates over the provided sam files. """
 
     novel_datasets = []
@@ -990,7 +991,6 @@ def process_all_sam_files(sam_files, dataset_list, struct_collection, outprefix)
     all_gene_annotations = []
     all_transcript_annotations = []
     all_abundance = []
-    all_ignored_reads = []
 
     # Initialize QC output file
     qc_file = outprefix + "_talon_QC.log"
@@ -1015,23 +1015,26 @@ def process_all_sam_files(sam_files, dataset_list, struct_collection, outprefix)
 
         # Now process the current sam file
         observed_transcripts, gene_annotations, transcript_annotations, \
-        abundance, ignored_reads = annotate_sam_transcripts(sam, d_id, 
-                                   struct_collection, o)
+        abundance = annotate_sam_transcripts(sam, d_id, cursor, struct_collection, o)
  
         # Consolidate the outputs
         all_observed_transcripts += observed_transcripts
         all_gene_annotations += gene_annotations
         all_transcript_annotations += transcript_annotations
         all_abundance += abundance
-        all_ignored_reads += ignored_reads
 
     o.close()
 
     return
 
-def annotate_sam_transcripts(sam_file, dataset, struct_collection, QC_file):
-    """ Process sma transcripts and annotate the ones that pass QC """
-    
+def annotate_sam_transcripts(sam_file, dataset, cursor, struct_collection, QC_file):
+    """ Process SAM transcripts and annotate the ones that pass QC """
+
+    observed_transcripts = []
+    gene_annotations = []
+    transcript_annotations = []
+    abundance = {}
+
     with open(sam_file) as sam:
         for line in sam:
             line = line.strip()
@@ -1049,8 +1052,78 @@ def annotate_sam_transcripts(sam_file, dataset, struct_collection, QC_file):
             if not passed_qc:
                 continue
 
-            exit() 
+            # For transcripts that pass QC, parse the attributes to 
+            # determine the chromosome, positions, and strand of the transcript
+            try:
+                read_ID, chrom, positions, strand, read_length = parse_transcript(line) 
+            except:
+                warnings.warn("Problem parsing transcript '%s'. Skipping.." \
+                               % read_ID)
+                continue
 
+            # Now identify the transcript
+            try:
+                location_dict = struct_collection.location_dict
+                edge_dict = struct_collection.edge_dict
+                transcript_dict = struct_collection.transcript_dict
+                vertex_2_gene = struct_collection.vertex_2_gene
+                run_info = struct_collection.run_info
+                annotation_info = identify_transcript(chrom, positions, strand, 
+                                                      cursor, location_dict, 
+                                                      edge_dict, transcript_dict, 
+                                                      vertex_2_gene, run_info)
+            except:
+                warnings.warn("Problem idnetifying transcript '%s'. Skipping.."\
+                               % read_ID)
+                continue
+                            
+            exit()
+            # Now that transcript has been annotated, create an observed entry
+            struct_collection.run_info['observed'] += 1
+            obs_ID = struct_collection.run_info['observed'] 
+            observed = (obs_ID, gene_ID, transcript_ID, read_ID, dataset, 
+                        start_vertex_ID, end_vertex_ID, start_delta, 
+                        end_delta, read_length)
+            observed_transcripts.append(observed)
+
+            # Also add transcript to abundance dict
+            try:
+                abundance[transcript_ID] += 1
+            except:
+                abundance[transcript_ID] = 1
+
+def parse_transcript(sam_read):
+    """ Given a SAM transcript, parse the entry to obtain:
+           - read ID
+           - chromosome
+           - positions (start, splice sites, end) ordered from 5' to 3'
+           - strand
+           - read length
+    """
+    sam = sam_read.split("\t")
+    read_ID = sam[0]
+    flag = sam[1]
+    chromosome = sam[2]
+    sam_start = int(sam[3]) # Start is earliest alignment position
+    cigar = sam[5]
+    seq = sam[9]
+    read_length = len(seq) 
+    other_fields = sam[11:]
+
+    # Compute attributes
+    sam_end = tutils.compute_transcript_end(sam_start, cigar) 
+    splice_sites = tutils.get_introns(other_fields, sam_start, cigar)
+    positions = [sam_start] + splice_sites + [sam_end]
+
+    # Flip the positions order if the read is on the minus strand
+    if flag in [16, 272]:
+        strand = "-"
+        positions = positions[::-1]
+    else:
+        strand = "+"
+    
+    return read_ID, chromosome, positions, strand, read_length
+    
 
 def check_read_quality(sam_read, struct_collection):
     """ Process an individual sam read and return quality attributes. """
@@ -1114,7 +1187,8 @@ def main():
 
     # TODO: Read and annotate input sam files. Also, write output files.
     print("Processing SAM files...")
-    process_all_sam_files(sam_files, dataset_list, struct_collection, outprefix)
+    process_all_sam_files(sam_files, dataset_list, cursor, struct_collection, 
+                          outprefix)
     
     # TODO: Update database
 
