@@ -75,3 +75,25 @@ def split_cigar(cigar):
     counts = [int(i) for i in counts]
 
     return alignTypes, counts
+
+def compute_transcript_end(start, cigar):
+    """ Given the start position and CIGAR string of a mapped SAM transcript,
+        compute the end position in the reference genome.
+        Args:
+            start: The start position of the transcript with respect to the
+            forward strand
+
+            cigar: SAM CIGAR string describing match operations to the reference
+            genome
+
+        Returns:
+            end position of the transcript.
+    """
+    end = start
+
+    ops, counts = split_cigar(cigar)
+    for op,ct in zip(ops, counts):
+        if op in ["H", "M", "N", "D"]:
+            end += ct
+
+    return end - 1
