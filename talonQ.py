@@ -1079,7 +1079,8 @@ def process_all_sam_files(sam_files, dataset_list, cursor, struct_collection,
     #print(all_transcript_annotations)
     #print(all_gene_annotations)
     
-    return
+    return novel_datasets, all_observed_transcripts, all_gene_annotations, \
+           all_transcript_annotations, all_abundance
 
 def annotate_sam_transcripts(sam_file, dataset, cursor, struct_collection, QC_file):
     """ Process SAM transcripts and annotate the ones that pass QC """
@@ -1152,10 +1153,6 @@ def annotate_sam_transcripts(sam_file, dataset, cursor, struct_collection, QC_fi
                         start_vertex, end_vertex, start_delta, 
                         end_delta, read_length)
             observed_transcripts.append(observed)
-
-            # Output this read to a sam file with tags labeling the
-            # novelty thereof
-            # TODO
 
             # Also add transcript to abundance dict
             try:
@@ -1249,7 +1246,99 @@ def check_read_quality(sam_read, struct_collection):
     # At this point, the read has passed the quality control
     return [read_ID, 1, 1, read_length, coverage, identity]
     
- 
+def update_database(cursor, batch_size, novel_datasets, observed_transcripts, 
+                    gene_annotations, transcript_annotations, abundance, 
+                    struct_collection):
+    """ Adds new entries to the database. """
+
+   
+    print("Updating abundance table....")
+    batch_add_abundance(cursor, abundance, batch_size) 
+
+    print("Updating observed transcript table...")
+    batch_add_observed(cursor, observed_transcripts, batch_size)
+
+    print("Updating gene, transcript, and exon annotations...")
+    batch_add_annotations(cursor, gene_annotations, "gene", batch_size)
+    batch_add_annotations(cursor, transcript_annotations, "transcript", batch_size)
+    batch_add_annotations(cursor, exon_annotations, "exon", batch_size)
+
+def batch_add_annotations(cursor, annotations, annot_type, batch_size):
+    """ Add gene/transcript/exon annotations to the appropriate annotation table
+    """
+
+    if annot_type not in ["gene", "transcript", "exon"]:
+        raise ValueError("When running batch annot update, must specify " + \
+                         "annot_type as 'gene', 'exon', or 'transcript'.")
+
+    index = 0
+    while index < len(annotations):
+        try:
+            batch = annotations[index:index + batch_size]
+        except:
+            batch = annotations[index:]
+        index += batch_size
+
+        try:
+            cols = " (" + ", ".join([str_wrap_double(x) for x in
+                   ["ID", "annot_name", "source", "attribute", "value"]]) + ") "
+            command = 'INSERT INTO "' + annot_type + '_annotations" ' + cols + \
+                      "VALUES " + '(?,?,?,?,?)'
+            cursor.executemany(command, batch)
+
+        except Exception as e:
+            print(e)
+    return
+
+def batch_add_observed(cursor, observed, batch_size):
+    """ Adds observed tuples (obs_ID, gene_ID, transcript_ID, read_name,
+        dataset, start_vertex_ID, end_vertex_ID, start_delta, end_delta, 
+        read_length) to observed table of database. """
+
+    index = 0
+    while index < len(observed):
+        try:
+            batch = observed[index:index + batch_size]
+        except:
+            batch = observed[index:]
+        index += batch_size
+
+        # Add to database
+        try:
+            cols = " (" + ", ".join([str_wrap_double(x) for x in
+                   ["obs_ID", "gene_ID", "transcript_ID", "read_name",
+                    "dataset", "start_vertex_ID", "end_vertex_ID",
+                    "start_delta", "end_delta", "read_length"]]) + ") "
+            command = 'INSERT INTO "observed"' + cols + \
+                      "VALUES " + '(?,?,?,?,?,?,?,?,?,?)'
+            cursor.executemany(command, batch)
+
+        except Exception as e:
+            print(e)
+    return
+
+def batch_add_abundance(cursor, abundances, batch_size):
+    """ Adds abundance tuples (transcript_ID, dataset, count) to the abundance
+        table of the database """
+
+    index = 0
+    while index < len(abundances):
+        try:
+            batch = abundances[index:index + batch_size]
+        except:
+            batch = abundances[index:]
+        index += batch_size
+
+        try:
+            cols = " (" + ", ".join([str_wrap_double(x) for x in
+                   ["transcript_id", "dataset", "count"]]) + ") "
+            command = 'INSERT INTO "abundance"' + cols + "VALUES " + '(?,?,?)'
+            cursor.executemany(command, batch)
+        except Exception as e:
+            print(e)
+    return 
+
+
 def main():
     """ Runs program """
 
@@ -1275,12 +1364,23 @@ def main():
 
     # TODO: Read and annotate input sam files. Also, write output files.
     print("Processing SAM files...")
-    process_all_sam_files(sam_files, dataset_list, cursor, struct_collection, 
-                          outprefix)
-    
+    novel_datasets, observed_transcripts, gene_annotations, \
+    transcript_annotations, abundance = process_all_sam_files(sam_files, 
+                                                                   dataset_list, 
+                                                                         cursor, 
+                                                              struct_collection, 
+                                                                      outprefix)
     # TODO: Update database
+    batch_size = 10000
+    update_database(cursor, batch_size, novel_datasets, observed_transcripts, 
+                    gene_annotations, transcript_annotations, abundance, 
+                    struct_collection)
 
+    # Validate database
 
+    # conn.commit()
+
+    # Generate output files if desired
 
     conn.close()
 
