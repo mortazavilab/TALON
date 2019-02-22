@@ -25,3 +25,14 @@ try:
 except Exception as e:
     print(e)
     sys.exit("Database initialization failed on Canx annotation")
+
+try:
+    subprocess.check_output(
+       ["python", "../initialize_talon_database.py",
+        "--f", "input_files/Map2k4_example/Map2k4.gtf",
+        "--a",  "gencodeM7",
+        "--l", "0",
+        "--g",  "mm10", "--o", "scratch/Map2k4"])
+except Exception as e:
+    print(e)
+    sys.exit("Database initialization failed on Map2k4 annotation")

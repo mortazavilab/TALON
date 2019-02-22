@@ -269,3 +269,44 @@ class TestIdentifyFSM(object):
         assert annotation['end_delta'] == 10
         conn.close()        
 
+    def test_NIC_with_all_known_edges(self):
+        """ Test case derived from a real mouse Map2k4 read. All of edges are
+            known (except 3'), yet the read is NIC not FSM/ISM """
+
+        conn = sqlite3.connect("scratch/Map2k4.db")
+        conn.row_factory = sqlite3.Row
+        cursor = conn.cursor()        
+        build = "mm10"
+        talon.make_temp_novel_gene_table(cursor, build)
+        edge_dict = talon.make_edge_dict(cursor)
+        location_dict = talon.make_location_dict(build, cursor)
+        run_info = talon.init_run_info(cursor, build)
+        transcript_dict = talon.make_transcript_dict(cursor)
+        vertex_2_gene = talon.make_vertex_2_gene_dict(cursor)
+        
+
+        chrom = "chr11"
+        strand = "-"
+        positions = (65788254, 65788136, 65775765, 65775733, 65756371, 65756269, 65735366, 65735192, 65719603, 65719484, 65712297, 65712178, 65709983, 65709932, 65707111, 65706984, 65696365, 65696288, 65693570, 65693422, 65691773, 65691728, 65690804, 65689322)
+      
+        annotation = talon.identify_transcript(chrom, positions, strand, cursor,
+                                               location_dict, edge_dict,
+                                               transcript_dict, vertex_2_gene,
+                                               run_info)
+
+        assert annotation['gene_ID'] == 1
+        assert annotation['transcript_ID'] == 8
+        novelty_types = [ x[-2] for x in annotation['transcript_novelty']]
+        assert "NIC_transcript" in novelty_types
+        assert "3p_novel" in novelty_types
+
+        conn.close()
+
+
+
+
+
+
+
+
+

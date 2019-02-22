@@ -50,11 +50,20 @@ def make_transcript_dict(cursor):
     """ Format of dict:
             Key: tuple consisting of edges in transcript path
             Value: SQLite3 row from transcript table
-         Note: if we later want to add novelty designation or other annotation
-         info to the transcript table, this is a very good place to do that.
+         This query returns the novelty designation of the transcript in 
+         addition to basic attributes (KNOWN if transcript is known, None
+         otherwise).
     """
     transcript_dict = {}
     query = """SELECT * FROM transcripts """
+    #query = """ SELECT t.*, 
+    #                   ta.value AS annot_status 
+    #	            FROM transcripts AS t
+    #	            LEFT JOIN transcript_annotations AS ta 
+    #                    ON t.transcript_ID = ta.ID
+    #	            AND ta.attribute = 'transcript_status' 
+    #                AND ta.value = 'KNOWN'
+    #        """
     cursor.execute(query)
     for transcript in cursor.fetchall():
         transcript_path = transcript["path"].split(",")
@@ -598,7 +607,6 @@ def process_FSM(edge_IDs, vertex_IDs, transcript_dict, run_info ):
         novel_transcript = create_transcript(gene_ID, edge_IDs, vertex_IDs,
                                              transcript_dict, run_info)
 
-        print(transcript_matches)
         transcript_IDs = ",".join([str(match["transcript_ID"]) for match in transcript_matches])
         novelty.append((novel_transcript['transcript_ID'], run_info.idprefix, 
                         "TALON", "FSM_transcript", "TRUE"))
@@ -766,7 +774,6 @@ def identify_transcript(chrom, positions, strand, cursor, location_dict, edge_di
     edge_IDs, e_novelty = match_all_transcript_edges(vertex_IDs, strand,
                                                      edge_dict, run_info)
 
-
     # Check novelty of exons and splice jns. This will help us categorize 
     # what type of novelty the transcript has
     all_SJs_known = check_all_SJs_known(e_novelty)
@@ -777,22 +784,32 @@ def identify_transcript(chrom, positions, strand, cursor, location_dict, edge_di
     # Look for FSM or ISM. This includes monoexonic cases where the exon is 
     # known
     if all_SJs_known or (n_exons == 1 and all_exons_known):
-        print("Transcript is either an FSM or an ISM")
+        #print("Transcript is either an FSM or an ISM")
         # Look for FSM first
         gene_ID, transcript_ID, transcript_novelty = process_FSM(edge_IDs, vertex_IDs, 
                                                              transcript_dict,
                                                              run_info) 
         if gene_ID == None:
             # Look for ISM
-            "No FSM found, so looking for ISM..."
+            #print("No FSM found, so looking for ISM...")
             gene_ID, transcript_ID, transcript_novelty = process_ISM(edge_IDs, vertex_IDs,
                                                              transcript_dict,
-                                                             run_info)        
-
+                                                             run_info)   
+        # There are rare NIC cases where all of the edges are known, but the
+        # transcript arrangement is still novel (i.e. Map2k4 case)   
+        if gene_ID == None:
+            #print("No ISM found, so looking for NIC...")
+            gene_ID, transcript_ID, transcript_novelty = process_NIC(edge_IDs,
+                                                                 vertex_IDs,
+                                                                 strand,
+                                                                 transcript_dict,
+                                                                 vertex_2_gene,
+                                                                 run_info)
+           
     # Novel in catalog transcripts have known splice donors and acceptors,
     # but new connections between them. 
     elif splice_vertices_known and n_exons > 1 and not(all_exons_novel):
-        print("Transcript is definitely Novel in Catalog (NIC)")
+        #print("Transcript is definitely Novel in Catalog (NIC)")
         gene_ID, transcript_ID, transcript_novelty = process_NIC(edge_IDs, 
                                                                  vertex_IDs, 
                                                                  strand, 
@@ -824,7 +841,7 @@ def identify_transcript(chrom, positions, strand, cursor, location_dict, edge_di
     # and contain at least one splice junction. They may belong to an existing
     # gene, but not necessarily.
     elif not(splice_vertices_known) and n_exons > 1 and not(all_exons_novel): 
-        print("Transcript is definitely Novel Not in Catalog (NNC)")
+        #print("Transcript is definitely Novel Not in Catalog (NNC)")
         gene_ID = find_gene_match_on_vertex_basis(vertex_IDs, strand, vertex_2_gene)
         transcript_ID = create_transcript(gene_ID, edge_IDs, vertex_IDs,
                                          transcript_dict, run_info)["transcript_ID"]
@@ -833,7 +850,7 @@ def identify_transcript(chrom, positions, strand, cursor, location_dict, edge_di
 
     # Transcripts that don't match the previous categories end up here
     else:
-        print("Transcript is genomic and/or antisense")
+        #print("Transcript is genomic and/or antisense")
         gene_ID, match_strand = search_for_overlap_with_gene(chrom, positions[0],
                                                              positions[1], strand, 
                                                              cursor, run_info)
@@ -1023,6 +1040,7 @@ def process_all_sam_files(sam_files, dataset_list, cursor, struct_collection,
     all_observed_transcripts = []
     all_gene_annotations = []
     all_transcript_annotations = []
+    all_exon_annotations = []
     all_abundance = []
 
     # Initialize QC output file
@@ -1048,12 +1066,13 @@ def process_all_sam_files(sam_files, dataset_list, cursor, struct_collection,
 
         # Now process the current sam file
         observed_transcripts, gene_annotations, transcript_annotations, \
-        abundance = annotate_sam_transcripts(sam, d_id, cursor, struct_collection, o)
+        exon_annotations, abundance = annotate_sam_transcripts(sam, d_id, cursor, struct_collection, o)
  
         # Consolidate the outputs
         all_observed_transcripts += observed_transcripts
         all_gene_annotations += gene_annotations
         all_transcript_annotations += transcript_annotations
+        all_exon_annotations += exon_annotations
         all_abundance += abundance
 
     o.close()
@@ -1104,15 +1123,16 @@ def annotate_sam_transcripts(sam_file, dataset, cursor, struct_collection, QC_fi
             transcript_dict = struct_collection.transcript_dict
             vertex_2_gene = struct_collection.vertex_2_gene
             run_info = struct_collection.run_info
-            #try:
-            annotation_info = identify_transcript(chrom, positions, strand, 
+            try:
+                annotation_info = identify_transcript(chrom, positions, strand, 
                                                       cursor, location_dict, 
                                                       edge_dict, transcript_dict, 
                                                       vertex_2_gene, run_info)
-            #except:
-            #    warnings.warn("Problem identifying transcript '%s'. Skipping.."\
-            #                   % read_ID)
-            #    continue
+            except:
+                warnings.warn("Problem identifying transcript '%s'. Skipping.."\
+                               % read_ID)
+                exit()
+                continue
                             
             # Now that transcript has been annotated, unpack values and 
             # create an observed entry and abundance record
@@ -1146,6 +1166,7 @@ def annotate_sam_transcripts(sam_file, dataset, cursor, struct_collection, QC_fi
             # Update annotation records
             gene_annotations += gene_novelty
             transcript_annotations += transcript_novelty
+            exon_annotations += exon_novelty
 
     # Before returning abundance, reformat it as database rows
     abundance_rows = []
@@ -1154,7 +1175,7 @@ def annotate_sam_transcripts(sam_file, dataset, cursor, struct_collection, QC_fi
         abundance_rows.append(curr_row)
     
     return observed_transcripts, gene_annotations, transcript_annotations, \
-           exon_novelty, abundance_rows
+           exon_annotations, abundance_rows
             
 
 def parse_transcript(sam_read):
