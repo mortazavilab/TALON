@@ -63,8 +63,8 @@ class TestIdentifyFSM(object):
         correct_gene_ID = fetch_correct_ID("TG2", "gene", cursor)
         novelty_types = [ x[-2] for x in annotation['transcript_novelty']]
         assert annotation['gene_ID'] == correct_gene_ID
-        assert novelty_types == ["FSM_transcript", "related_transcript_IDs",
-                                 "3p_novel"]
+        assert "FSM_transcript" in novelty_types
+        assert "3p_novel" in novelty_types
         assert annotation['end_delta'] == None
         conn.close()
 
@@ -92,8 +92,8 @@ class TestIdentifyFSM(object):
         correct_gene_ID = fetch_correct_ID("TG1", "gene", cursor)
         novelty_types = [ x[-2] for x in annotation['transcript_novelty']]
         assert annotation['gene_ID'] == correct_gene_ID
-        assert novelty_types == ["ISM_transcript", "ISM-suffix_transcript",
-                                 "related_transcript_IDs"]
+        assert "ISM_transcript" in novelty_types 
+        assert "ISM-suffix_transcript" in novelty_types
         assert annotation['start_delta'] == -50
         conn.close()
 
@@ -121,8 +121,8 @@ class TestIdentifyFSM(object):
         correct_gene_ID = fetch_correct_ID("TG1", "gene", cursor)
         novelty_types = [ x[-2] for x in annotation['transcript_novelty']]
         assert annotation['gene_ID'] == correct_gene_ID
-        assert novelty_types == ["ISM_transcript", "ISM-prefix_transcript",
-                                 "related_transcript_IDs"]
+        assert "ISM_transcript" in novelty_types
+        assert "ISM-prefix_transcript" in novelty_types
         assert annotation['start_delta'] == annotation['end_delta'] == 0
         conn.close()
 
@@ -150,7 +150,8 @@ class TestIdentifyFSM(object):
         correct_gene_ID = fetch_correct_ID("TG1", "gene", cursor)
         novelty_types = [ x[-2] for x in annotation['transcript_novelty']]
         assert annotation['gene_ID'] == correct_gene_ID
-        assert novelty_types == ["ISM_transcript", "related_transcript_IDs"]
+        assert "ISM_transcript" in novelty_types 
+        assert "related_transcript_IDs" in novelty_types
         assert annotation['start_delta'] == annotation['end_delta'] == 0
         conn.close()
 
@@ -178,7 +179,7 @@ class TestIdentifyFSM(object):
         correct_gene_ID = fetch_correct_ID("TG1", "gene", cursor)
         novelty_types = [ x[-2] for x in annotation['transcript_novelty']]
         assert annotation['gene_ID'] == correct_gene_ID
-        assert novelty_types == ["NIC_transcript"]
+        assert "NIC_transcript" in novelty_types
         assert annotation['start_delta'] == annotation['end_delta'] == 0
         conn.close()
 
@@ -207,7 +208,7 @@ class TestIdentifyFSM(object):
         correct_gene_ID = fetch_correct_ID("TG1", "gene", cursor)
         novelty_types = [ x[-2] for x in annotation['transcript_novelty']]
         assert annotation['gene_ID'] == correct_gene_ID
-        assert novelty_types == ["NNC_transcript"]
+        assert "NNC_transcript" in novelty_types
         assert annotation['start_delta'] == annotation['end_delta'] == 0
         conn.close()
 
@@ -236,8 +237,8 @@ class TestIdentifyFSM(object):
         gene_novelty_types = [ x[-2] for x in annotation['gene_novelty']]
         t_novelty_types = [ x[-2] for x in annotation['transcript_novelty']]
         assert annotation['gene_novelty'][0][-1] == "TRUE"
-        assert gene_novelty_types == ["antisense_gene", "related_gene_IDs"]
-        assert t_novelty_types == ["antisense_transcript"]
+        assert "antisense_gene" in gene_novelty_types
+        assert "antisense_transcript" in t_novelty_types
         assert annotation['start_delta'] == annotation['end_delta'] == 0
         conn.close()
 
@@ -264,7 +265,7 @@ class TestIdentifyFSM(object):
         correct_gene_ID = fetch_correct_ID("TG1", "gene", cursor)
         novelty_types = [ x[-2] for x in annotation['transcript_novelty']]
         assert annotation['gene_ID'] == correct_gene_ID
-        assert novelty_types == ["genomic_transcript"]
+        assert "genomic_transcript" in novelty_types
         assert annotation['end_delta'] == 10
         conn.close()        
 

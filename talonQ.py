@@ -460,10 +460,10 @@ def search_for_ISM(edge_IDs, transcript_dict):
 
     if len(edge_IDs) > 1:
         edge_IDs = edge_IDs[1:-1]
-        ISM_matches = list(filter(lambda t: bytes(edge_IDs) in bytes(t),
+        ISM_matches = list(filter(lambda t: set(edge_IDs) <= set(t),
                               list(transcript_dict.keys())))
     else:
-        ISM_matches = list(filter(lambda t: bytes(edge_IDs) in bytes(t),
+        ISM_matches = list(filter(lambda t: set(edge_IDs) <= set(t),
                               list(transcript_dict.keys())))
      
 
@@ -598,7 +598,8 @@ def process_FSM(edge_IDs, vertex_IDs, transcript_dict, run_info ):
         novel_transcript = create_transcript(gene_ID, edge_IDs, vertex_IDs,
                                              transcript_dict, run_info)
 
-        transcript_IDs = ",".join([str(match[0]) for match in transcript_matches])
+        print(transcript_matches)
+        transcript_IDs = ",".join([str(match["transcript_ID"]) for match in transcript_matches])
         novelty.append((novel_transcript['transcript_ID'], run_info.idprefix, 
                         "TALON", "FSM_transcript", "TRUE"))
         novelty.append((novel_transcript['transcript_ID'], run_info.idprefix, 
@@ -665,11 +666,13 @@ def process_NIC(edge_IDs, vertex_IDs, strand, transcript_dict, vertex_2_gene, ru
         same-strand genes. """
 
     gene_matches = []
+    
     for vertex in vertex_IDs:
-        curr_matches = vertex_2_gene[vertex]
+        if vertex in vertex_2_gene:
+            curr_matches = vertex_2_gene[vertex]
 
-        # Make sure the gene is on the correct strand
-        gene_matches += [ x[0] for x in list(curr_matches) if x[1] == strand ]
+            # Make sure the gene is on the correct strand
+            gene_matches += [ x[0] for x in list(curr_matches) if x[1] == strand ]
 
     # Now count up how often we see each gene
     gene_tally = dict((x,gene_matches.count(x)) for x in set(gene_matches))
@@ -763,8 +766,6 @@ def identify_transcript(chrom, positions, strand, cursor, location_dict, edge_di
     edge_IDs, e_novelty = match_all_transcript_edges(vertex_IDs, strand,
                                                      edge_dict, run_info)
 
-    print(v_novelty)
-    print(strand)
 
     # Check novelty of exons and splice jns. This will help us categorize 
     # what type of novelty the transcript has
@@ -872,15 +873,39 @@ def identify_transcript(chrom, positions, strand, cursor, location_dict, edge_di
         transcript_novelty.append((transcript_ID, run_info.idprefix, "TALON",
                                   "3p_novel", "TRUE"))
 
+    # For novel genes and transcripts, add names to novelty entries
+    if len(gene_novelty) > 0:
+        gene_name = run_info.idprefix + "-gene_%d" % gene_ID
+        gene_novelty.append((gene_ID, run_info.idprefix, "TALON",
+                         "gene_name", gene_name, None))
+        gene_novelty.append((gene_ID, run_info.idprefix, "TALON",
+                         "gene_id", gene_name, None))
+    if len(transcript_novelty) > 0:
+        transcript_name = run_info.idprefix + "-transcript_%d" % transcript_ID
+        transcript_novelty.append((transcript_ID, run_info.idprefix, "TALON",
+                         "transcript_name", transcript_name, None))
+        transcript_novelty.append((transcript_ID, run_info.idprefix, "TALON",
+                         "transcript_id", transcript_name, None))
+
+    # Add annotation entries for any novel exons
+    exon_novelty = []
+    if not all_exons_known:
+        for exon,is_novel in zip(edge_IDs, e_novelty):
+            if is_novel:
+                exon_novelty.append((exon, run_info.idprefix, "TALON", 
+                                     "exon_status", "NOVEL", None))
+
     # Package up information for output
     annotations = {'gene_ID': gene_ID,
                    'transcript_ID': transcript_ID,
                    'gene_novelty': gene_novelty,
                    'transcript_novelty': transcript_novelty,
+                   'exon_novelty': exon_novelty,
                    'start_vertex': vertex_IDs[0],
                    'end_vertex': vertex_IDs[-1],
                    'start_delta': diff_5p,
                    'end_delta': diff_3p}
+    
     return annotations
 
 def check_inputs(options):
@@ -1043,6 +1068,7 @@ def annotate_sam_transcripts(sam_file, dataset, cursor, struct_collection, QC_fi
     observed_transcripts = []
     gene_annotations = []
     transcript_annotations = []
+    exon_annotations = []
     abundance = {}
 
     with open(sam_file) as sam:
@@ -1094,6 +1120,7 @@ def annotate_sam_transcripts(sam_file, dataset, cursor, struct_collection, QC_fi
             transcript_ID = annotation_info['transcript_ID']
             gene_novelty = annotation_info['gene_novelty']
             transcript_novelty = annotation_info['transcript_novelty']
+            exon_novelty = annotation_info['exon_novelty']
             start_vertex = annotation_info['start_vertex']
             end_vertex = annotation_info['end_vertex']
             start_delta = annotation_info['start_delta']
@@ -1127,7 +1154,7 @@ def annotate_sam_transcripts(sam_file, dataset, cursor, struct_collection, QC_fi
         abundance_rows.append(curr_row)
     
     return observed_transcripts, gene_annotations, transcript_annotations, \
-           abundance_rows
+           exon_novelty, abundance_rows
             
 
 def parse_transcript(sam_read):

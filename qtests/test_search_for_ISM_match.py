@@ -17,7 +17,7 @@ class TestSearchForISM(object):
         transcript_dict = talon.make_transcript_dict(cursor)
         conn.close()
 
-        edges = ( 5, 4, 3, 2 )
+        edges = ( 100, 200, 300)
         gene_ID, matches = talon.search_for_ISM(edges, transcript_dict)
 
         # Make sure that no match got returned
