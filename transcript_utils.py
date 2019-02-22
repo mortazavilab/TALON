@@ -141,6 +141,8 @@ def compute_jI(start, cigar):
 def get_introns(fields, start, cigar):
     """ Locates the jI field in a list of SAM fields or computes
         it from the CIGAR string and start position if it isn't found.
+        Note that positions refer to start and endpoints of introns, not exons,
+        so adjustments are needed to avoid an off-by-one error if you want exons.
 
         Example jI strings:
             no introns: jI:B:i,-1

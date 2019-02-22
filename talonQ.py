@@ -763,6 +763,9 @@ def identify_transcript(chrom, positions, strand, cursor, location_dict, edge_di
     edge_IDs, e_novelty = match_all_transcript_edges(vertex_IDs, strand,
                                                      edge_dict, run_info)
 
+    print(v_novelty)
+    print(strand)
+
     # Check novelty of exons and splice jns. This will help us categorize 
     # what type of novelty the transcript has
     all_SJs_known = check_all_SJs_known(e_novelty)
@@ -834,14 +837,14 @@ def identify_transcript(chrom, positions, strand, cursor, location_dict, edge_di
                                                              positions[1], strand, 
                                                              cursor, run_info)
         if gene_ID == None:
-            gene_ID = create_gene(chromosome, positions[0], positions[-1],
+            gene_ID = create_gene(chrom, positions[0], positions[-1],
                               strand, cursor, run_info)
             gene_novelty = [(gene_ID, run_info.idprefix, "TALON",
                          "intergenic_novel","TRUE")]
 
         elif match_strand != strand:
             anti_gene_ID = gene_ID
-            gene_ID = create_gene(chromosome, positions[0], positions[-1],
+            gene_ID = create_gene(chrom, positions[0], positions[-1],
                               strand, cursor, run_info)
             gene_novelty = [(gene_ID, run_info.idprefix, "TALON",
                          "antisense_gene","TRUE")]
@@ -1029,8 +1032,8 @@ def process_all_sam_files(sam_files, dataset_list, cursor, struct_collection,
         all_abundance += abundance
 
     o.close()
-    print(all_transcript_annotations)
-    print(all_gene_annotations)
+    #print(all_transcript_annotations)
+    #print(all_gene_annotations)
     
     return
 
@@ -1064,25 +1067,26 @@ def annotate_sam_transcripts(sam_file, dataset, cursor, struct_collection, QC_fi
             try:
                 read_ID, chrom, positions, strand, read_length = parse_transcript(line) 
             except:
-                warnings.warn("Problem parsing transcript '%s'. Skipping.." \
-                               % read_ID)
+                message = "Problem parsing transcript '%s'. Skipping.." \
+                           % line.split("\t")[0]
+                warnings.warn(message)
                 continue
 
             # Now identify the transcript
-            try:
-                location_dict = struct_collection.location_dict
-                edge_dict = struct_collection.edge_dict
-                transcript_dict = struct_collection.transcript_dict
-                vertex_2_gene = struct_collection.vertex_2_gene
-                run_info = struct_collection.run_info
-                annotation_info = identify_transcript(chrom, positions, strand, 
+            location_dict = struct_collection.location_dict
+            edge_dict = struct_collection.edge_dict
+            transcript_dict = struct_collection.transcript_dict
+            vertex_2_gene = struct_collection.vertex_2_gene
+            run_info = struct_collection.run_info
+            #try:
+            annotation_info = identify_transcript(chrom, positions, strand, 
                                                       cursor, location_dict, 
                                                       edge_dict, transcript_dict, 
                                                       vertex_2_gene, run_info)
-            except:
-                warnings.warn("Problem idnetifying transcript '%s'. Skipping.."\
-                               % read_ID)
-                continue
+            #except:
+            #    warnings.warn("Problem identifying transcript '%s'. Skipping.."\
+            #                   % read_ID)
+            #    continue
                             
             # Now that transcript has been annotated, unpack values and 
             # create an observed entry and abundance record
@@ -1107,7 +1111,6 @@ def annotate_sam_transcripts(sam_file, dataset, cursor, struct_collection, QC_fi
             # TODO
 
             # Also add transcript to abundance dict
-            print(transcript_ID)
             try:
                 abundance[transcript_ID] += 1
             except:
@@ -1137,7 +1140,7 @@ def parse_transcript(sam_read):
     """
     sam = sam_read.split("\t")
     read_ID = sam[0]
-    flag = sam[1]
+    flag = int(sam[1])
     chromosome = sam[2]
     sam_start = int(sam[3]) # Start is earliest alignment position
     cigar = sam[5]
@@ -1147,7 +1150,9 @@ def parse_transcript(sam_read):
 
     # Compute attributes
     sam_end = tutils.compute_transcript_end(sam_start, cigar) 
-    splice_sites = tutils.get_introns(other_fields, sam_start, cigar)
+    intron_list = tutils.get_introns(other_fields, sam_start, cigar)
+    # Adjust intron positions by 1 to get splice sites
+    splice_sites = [x+1 if i%2==1 else x-1 for i,x in enumerate(intron_list)]
     positions = [sam_start] + splice_sites + [sam_end]
 
     # Flip the positions order if the read is on the minus strand
@@ -1156,7 +1161,7 @@ def parse_transcript(sam_read):
         positions = positions[::-1]
     else:
         strand = "+"
-    
+
     return read_ID, chromosome, positions, strand, read_length
     
 

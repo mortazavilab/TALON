@@ -13,4 +13,15 @@ try:
         "--g",  "toy_build", "--o", "scratch/toy"])
 except Exception as e:
     print(e)
-    sys.exit("Database initialization failed on toy artificial transcript")
+    sys.exit("Database initialization failed on toy artificial annotation")
+
+try:
+    subprocess.check_output(
+       ["python", "../initialize_talon_database.py",
+        "--f", "input_files/Canx_example/Canx.gtf",
+        "--a",  "gencodeM7",
+        "--l", "0",
+        "--g",  "mm10", "--o", "scratch/Canx"])
+except Exception as e:
+    print(e)
+    sys.exit("Database initialization failed on Canx annotation")
