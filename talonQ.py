@@ -502,26 +502,6 @@ def search_for_overlap_with_gene(chromosome, start, end, strand,
                       (end >= %d AND end <= %d))
                  GROUP BY gene_ID;"""    
 
-    #query = """ SELECT gene_ID, 
-    #                chromosome, 
-    #                start, 
-    #                end,
-    #                strand    
-    #            FROM (SELECT g.gene_ID,
-    #                         loc.chromosome,
-    #                         MIN(loc.position) as start,
-    #                         MAX(loc.position) as end,
-    #                         g.strand
-    #                   FROM genes as g
-    #                   LEFT JOIN vertex as v ON g.gene_ID = v.gene_ID
-    #                   LEFT JOIN location as loc ON loc.location_ID = v.vertex_ID
-    #                   WHERE loc.genome_build = '%s'
-    #                   AND loc.chromosome = '%s'
-    #                   GROUP BY g.gene_ID)
-    #             WHERE (start <= %d AND end >= %d) OR
-    #                   (start >= %d AND end <= %d) OR
-    #                   (start >= %d AND start <= %d) OR
-    #                   (end >= %d AND end <= %d);"""
 
     cursor.execute(query % (chromosome, min_start, max_end,
                             min_start, max_end, min_start, max_end, min_start,
@@ -607,7 +587,7 @@ def process_FSM(edge_IDs, vertex_IDs, transcript_dict, run_info ):
     # At this point, return None for a monoexonic transcript, because different
     # ends are not allowed
     if len(edge_IDs) == 1:
-        return None, None, None
+        return None, None, novelty
     
     # Next, look for FSM with different ends. This triggers a novel transcript
     # that has novel 5' or 3' ends
@@ -619,11 +599,14 @@ def process_FSM(edge_IDs, vertex_IDs, transcript_dict, run_info ):
                                              transcript_dict, run_info)
 
         transcript_IDs = ",".join([str(match[0]) for match in transcript_matches])
-        novelty.append((novel_transcript['transcript_ID'],"FSM", transcript_IDs))
+        novelty.append((novel_transcript['transcript_ID'], run_info.idprefix, 
+                        "TALON", "FSM_transcript", "TRUE"))
+        novelty.append((novel_transcript['transcript_ID'], run_info.idprefix, 
+                        "TALON", "related_transcript_IDs", transcript_IDs))
                 
         return gene_ID, novel_transcript["transcript_ID"], novelty
 
-    return None,None,None
+    return None,None,novelty
 
 def process_ISM(edge_IDs, vertex_IDs, transcript_dict, run_info ):
     """ Given a transcript, find the best gene and transcript match for it. 
@@ -636,7 +619,7 @@ def process_ISM(edge_IDs, vertex_IDs, transcript_dict, run_info ):
 
     gene_ID, ISM_matches = search_for_ISM(edge_IDs, transcript_dict)
     if ISM_matches == None:
-        return None,None,None
+        return None,None,[]
 
     # Look for suffix ISM novelty
     suffix_gene_ID, suffix_matches = search_for_transcript_suffix(edge_IDs, 
@@ -653,21 +636,27 @@ def process_ISM(edge_IDs, vertex_IDs, transcript_dict, run_info ):
     # Create a new transcript. Must wait until here to do it because otherwise 
     # the transcript can find suffix or prefix matches to itself!
     novel_transcript = create_transcript(gene_ID, edge_IDs, vertex_IDs,
-                                         transcript_dict, run_info)
-    ISM_IDs = ",".join([str(match[0]) for match in ISM_matches])
-    novelty = [(novel_transcript["transcript_ID"], "ISM", ISM_IDs)]  
+                                         transcript_dict, run_info)["transcript_ID"]
+    ISM_IDs = [str(match[0]) for match in ISM_matches]
+    novelty = [(novel_transcript, run_info.idprefix, "TALON", "ISM_transcript","TRUE")]  
  
     # Add novelty types
     if suffix_ISM == True:
-        suffix_IDs = ",".join([str(match[0]) for match in suffix_matches])
-        novelty.append(((novel_transcript["transcript_ID"], "ISM_suffix",
-                         suffix_IDs))) 
+        suffix_IDs = [str(match[0]) for match in suffix_matches]
+        ISM_IDs += suffix_IDs
+        novelty.append(((novel_transcript, run_info.idprefix, "TALON",
+                         "ISM-suffix_transcript","TRUE"))) 
     if prefix_ISM == True:
-        prefix_IDs = ",".join([str(match[0]) for match in prefix_matches])
-        novelty.append(((novel_transcript["transcript_ID"], "ISM_prefix",
-                         prefix_IDs)))
+        prefix_IDs = [str(match[0]) for match in prefix_matches]
+        ISM_IDs += prefix_IDs
+        novelty.append(((novel_transcript, run_info.idprefix, "TALON",
+                         "ISM-prefix_transcript","TRUE")))
+    
+    ISM_IDs = ",".join(set(ISM_IDs))
+    novelty.append(((novel_transcript, run_info.idprefix, "TALON",
+                         "related_transcript_IDs", ISM_IDs)))
 
-    return gene_ID, novel_transcript["transcript_ID"], novelty
+    return gene_ID, novel_transcript, novelty
     
 def process_NIC(edge_IDs, vertex_IDs, strand, transcript_dict, vertex_2_gene, run_info):
     """ For a transcript that has been determined to be novel in catalog, find
@@ -693,7 +682,8 @@ def process_NIC(edge_IDs, vertex_IDs, strand, transcript_dict, vertex_2_gene, ru
     # Create a new transcript of that gene
     novel_transcript = create_transcript(gene_ID, edge_IDs, vertex_IDs,
                                          transcript_dict, run_info)
-    novelty = [(novel_transcript["transcript_ID"], "NIC", None)]
+    novelty = [(novel_transcript, run_info.idprefix, "TALON",
+                         "NIC_transcript","TRUE")]
 
     return gene_ID, novel_transcript["transcript_ID"], novelty    
 
@@ -819,8 +809,12 @@ def identify_transcript(chrom, positions, strand, cursor, location_dict, edge_di
         transcript_ID = create_transcript(gene_ID, edge_IDs, vertex_IDs,
                                          transcript_dict, run_info)["transcript_ID"]
 
-        gene_novelty = [(gene_ID, "antisense", anti_gene_ID)]
-        transcript_novelty = [(transcript_ID, "antisense", None)]
+        gene_novelty = [(gene_ID, run_info.idprefix, "TALON",
+                         "antisense_gene","TRUE")]
+        gene_novelty.append((gene_ID, run_info.idprefix, "TALON",
+                         "related_gene_IDs", anti_gene_ID))
+        transcript_novelty = [(transcript_ID, run_info.idprefix, "TALON", 
+                               "antisense_transcript", "TRUE")]
 
     # Novel not in catalog transcripts contain new splice donors/acceptors
     # and contain at least one splice junction. They may belong to an existing
@@ -830,7 +824,8 @@ def identify_transcript(chrom, positions, strand, cursor, location_dict, edge_di
         gene_ID = find_gene_match_on_vertex_basis(vertex_IDs, strand, vertex_2_gene)
         transcript_ID = create_transcript(gene_ID, edge_IDs, vertex_IDs,
                                          transcript_dict, run_info)["transcript_ID"]
-        transcript_novelty = [(transcript_ID, "NNC", None)]
+        transcript_novelty = [(transcript_ID, run_info.idprefix, "TALON",
+                               "NNC_transcript", "TRUE")]
 
     # Transcripts that don't match the previous categories end up here
     else:
@@ -841,29 +836,38 @@ def identify_transcript(chrom, positions, strand, cursor, location_dict, edge_di
         if gene_ID == None:
             gene_ID = create_gene(chromosome, positions[0], positions[-1],
                               strand, cursor, run_info)
-            gene_novelty.append((gene_ID, "intergenic", None))
+            gene_novelty = [(gene_ID, run_info.idprefix, "TALON",
+                         "intergenic_novel","TRUE")]
 
         elif match_strand != strand:
             anti_gene_ID = gene_ID
             gene_ID = create_gene(chromosome, positions[0], positions[-1],
                               strand, cursor, run_info)
-            gene_novelty.append((gene_ID, "antisense", None))         
+            gene_novelty = [(gene_ID, run_info.idprefix, "TALON",
+                         "antisense_gene","TRUE")]
+            gene_novelty.append((gene_ID, run_info.idprefix, "TALON",
+                         "related_gene_IDs",anti_gene_ID))
 
         transcript_ID = create_transcript(gene_ID, edge_IDs, vertex_IDs,
                                          transcript_dict, run_info)["transcript_ID"]
         if match_strand != strand:
-            transcript_novelty.append((transcript_ID, "antisense", anti_gene_ID))
+            transcript_novelty = [(transcript_ID, run_info.idprefix, "TALON",
+                                  "antisense_transcript", "TRUE")]
         else:
-            transcript_novelty.append((transcript_ID, "genomic", None)) 
+            transcript_novelty = [(transcript_ID, run_info.idprefix, "TALON",
+                                  "genomic_transcript", "TRUE")]
        
     # Add all novel vertices to vertex_2_gene now that we have the gene ID
     update_vertex_2_gene(gene_ID, vertex_IDs, strand, vertex_2_gene)
  
     # Process 5' and 3' end novelty on relevant transcripts
     if v_novelty[0] == 1:
+        transcript_novelty.append((transcript_ID, run_info.idprefix, "TALON",
+                                  "5p_novel", "TRUE"))
         transcript_novelty.append((transcript_ID,"5p_novelty", None))
     if v_novelty[-1] == 1:
-        transcript_novelty.append((transcript_ID,"3p_novelty", None))
+        transcript_novelty.append((transcript_ID, run_info.idprefix, "TALON",
+                                  "3p_novel", "TRUE"))
 
     # Package up information for output
     annotations = {'gene_ID': gene_ID,
@@ -983,6 +987,7 @@ def prepare_data_structures(cursor, build, min_coverage, min_identity):
     return struct_collection
 
 def process_all_sam_files(sam_files, dataset_list, cursor, struct_collection, 
+
                           outprefix):
     """ Iterates over the provided sam files. """
 
@@ -1024,7 +1029,9 @@ def process_all_sam_files(sam_files, dataset_list, cursor, struct_collection,
         all_abundance += abundance
 
     o.close()
-
+    print(all_transcript_annotations)
+    print(all_gene_annotations)
+    
     return
 
 def annotate_sam_transcripts(sam_file, dataset, cursor, struct_collection, QC_file):
@@ -1077,20 +1084,48 @@ def annotate_sam_transcripts(sam_file, dataset, cursor, struct_collection, QC_fi
                                % read_ID)
                 continue
                             
-            exit()
-            # Now that transcript has been annotated, create an observed entry
+            # Now that transcript has been annotated, unpack values and 
+            # create an observed entry and abundance record
+            gene_ID = annotation_info['gene_ID']
+            transcript_ID = annotation_info['transcript_ID']
+            gene_novelty = annotation_info['gene_novelty']
+            transcript_novelty = annotation_info['transcript_novelty']
+            start_vertex = annotation_info['start_vertex']
+            end_vertex = annotation_info['end_vertex']
+            start_delta = annotation_info['start_delta']
+            end_delta = annotation_info['end_delta']
+
             struct_collection.run_info['observed'] += 1
             obs_ID = struct_collection.run_info['observed'] 
             observed = (obs_ID, gene_ID, transcript_ID, read_ID, dataset, 
-                        start_vertex_ID, end_vertex_ID, start_delta, 
+                        start_vertex, end_vertex, start_delta, 
                         end_delta, read_length)
             observed_transcripts.append(observed)
 
+            # Output this read to a sam file with tags labeling the
+            # novelty thereof
+            # TODO
+
             # Also add transcript to abundance dict
+            print(transcript_ID)
             try:
                 abundance[transcript_ID] += 1
             except:
                 abundance[transcript_ID] = 1
+
+            # Update annotation records
+            gene_annotations += gene_novelty
+            transcript_annotations += transcript_novelty
+
+    # Before returning abundance, reformat it as database rows
+    abundance_rows = []
+    for transcript, count in abundance.items():
+        curr_row = (transcript, dataset, count)
+        abundance_rows.append(curr_row)
+    
+    return observed_transcripts, gene_annotations, transcript_annotations, \
+           abundance_rows
+            
 
 def parse_transcript(sam_read):
     """ Given a SAM transcript, parse the entry to obtain:

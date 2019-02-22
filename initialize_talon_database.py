@@ -407,7 +407,8 @@ def add_annotation_table(database, table_name, key_table, fk_id):
                   annot_name text,
                   source text,
                   attribute text,
-                  value text, 
+                  value text,
+                  misc text, 
                   PRIMARY KEY (ID, source, attribute), """ + fk_statement + """); """
     c.execute(command)
     conn.commit()

@@ -91,6 +91,6 @@ class TestIdentifyISM(object):
         gene_ID, transcript_ID, novelty = talon.process_ISM(edge_IDs, vertex_IDs,
                                                             transcript_dict,
                                                             run_info)
-        assert gene_ID == transcript_ID == novelty == None 
+        assert gene_ID == transcript_ID == None 
         conn.close()       
 

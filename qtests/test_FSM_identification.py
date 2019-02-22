@@ -74,6 +74,6 @@ class TestIdentifyFSM(object):
         gene_ID, transcript_ID, novelty = talon.process_FSM(edge_IDs, vertex_IDs,
                                                             transcript_dict,
                                                             run_info)
-        assert gene_ID == transcript_ID == novelty == None 
+        assert gene_ID == transcript_ID == None 
         conn.close()       
 
