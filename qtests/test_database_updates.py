@@ -121,3 +121,23 @@ class TestDatabaseUpdates(object):
         cursor.execute(query)
         assert len(cursor.fetchall()) == 2
         conn.close()
+
+    def test_gene_update(self):
+        """ Try to add novel entries to database while ignoring duplicates
+        """
+        conn, cursor = get_db_cursor()
+        build = "toy_build"
+        edge_dict = talon.make_edge_dict(cursor)
+        run_info = talon.init_run_info(cursor, build)
+        talon.make_temp_novel_gene_table(cursor, build)
+        talon.create_gene("chr4", 1, 1000, "+", cursor, run_info)
+
+        talon.add_genes(cursor)
+
+        # Test if gene with ID 10 is there, but make sure we didn't add 
+        # duplicates of 1 and 2
+        query = "SELECT * FROM genes"
+        gene_IDs = [ x['gene_ID'] for x in cursor.execute(query)]
+        assert 5 in gene_IDs
+        assert len(gene_IDs) == 5
+        conn.close()

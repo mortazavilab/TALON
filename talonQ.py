@@ -357,7 +357,10 @@ def create_vertex(chromosome, position, run_info, location_dict):
                   'chromosome': chromosome,
                   'position': position}
 
-    location_dict[chromosome][position] = new_vertex
+    try:
+        location_dict[chromosome][position] = new_vertex
+    except:
+        location_dict[chromosome] = { position: new_vertex }
     #location_dict[(chromosome, position)] = new_vertex
 
     return new_vertex
@@ -1423,8 +1426,7 @@ def update_database(cursor, batch_size, datasets, observed_transcripts,
     """ Adds new entries to the database. """
 
     print("Adding novel genes to database...")
-    
-
+    add_genes(cursor)    
 
     print("Adding %d dataset record(s) to database..." % len(datasets))
     add_datasets(cursor, datasets)  
@@ -1439,6 +1441,14 @@ def update_database(cursor, batch_size, datasets, observed_transcripts,
     batch_add_annotations(cursor, gene_annotations, "gene", batch_size)
     batch_add_annotations(cursor, transcript_annotations, "transcript", batch_size)
     batch_add_annotations(cursor, exon_annotations, "exon", batch_size)
+
+
+def add_genes(cursor):
+    """ Extract gene entries from the temporary table """
+
+    query = "INSERT or IGNORE INTO genes SELECT gene_ID, strand FROM temp_gene;"
+    cursor.execute(query)
+    return
 
 def add_datasets(cursor, datasets):
     """ Add dataset records to database """
@@ -1562,10 +1572,10 @@ def main():
                                                               struct_collection, 
                                                                       outprefix)
     # TODO: Update database
-    #batch_size = 10000
-    #update_database(cursor, batch_size, novel_datasets, observed_transcripts, 
-    #                gene_annotations, transcript_annotations, abundance, 
-    #                struct_collection)
+    batch_size = 10000
+    update_database(cursor, batch_size, novel_datasets, observed_transcripts, 
+                    gene_annotations, transcript_annotations, abundance, 
+                    struct_collection)
 
     # Validate database
 
