@@ -151,7 +151,6 @@ class TestIdentifyFSM(object):
         novelty_types = [ x[-2] for x in annotation['transcript_novelty']]
         assert annotation['gene_ID'] == correct_gene_ID
         assert "ISM_transcript" in novelty_types 
-        assert "related_transcript_IDs" in novelty_types
         assert annotation['start_delta'] == annotation['end_delta'] == 0
         conn.close()
 

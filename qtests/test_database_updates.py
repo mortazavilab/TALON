@@ -29,6 +29,22 @@ class TestDatabaseUpdates(object):
         assert len(cursor.fetchall()) == 3
         conn.close()
 
+    def test_datasets(self):
+        """ Try to add dataset metadata to database """
+        conn, cursor = get_db_cursor()
+        build = "toy_build"
+        edge_dict = talon.make_edge_dict(cursor)
+        run_info = talon.init_run_info(cursor, build)
+
+        datasets = [ ( 1, "toy", "toy", "toy") ]
+        talon.add_datasets(cursor, datasets)
+
+        # Test if items are there
+        query = "SELECT * FROM dataset"
+        cursor.execute(query)
+        assert len(cursor.fetchall()) == 1
+        conn.close()
+
     def test_observed(self):
         """ Try to add observed entries to database in batches
         """

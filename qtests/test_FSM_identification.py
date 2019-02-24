@@ -22,7 +22,7 @@ class TestIdentifyFSM(object):
         vertex_IDs = (1, 2, 3, 4, 5, 6)
         v_novelty = (0, 0, 0, 0, 0, 0)
 
-        gene_ID, transcript_ID, novelty = talon.process_FSM(edge_IDs, vertex_IDs,
+        gene_ID, transcript_ID, novelty = talon.process_FSM_or_ISM(edge_IDs, vertex_IDs,
                                                             transcript_dict,
                                                             run_info)
 
@@ -48,7 +48,7 @@ class TestIdentifyFSM(object):
         vertex_IDs = (1, 2, 3, 4, 5, 500) # Last vertex is novel
         v_novelty = (0, 0, 0, 0, 0, 1)
    
-        gene_ID, transcript_ID, novelty = talon.process_FSM(edge_IDs, vertex_IDs,
+        gene_ID, transcript_ID, novelty = talon.process_FSM_or_ISM(edge_IDs, vertex_IDs,
                                                             transcript_dict,
                                                             run_info)
 
@@ -58,7 +58,7 @@ class TestIdentifyFSM(object):
         conn.close()
 
     def test_no_match(self):
-        """ Example with no FSM match """
+        """ Example with no FSM or ISM match """
 
         conn, cursor = get_db_cursor()
         build = "toy_build"
@@ -67,11 +67,11 @@ class TestIdentifyFSM(object):
         run_info = talon.init_run_info(cursor, build)
         transcript_dict = talon.make_transcript_dict(cursor)
 
-        edge_IDs = (3, 4, 5) 
-        vertex_IDs = (3, 4, 5, 6) 
+        edge_IDs = (1, 200, 3) 
+        vertex_IDs = (1, 2, 5, 6) 
         v_novelty = (0, 0, 0, 0)
 
-        gene_ID, transcript_ID, novelty = talon.process_FSM(edge_IDs, vertex_IDs,
+        gene_ID, transcript_ID, novelty = talon.process_FSM_or_ISM(edge_IDs, vertex_IDs,
                                                             transcript_dict,
                                                             run_info)
         assert gene_ID == transcript_ID == None 

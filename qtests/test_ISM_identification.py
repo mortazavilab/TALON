@@ -22,7 +22,7 @@ class TestIdentifyISM(object):
         vertex_IDs = (3, 4, 5, 6)
         v_novelty = (0, 0, 0, 0)
 
-        gene_ID, transcript_ID, novelty = talon.process_ISM(edge_IDs, vertex_IDs,
+        gene_ID, transcript_ID, novelty = talon.process_FSM_or_ISM(edge_IDs, vertex_IDs,
                                                       transcript_dict,
                                                       run_info)
 
@@ -43,7 +43,7 @@ class TestIdentifyISM(object):
         edge_IDs = (200,2,3)
         vertex_IDs = (500, 2, 3, 4) 
         v_novelty = (1, 0, 0, 0)
-        gene_ID, transcript_ID, novelty = talon.process_ISM(edge_IDs, vertex_IDs,
+        gene_ID, transcript_ID, novelty = talon.process_FSM_or_ISM(edge_IDs, vertex_IDs,
                                                             transcript_dict,
                                                             run_info)
 
@@ -66,7 +66,7 @@ class TestIdentifyISM(object):
         vertex_IDs = (5, 6)
         v_novelty = (0, 0)
 
-        gene_ID, transcript_ID, novelty = talon.process_ISM(edge_IDs, vertex_IDs,
+        gene_ID, transcript_ID, novelty = talon.process_FSM_or_ISM(edge_IDs, vertex_IDs,
                                                             transcript_dict,
                                                             run_info)
 
@@ -88,7 +88,7 @@ class TestIdentifyISM(object):
         vertex_IDs = (1, 2, 3, 4, 50, 70) 
         v_novelty = (0, 0, 0, 0, 1, 1)
 
-        gene_ID, transcript_ID, novelty = talon.process_ISM(edge_IDs, vertex_IDs,
+        gene_ID, transcript_ID, novelty = talon.process_FSM_or_ISM(edge_IDs, vertex_IDs,
                                                             transcript_dict,
                                                             run_info)
         assert gene_ID == transcript_ID == None 

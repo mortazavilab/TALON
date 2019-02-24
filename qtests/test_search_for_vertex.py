@@ -36,6 +36,7 @@ class TestSearchForVertex(object):
         match = talon.search_for_vertex_at_pos(chrom, pos, location_dict)
         conn.close()
 
+        print(match)
         # Make sure that match is correct and that we can access various 
         # attributes using their names
         assert match["genome_build"] == "toy_build"

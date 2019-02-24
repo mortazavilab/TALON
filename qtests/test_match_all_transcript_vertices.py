@@ -39,7 +39,7 @@ class TestMatchAllVertices(object):
         location_dict = talon.make_location_dict(build, cursor)
         run_info = talon.init_run_info(cursor, build)
         orig_vertex_count = run_info['vertex']
-        orig_n_locations = len(location_dict)
+        orig_n_locations = len(location_dict["chr1"])
         conn.close()
 
         chrom = "chr1"
@@ -56,6 +56,6 @@ class TestMatchAllVertices(object):
        
         # Make sure the data structures got updated
         assert new_vertex_count == orig_vertex_count + 1
-        assert len(location_dict) == orig_n_locations + 1
+        assert len(location_dict["chr1"]) == orig_n_locations + 1
 
 

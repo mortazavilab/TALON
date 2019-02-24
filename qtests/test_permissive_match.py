@@ -120,7 +120,7 @@ class TestPermissiveMatch(object):
         assert end_diff == 30
         conn.close()    
 
-    def test_monexonic_edge_case(self):
+    def test_monoexonic_edge_case(self):
         """ Case I observed during testing where start and end accidentally 
             ended up being assigned to the same vertex """
         # TODO: solve this case. It isn't working right now.

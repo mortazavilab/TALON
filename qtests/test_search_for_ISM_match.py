@@ -18,10 +18,10 @@ class TestSearchForISM(object):
         conn.close()
 
         edges = ( 100, 200, 300)
-        gene_ID, matches = talon.search_for_ISM(edges, transcript_dict)
+        matches = talon.search_for_ISM(edges, transcript_dict)
 
         # Make sure that no match got returned
-        assert gene_ID == None
+        assert matches == None
 
     def test_find_match(self):
         """ Example where the toy transcript database contains exactly one  
@@ -32,12 +32,12 @@ class TestSearchForISM(object):
         transcript_dict = talon.make_transcript_dict(cursor)
 
         edges = ( 2, 3 )
-        gene_ID, matches = talon.search_for_ISM(edges, transcript_dict)
+        matches = talon.search_for_ISM(edges, transcript_dict)
 
         # Make sure that correct match got returned
         correct_gene_ID = fetch_correct_ID("TG1", "gene", cursor)
 
-        assert gene_ID == correct_gene_ID
+        assert matches[0]["gene_ID"] == correct_gene_ID
         conn.close()
 
     def test_find_monoexon_match(self):
@@ -48,11 +48,11 @@ class TestSearchForISM(object):
         transcript_dict = talon.make_transcript_dict(cursor)
 
         edges = ( 14, )
-        gene_ID, matches = talon.search_for_ISM(edges, transcript_dict)
+        matches = talon.search_for_ISM(edges, transcript_dict)
 
         # Make sure that correct match got returned
         correct_gene_ID = fetch_correct_ID("TG2", "gene", cursor)
 
-        assert gene_ID == correct_gene_ID
+        assert matches[0]["gene_ID"] == correct_gene_ID
         conn.close()
 
