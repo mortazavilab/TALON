@@ -1426,7 +1426,10 @@ def update_database(cursor, batch_size, datasets, observed_transcripts,
     """ Adds new entries to the database. """
 
     print("Adding novel genes to database...")
-    add_genes(cursor)    
+    add_genes(cursor)
+
+    print("Adding novel transcripts to database...")
+    batch_add_transcripts(cursor, struct_collection.transcript_dict, batch_size) 
 
     print("Adding %d dataset record(s) to database..." % len(datasets))
     add_datasets(cursor, datasets)  
@@ -1442,6 +1445,28 @@ def update_database(cursor, batch_size, datasets, observed_transcripts,
     batch_add_annotations(cursor, transcript_annotations, "transcript", batch_size)
     batch_add_annotations(cursor, exon_annotations, "exon", batch_size)
 
+def batch_add_transcripts(cursor, transcript_dict, batch_size):
+    """ Add new transcripts to database """
+
+    transcript_entries = list(transcript_dict.values()) 
+    index = 0
+    while index < len(transcript_entries):
+        try:
+            transcript_batch = transcript_entries[index:index + batch_size]
+        except:
+            transcript_batch = transcript_entries[index:]
+        index += batch_size
+
+        try:
+            cols = " (" + ", ".join([str_wrap_double(x) for x in
+                   ["transcript_id", "gene_id", "path", "start_vertex",
+                     "end_vertex", "n_exons"]]) + ") "
+            command = 'INSERT OR IGNORE INTO "transcripts"' + cols + "VALUES " + '(?,?,?,?,?,?)'
+            cursor.executemany(command, transcript_batch)
+        except Exception as e:
+            print(e)
+
+    return
 
 def add_genes(cursor):
     """ Extract gene entries from the temporary table """

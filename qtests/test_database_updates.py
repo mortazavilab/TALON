@@ -123,7 +123,7 @@ class TestDatabaseUpdates(object):
         conn.close()
 
     def test_gene_update(self):
-        """ Try to add novel entries to database while ignoring duplicates
+        """ Try to add novel gene entries to database while ignoring duplicates
         """
         conn, cursor = get_db_cursor()
         build = "toy_build"
@@ -134,10 +134,34 @@ class TestDatabaseUpdates(object):
 
         talon.add_genes(cursor)
 
-        # Test if gene with ID 10 is there, but make sure we didn't add 
-        # duplicates of 1 and 2
+        # Test if gene with ID 5 is there, but make sure we didn't add 
+        # duplicates of the other genes
         query = "SELECT * FROM genes"
         gene_IDs = [ x['gene_ID'] for x in cursor.execute(query)]
         assert 5 in gene_IDs
         assert len(gene_IDs) == 5
         conn.close()
+
+    def test_transcript_update(self):
+        """ Try to add novel transcript entries to database while ignoring 
+            duplicates
+        """
+        conn, cursor = get_db_cursor()
+        build = "toy_build"
+        edge_dict = talon.make_edge_dict(cursor)
+        run_info = talon.init_run_info(cursor, build)
+        transcript_dict = talon.make_transcript_dict(cursor)
+        talon.create_transcript( 1, (1,2,3), (1,2,3,4), transcript_dict, run_info)
+
+        #batch_size = 5
+        #talon.batch_add_transcripts(cursor, transcript_dict, batch_size)
+
+        # Test if transcript with ID 5 is there, but make sure we didn't add
+        # duplicates of the others
+        #query = "SELECT * FROM transcripts"
+        #transcript_IDs = [ x['transcript_ID'] for x in cursor.execute(query)]
+        #assert 5 in transcript_IDs
+        #assert len(transcript_IDs) == 5
+        #conn.close()
+
+
