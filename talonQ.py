@@ -958,22 +958,11 @@ def identify_transcript(chrom, positions, strand, cursor, location_dict, edge_di
     # Look for FSM or ISM. This includes monoexonic cases where the exon is 
     # known
     if all_SJs_known or (n_exons == 1 and all_exons_known):
-        #print("Transcript is either an FSM or an ISM")
+
         # Look for FSM first
         gene_ID, transcript_ID, transcript_novelty = process_FSM_or_ISM(edge_IDs, vertex_IDs, transcript_dict, run_info)
-        #gene_ID, transcript_ID, transcript_novelty = process_FSM(edge_IDs, vertex_IDs, 
-        #                                                     transcript_dict,
-        #                                                     run_info) 
-        #if gene_ID == None:
-        #    # Look for ISM
-        #    #print("No FSM found, so looking for ISM...")
-        #    gene_ID, transcript_ID, transcript_novelty = process_ISM(edge_IDs, vertex_IDs,
-                                                             #transcript_dict,
-                                                             #run_info)   
-        # There are rare NIC cases where all of the edges are known, but the
-        # transcript arrangement is still novel (i.e. Map2k4 case)   
+
         if gene_ID == None:
-            #print("No ISM found, so looking for NIC...")
             gene_ID, transcript_ID, transcript_novelty = process_NIC(edge_IDs,
                                                                  vertex_IDs,
                                                                  strand,
@@ -984,7 +973,6 @@ def identify_transcript(chrom, positions, strand, cursor, location_dict, edge_di
     # Novel in catalog transcripts have known splice donors and acceptors,
     # but new connections between them. 
     elif splice_vertices_known and n_exons > 1 and not(all_exons_novel):
-        #print("Transcript is definitely Novel in Catalog (NIC)")
         gene_ID, transcript_ID, transcript_novelty = process_NIC(edge_IDs, 
                                                                  vertex_IDs, 
                                                                  strand, 
@@ -1016,7 +1004,6 @@ def identify_transcript(chrom, positions, strand, cursor, location_dict, edge_di
     # and contain at least one splice junction. They may belong to an existing
     # gene, but not necessarily.
     elif not(splice_vertices_known) and n_exons > 1 and not(all_exons_novel): 
-        #print("Transcript is definitely Novel Not in Catalog (NNC)")
         gene_ID = find_gene_match_on_vertex_basis(vertex_IDs, strand, vertex_2_gene)
         transcript_ID = create_transcript(gene_ID, edge_IDs, vertex_IDs,
                                          transcript_dict, run_info)["transcript_ID"]
@@ -1025,7 +1012,6 @@ def identify_transcript(chrom, positions, strand, cursor, location_dict, edge_di
 
     # Transcripts that don't match the previous categories end up here
     else:
-        #print("Transcript is genomic and/or antisense")
         gene_ID, match_strand = search_for_overlap_with_gene(chrom, positions[0],
                                                              positions[1], strand, 
                                                              cursor, run_info)
@@ -1252,8 +1238,6 @@ def process_all_sam_files(sam_files, dataset_list, cursor, struct_collection,
         all_abundance += abundance
 
     o.close()
-    #print(all_transcript_annotations)
-    #print(all_gene_annotations)
     
     return novel_datasets, all_observed_transcripts, all_gene_annotations, \
            all_transcript_annotations, all_exon_annotations, all_abundance
@@ -1455,12 +1439,14 @@ def update_database(cursor, batch_size, datasets, observed_transcripts,
     update_counter(cursor, struct_collection.run_info)
 
     # TODO: I need to fix our notation for describing the annotations
-    exit()
-    print("Updating gene, transcript, and exon annotations...")
-    batch_add_annotations(cursor, gene_annotations, "gene", batch_size)
-    batch_add_annotations(cursor, transcript_annotations, "transcript", batch_size)
-    batch_add_annotations(cursor, exon_annotations, "exon", batch_size)
+    
+    #print("Updating gene, transcript, and exon annotations...")
+    #batch_add_annotations(cursor, gene_annotations, "gene", batch_size)
+    #batch_add_annotations(cursor, transcript_annotations, "transcript", batch_size)
+    #batch_add_annotations(cursor, exon_annotations, "exon", batch_size)
 
+    return
+ 
 def update_counter(cursor, run_info):
     # Update the database counter
     
@@ -1585,7 +1571,6 @@ def batch_add_transcripts(cursor, transcript_dict, batch_size):
                                        transcript['end_vertex'],
                                        transcript['n_exons']))
 
-    print("Adding %d transcripts..." % len(transcript_entries))
     index = 0
     while index < len(transcript_entries):
         try:
@@ -1701,6 +1686,36 @@ def batch_add_abundance(cursor, abundances, batch_size):
             print(e)
     return 
 
+def check_database_integrity(cursor):
+    """ Perform some checks on the database. Run before committing changes"""
+
+    print("Validating database........")
+    # For each category, check that the number of table entries matches the counter
+    counter_query = "SELECT * FROM counters"
+    cursor.execute(counter_query)
+    counters = cursor.fetchall()
+
+    
+
+    for table_name, curr_counter in counters:
+        curr_counter = int(curr_counter)
+
+        # Vertex case needs to be handled differently
+        if table_name == "vertex":
+            table_name = "location"
+             
+        query = "select COUNT(*) from " + table_name
+        cursor.execute(query)
+        actual_count = int(cursor.fetchone()[0])
+
+        if actual_count != curr_counter:
+            print("table_count: "  + str(actual_count))
+            print("counter_value: " + str(curr_counter))
+            raise ValueError("Database counter for '" + table_name + \
+                  "' does not match the number of entries in the table." + \
+                  " Discarding changes to database and exiting...")
+
+    return
 
 def main():
     """ Runs program """
@@ -1725,18 +1740,20 @@ def main():
     struct_collection = prepare_data_structures(cursor, build, min_coverage, 
                                                 min_identity)
 
-    # TODO: Read and annotate input sam files. Also, write output files.
+    # Read and annotate input sam files. Also, write output QC log file.
     print("Processing SAM files...")
     datasets, observed_transcripts, gene_annotations, transcript_annotations, \
     exon_annotations, abundance = process_all_sam_files(sam_files, dataset_list, cursor, 
                                       struct_collection, outprefix)
 
-    # TODO: Update database
+    # Update database
     batch_size = 10000
     update_database(cursor, batch_size, datasets, observed_transcripts,
                     gene_annotations, transcript_annotations, exon_annotations,
                     abundance, struct_collection)
-    # Validate database
+
+    # TODO: Validate database
+    check_database_integrity(cursor) 
 
     # conn.commit()
 
