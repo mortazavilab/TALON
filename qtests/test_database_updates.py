@@ -186,3 +186,23 @@ class TestDatabaseUpdates(object):
         assert len(edge_IDs) == orig_n_edges + 1
         conn.close()
 
+    def test_location_update(self):
+        """ Update locations """
+        conn, cursor = get_db_cursor()
+        build = "toy_build"
+        location_dict = talon.make_location_dict(build, cursor)
+        run_info = talon.init_run_info(cursor, build)
+        orig_n_pos = run_info.vertex
+
+        talon.create_vertex("chr4", 2000, run_info, location_dict)
+
+        batch_size = 10
+        talon.batch_add_locations(cursor, location_dict, batch_size)
+
+        # Test if the table has the correct number of locations now
+        query = "SELECT * FROM location"
+        cursor.execute(query)
+        loc_IDs = [ x['location_ID'] for x in cursor.fetchall()]
+        assert orig_n_pos + 1 in loc_IDs
+        assert len(loc_IDs) == orig_n_pos + 1
+        conn.close()

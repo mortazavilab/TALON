@@ -1435,6 +1435,11 @@ def update_database(cursor, batch_size, datasets, observed_transcripts,
     print("Adding novel exons/introns to database...")
     batch_add_edges(cursor, struct_collection.edge_dict, batch_size)
 
+    print("Adding novel vertices/locations to database...")
+    batch_add_locations(cursor, struct_collection.location_dict, batch_size)
+
+    # TODO: add vertex-gene relationships from vertex2gene
+
     print("Adding %d dataset record(s) to database..." % len(datasets))
     add_datasets(cursor, datasets)  
  
@@ -1450,6 +1455,38 @@ def update_database(cursor, batch_size, datasets, observed_transcripts,
     batch_add_annotations(cursor, gene_annotations, "gene", batch_size)
     batch_add_annotations(cursor, transcript_annotations, "transcript", batch_size)
     batch_add_annotations(cursor, exon_annotations, "exon", batch_size)
+
+def batch_add_locations(cursor, location_dict, batch_size):
+    """ Add new locations to database """
+    location_entries = []
+    for chrom_dict in location_dict.values():
+        for loc in list(chrom_dict.values()):
+            if type(loc) is dict:
+                location_entries.append((loc['location_ID'],
+                                         loc['genome_build'],
+                                         loc['chromosome'],
+                                         loc['position']))
+
+    index = 0
+    while index < len(location_entries):
+        try:
+            location_batch = location_entries[index:index + batch_size]
+        except:
+            location_batch = location_entries[index:]
+        index += batch_size
+
+        try:
+            cols = " (" + ", ".join([str_wrap_double(x) for x in
+                   ["location_id", "genome_build", "chromosome", "position"]]) + ") "
+            command = 'INSERT INTO "location"' + cols + "VALUES " + \
+                      '(?,?,?,?)'
+            cursor.executemany(command, location_batch)
+
+        except Exception as e:
+            print(e)
+
+    return
+    
 
 def batch_add_edges(cursor, edge_dict, batch_size):
     """ Add new edges to database """
