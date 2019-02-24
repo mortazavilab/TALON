@@ -1439,7 +1439,6 @@ def update_database(cursor, batch_size, datasets, observed_transcripts,
     print("Adding novel vertices/locations to database...")
     batch_add_locations(cursor, struct_collection.location_dict, batch_size)
 
-    # TODO: add vertex-gene relationships from vertex2gene
     print("Updating gene-vertex assignments...")
     batch_add_vertex2gene(cursor, struct_collection.vertex_2_gene, batch_size)
 
@@ -1452,12 +1451,38 @@ def update_database(cursor, batch_size, datasets, observed_transcripts,
     print("Adding %d transcript observation(s) to database..." % len(observed_transcripts))
     batch_add_observed(cursor, observed_transcripts, batch_size)
 
+    print("Updating counters...")
+    update_counter(cursor, struct_collection.run_info)
+
     # TODO: I need to fix our notation for describing the annotations
     exit()
     print("Updating gene, transcript, and exon annotations...")
     batch_add_annotations(cursor, gene_annotations, "gene", batch_size)
     batch_add_annotations(cursor, transcript_annotations, "transcript", batch_size)
     batch_add_annotations(cursor, exon_annotations, "exon", batch_size)
+
+def update_counter(cursor, run_info):
+    # Update the database counter
+    
+    update_g = 'UPDATE "counters" SET "count" = ? WHERE "category" = "genes"'
+    cursor.execute(update_g,[run_info.genes])
+    
+    update_t = 'UPDATE "counters" SET "count" = ? WHERE "category" = "transcripts"'
+    cursor.execute(update_t,[run_info.transcripts])
+
+    update_e = 'UPDATE "counters" SET "count" = ? WHERE "category" = "edge"'
+    cursor.execute(update_e,[run_info.edge])
+
+    update_v = 'UPDATE "counters" SET "count" = ? WHERE "category" = "vertex"'
+    cursor.execute(update_v,[run_info.vertex])
+
+    update_d = 'UPDATE "counters" SET "count" = ? WHERE "category" = "dataset"'
+    cursor.execute(update_d,[run_info.dataset])
+
+    update_o = 'UPDATE "counters" SET "count" = ? WHERE "category" = "observed"'
+    cursor.execute(update_o,[run_info.observed])
+
+    return
 
 def batch_add_vertex2gene(cursor, vertex_2_gene, batch_size):
     """ Add new vertex-gene relationships to the vertex table """

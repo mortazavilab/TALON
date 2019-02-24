@@ -230,3 +230,31 @@ class TestDatabaseUpdates(object):
         cursor.execute(query)
         vertex_IDs = [ x['vertex_ID'] for x in cursor.fetchall()]
         assert vertex_IDs == [1, 2, 3, 4, 5, 6]
+
+    def test_counter_update(self):
+        """ Update counters """
+        conn, cursor = get_db_cursor()
+        build = "toy_build"
+        run_info = talon.init_run_info(cursor, build)
+
+        # Change the counter values to some arbitrary numbers
+        run_info.genes = 10
+        run_info.transcripts = 20
+        run_info.edge = 2000
+        run_info.vertex = 10000
+        run_info.dataset = 30
+        run_info.observed = 400
+
+        # Now try the update
+        talon.update_counter(cursor, run_info)
+        run_info = None
+
+        # Check results with queries
+        run_info_2 = talon.init_run_info(cursor, build)
+        assert run_info_2.genes == 10
+        assert run_info_2.transcripts == 20
+        assert run_info_2.edge == 2000
+        assert run_info_2.vertex == 10000
+        assert run_info_2.dataset == 30
+        assert run_info_2.observed == 400
+
