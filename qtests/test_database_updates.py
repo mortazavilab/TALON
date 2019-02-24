@@ -206,3 +206,27 @@ class TestDatabaseUpdates(object):
         assert orig_n_pos + 1 in loc_IDs
         assert len(loc_IDs) == orig_n_pos + 1
         conn.close()
+
+    def test_vertex2gene_update(self):
+        """ Update vertex to gene relationships """
+        conn, cursor = get_db_cursor()
+        build = "toy_build"
+        vertex_2_gene = talon.make_vertex_2_gene_dict(cursor)
+        # Pretend that vertex 1 and 2 can now belong to gene 2 as well as 1
+        talon.update_vertex_2_gene(2, (1,2), "-", vertex_2_gene) 
+        # Add redundant assignments
+        talon.update_vertex_2_gene(1, (1,2,3,4,5,6), "+", vertex_2_gene)
+
+        batch_size = 100
+        talon.batch_add_vertex2gene(cursor, vertex_2_gene, batch_size)
+
+        # Use queries to check if the insert worked as expected
+        query = "SELECT * FROM vertex WHERE vertex_ID = '1'"
+        cursor.execute(query)
+        gene_IDs = [ x['gene_ID'] for x in cursor.fetchall()]
+        assert gene_IDs == [1, 2]
+
+        query = "SELECT * FROM vertex WHERE gene_ID = '1'"
+        cursor.execute(query)
+        vertex_IDs = [ x['vertex_ID'] for x in cursor.fetchall()]
+        assert vertex_IDs == [1, 2, 3, 4, 5, 6]

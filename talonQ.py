@@ -1054,6 +1054,7 @@ def identify_transcript(chrom, positions, strand, cursor, location_dict, edge_di
                                   "genomic_transcript", "TRUE")]
        
     # Add all novel vertices to vertex_2_gene now that we have the gene ID
+    # TODO: we might be able to run this operation fewer times by screening novelty
     update_vertex_2_gene(gene_ID, vertex_IDs, strand, vertex_2_gene)
  
     # Process 5' and 3' end novelty on relevant transcripts
@@ -1439,6 +1440,8 @@ def update_database(cursor, batch_size, datasets, observed_transcripts,
     batch_add_locations(cursor, struct_collection.location_dict, batch_size)
 
     # TODO: add vertex-gene relationships from vertex2gene
+    print("Updating gene-vertex assignments...")
+    batch_add_vertex2gene(cursor, struct_collection.vertex_2_gene, batch_size)
 
     print("Adding %d dataset record(s) to database..." % len(datasets))
     add_datasets(cursor, datasets)  
@@ -1455,6 +1458,33 @@ def update_database(cursor, batch_size, datasets, observed_transcripts,
     batch_add_annotations(cursor, gene_annotations, "gene", batch_size)
     batch_add_annotations(cursor, transcript_annotations, "transcript", batch_size)
     batch_add_annotations(cursor, exon_annotations, "exon", batch_size)
+
+def batch_add_vertex2gene(cursor, vertex_2_gene, batch_size):
+    """ Add new vertex-gene relationships to the vertex table """
+    entries = []
+    for vertex_ID, gene_set in vertex_2_gene.items():
+        for gene in gene_set:
+            entries.append((vertex_ID, gene[0]))
+
+    index = 0
+    while index < len(entries):
+        try:
+            batch = entries[index:index + batch_size]
+        except:
+            batch = entries[index:]
+        index += batch_size
+
+        try:
+            cols = " (" + ", ".join([str_wrap_double(x) for x in
+                   ["vertex_ID", "gene_ID"]]) + ") "
+            command = 'INSERT OR IGNORE INTO "vertex"' + cols + "VALUES " + \
+                      '(?,?)'
+            cursor.executemany(command, batch)
+
+        except Exception as e:
+            print(e)
+
+    return
 
 def batch_add_locations(cursor, location_dict, batch_size):
     """ Add new locations to database """
@@ -1477,7 +1507,7 @@ def batch_add_locations(cursor, location_dict, batch_size):
 
         try:
             cols = " (" + ", ".join([str_wrap_double(x) for x in
-                   ["location_id", "genome_build", "chromosome", "position"]]) + ") "
+                   ["location_ID", "genome_build", "chromosome", "position"]]) + ") "
             command = 'INSERT INTO "location"' + cols + "VALUES " + \
                       '(?,?,?,?)'
             cursor.executemany(command, location_batch)
