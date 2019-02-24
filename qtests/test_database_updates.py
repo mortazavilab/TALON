@@ -153,15 +153,16 @@ class TestDatabaseUpdates(object):
         transcript_dict = talon.make_transcript_dict(cursor)
         talon.create_transcript( 1, (1,2,3), (1,2,3,4), transcript_dict, run_info)
 
-        #batch_size = 5
-        #talon.batch_add_transcripts(cursor, transcript_dict, batch_size)
+        batch_size = 5
+        talon.batch_add_transcripts(cursor, transcript_dict, batch_size)
 
         # Test if transcript with ID 5 is there, but make sure we didn't add
         # duplicates of the others
-        #query = "SELECT * FROM transcripts"
-        #transcript_IDs = [ x['transcript_ID'] for x in cursor.execute(query)]
-        #assert 5 in transcript_IDs
-        #assert len(transcript_IDs) == 5
-        #conn.close()
+        query = "SELECT * FROM transcripts"
+        cursor.execute(query)
+        transcript_IDs = [ x['transcript_ID'] for x in cursor.fetchall()]
+        assert 5 in transcript_IDs
+        assert len(transcript_IDs) == 5
+        conn.close()
 
 

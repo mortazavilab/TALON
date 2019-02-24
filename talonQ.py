@@ -1111,7 +1111,7 @@ def check_inputs(options):
     cursor.execute(""" SELECT DISTINCT name FROM genome_build """)
     builds = [ str(x[0]) for x in cursor.fetchall() ]
     if options.build not in builds:
-        build_names = ", ".join(list(annot_builds))
+        build_names = ", ".join(list(builds))
         raise ValueError("Please specify a genome build that exists in the" +
                           " database. The choices are: " + build_names)
 
@@ -1431,7 +1431,9 @@ def update_database(cursor, batch_size, datasets, observed_transcripts,
 
     print("Adding novel transcripts to database...")
     batch_add_transcripts(cursor, struct_collection.transcript_dict, batch_size) 
-    #exit()
+
+    print("Adding novel exons/introns to database...")
+    batch_add_edges(cursor, struct_collection.edge_dict, batch_size)
 
     print("Adding %d dataset record(s) to database..." % len(datasets))
     add_datasets(cursor, datasets)  
@@ -1439,7 +1441,7 @@ def update_database(cursor, batch_size, datasets, observed_transcripts,
     print("Updating abundance table....")
     batch_add_abundance(cursor, abundance, batch_size) 
 
-    print("Adding %d transcript observations to database..." % len(observed_transcripts))
+    print("Adding %d transcript observation(s) to database..." % len(observed_transcripts))
     batch_add_observed(cursor, observed_transcripts, batch_size)
 
     # TODO: I need to fix our notation for describing the annotations
@@ -1449,20 +1451,49 @@ def update_database(cursor, batch_size, datasets, observed_transcripts,
     batch_add_annotations(cursor, transcript_annotations, "transcript", batch_size)
     batch_add_annotations(cursor, exon_annotations, "exon", batch_size)
 
+def batch_add_edges(cursor, edge_dict, batch_size):
+    """ Add new edges to database """
+    edge_entries = []
+    for edge in list(edge_dict.values()):
+        if type(edge) is dict:
+            edge_entries.append((edge['edge_ID'],
+                                 edge['v1'],
+                                 edge['v2'],
+                                 edge['edge_type']))
 
+    index = 0
+    while index < len(edge_entries):
+        try:
+            batch = edge_entries[index:index + batch_size]
+        except:
+            batch = edge_entries[index:]
+        index += batch_size
+
+        try:
+            cols = " (" + ", ".join([str_wrap_double(x) for x in
+                   ["edge_ID", "v1", "v2", "edge_type"]]) + ") "
+            command = 'INSERT INTO "edge"' + cols + "VALUES " + '(?,?,?,?)'
+            cursor.executemany(command, batch)
+
+        except Exception as e:
+            print(e)
+
+    return
 
 def batch_add_transcripts(cursor, transcript_dict, batch_size):
     """ Add new transcripts to database """
 
     transcript_entries = []
     for transcript in list(transcript_dict.values()):
-        if type(transcript) == dict:
-            transcript_entries.append((transcript['gene_ID'],
-                                       transcript['transcript_ID'],
+        if type(transcript) is dict:
+            transcript_entries.append((transcript['transcript_ID'],
+                                       transcript['gene_ID'],
                                        transcript['path'],
                                        transcript['start_vertex'],
                                        transcript['end_vertex'],
                                        transcript['n_exons']))
+    print("Adding %d transcripts" % len(transcript_entries))
+    print(transcript_entries)
     index = 0
     while index < len(transcript_entries):
         try:
@@ -1475,7 +1506,7 @@ def batch_add_transcripts(cursor, transcript_dict, batch_size):
             cols = " (" + ", ".join([str_wrap_double(x) for x in
                    ["transcript_id", "gene_id", "path", "start_vertex",
                      "end_vertex", "n_exons"]]) + ") "
-            command = 'INSERT OR IGNORE INTO "transcripts"' + cols + "VALUES " + '(?,?,?,?,?,?)'
+            command = 'INSERT INTO "transcripts"' + cols + "VALUES " + '(?,?,?,?,?,?)'
             cursor.executemany(command, transcript_batch)
         except Exception as e:
             print(e)
