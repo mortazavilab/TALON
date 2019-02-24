@@ -7,6 +7,7 @@
 
 import cProfile
 import argparse
+#from import collections import namedtuple
 from functools import reduce
 import sqlite3
 import dstruct
@@ -1254,7 +1255,7 @@ def process_all_sam_files(sam_files, dataset_list, cursor, struct_collection,
     #print(all_gene_annotations)
     
     return novel_datasets, all_observed_transcripts, all_gene_annotations, \
-           all_transcript_annotations, all_abundance
+           all_transcript_annotations, all_exon_annotations, all_abundance
 
 def annotate_sam_transcripts(sam_file, dataset, cursor, struct_collection, QC_file):
     """ Process SAM transcripts and annotate the ones that pass QC """
@@ -1421,8 +1422,8 @@ def check_read_quality(sam_read, struct_collection):
     return [read_ID, 1, 1, read_length, coverage, identity]
     
 def update_database(cursor, batch_size, datasets, observed_transcripts, 
-                    gene_annotations, transcript_annotations, abundance, 
-                    struct_collection):
+                    gene_annotations, transcript_annotations, exon_annotations,
+                    abundance, struct_collection):
     """ Adds new entries to the database. """
 
     print("Adding novel genes to database...")
@@ -1430,6 +1431,7 @@ def update_database(cursor, batch_size, datasets, observed_transcripts,
 
     print("Adding novel transcripts to database...")
     batch_add_transcripts(cursor, struct_collection.transcript_dict, batch_size) 
+    #exit()
 
     print("Adding %d dataset record(s) to database..." % len(datasets))
     add_datasets(cursor, datasets)  
@@ -1440,15 +1442,27 @@ def update_database(cursor, batch_size, datasets, observed_transcripts,
     print("Adding %d transcript observations to database..." % len(observed_transcripts))
     batch_add_observed(cursor, observed_transcripts, batch_size)
 
+    # TODO: I need to fix our notation for describing the annotations
+    exit()
     print("Updating gene, transcript, and exon annotations...")
     batch_add_annotations(cursor, gene_annotations, "gene", batch_size)
     batch_add_annotations(cursor, transcript_annotations, "transcript", batch_size)
     batch_add_annotations(cursor, exon_annotations, "exon", batch_size)
 
+
+
 def batch_add_transcripts(cursor, transcript_dict, batch_size):
     """ Add new transcripts to database """
 
-    transcript_entries = list(transcript_dict.values()) 
+    transcript_entries = []
+    for transcript in list(transcript_dict.values()):
+        if type(transcript) == dict:
+            transcript_entries.append((transcript['gene_ID'],
+                                       transcript['transcript_ID'],
+                                       transcript['path'],
+                                       transcript['start_vertex'],
+                                       transcript['end_vertex'],
+                                       transcript['n_exons']))
     index = 0
     while index < len(transcript_entries):
         try:
@@ -1590,18 +1604,15 @@ def main():
 
     # TODO: Read and annotate input sam files. Also, write output files.
     print("Processing SAM files...")
-    novel_datasets, observed_transcripts, gene_annotations, \
-    transcript_annotations, abundance = process_all_sam_files(sam_files, 
-                                                                   dataset_list, 
-                                                                         cursor, 
-                                                              struct_collection, 
-                                                                      outprefix)
+    datasets, observed_transcripts, gene_annotations, transcript_annotations, \
+    exon_annotations, abundance = process_all_sam_files(sam_files, dataset_list, cursor, 
+                                      struct_collection, outprefix)
+
     # TODO: Update database
     batch_size = 10000
-    update_database(cursor, batch_size, novel_datasets, observed_transcripts, 
-                    gene_annotations, transcript_annotations, abundance, 
-                    struct_collection)
-
+    update_database(cursor, batch_size, datasets, observed_transcripts,
+                    gene_annotations, transcript_annotations, exon_annotations,
+                    abundance, struct_collection)
     # Validate database
 
     # conn.commit()
