@@ -1492,8 +1492,8 @@ def batch_add_transcripts(cursor, transcript_dict, batch_size):
                                        transcript['start_vertex'],
                                        transcript['end_vertex'],
                                        transcript['n_exons']))
-    print("Adding %d transcripts" % len(transcript_entries))
-    print(transcript_entries)
+
+    print("Adding %d transcripts..." % len(transcript_entries))
     index = 0
     while index < len(transcript_entries):
         try:

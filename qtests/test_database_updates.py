@@ -165,4 +165,24 @@ class TestDatabaseUpdates(object):
         assert len(transcript_IDs) == 5
         conn.close()
 
+    def test_edge_update(self):
+        """ Try to add novel exons and introns. """
+        conn, cursor = get_db_cursor()
+        build = "toy_build"
+        edge_dict = talon.make_edge_dict(cursor)
+        run_info = talon.init_run_info(cursor, build)
+        orig_n_edges = run_info.edge
+
+        talon.create_edge(2, 1, "exon", "-", edge_dict, run_info)
+
+        batch_size = 10
+        talon.batch_add_edges(cursor, edge_dict, batch_size)
+        
+        # Test if the edge table has the correct number of edges now
+        query = "SELECT * FROM edge"
+        cursor.execute(query)
+        edge_IDs = [ x['edge_ID'] for x in cursor.fetchall()]
+        assert orig_n_edges + 1 in edge_IDs
+        assert len(edge_IDs) == orig_n_edges + 1
+        conn.close()
 
