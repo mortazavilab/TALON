@@ -5,8 +5,6 @@
 # assigns them transcript and gene identifiers based on a GTF annotation.
 # Novel transcripts are assigned new identifiers.
 
-from pstats import *
-#from pstats import SortKey
 import cProfile
 import argparse
 from functools import reduce
@@ -77,6 +75,9 @@ def make_transcript_dict(cursor):
 
 def make_location_dict(genome_build, cursor):
     """ Format of dict:
+        chromosome -> dict(position -> SQLite3 row from location table)
+
+        old:
             Key: chromosome, pos
             Value: SQLite3 row from location table
     """
@@ -86,8 +87,14 @@ def make_location_dict(genome_build, cursor):
     for location in cursor.fetchall():
         chromosome = location["chromosome"]
         position = location["position"]
-        key = (chromosome, position)
-        location_dict[key] = location
+        try:
+            location_dict[chromosome][position] = location
+        except:
+            location_dict[chromosome] = {position: location} 
+        #chromosome = location["chromosome"]
+        #position = location["position"]
+        #key = (chromosome, position)
+        #location_dict[key] = location
 
     return location_dict
     
@@ -162,9 +169,10 @@ def search_for_vertex_at_pos(chromosome, position, location_dict):
         location dict to determine whether a vertex 
         fitting those criteria exists. Returns the row if yes, and __ if no.
     """
-    query_key = (chromosome, position)
+    #query_key = (chromosome, position)
     try:
-        return location_dict[query_key]
+        return location_dict[chromosome][position]
+        #return location_dict[query_key]
     except:
         return None
 
@@ -235,8 +243,8 @@ def permissive_vertex_search(chromosome, position, strand, sj_pos, pos_type,
         If no vertex is found, the function returns None. """
 
     # Try a strict match first
-    if (chromosome, position) in locations:
-        match = locations[(chromosome, position)]
+    if chromosome in locations and position in locations[chromosome]:
+        match = locations[chromosome][position]
         dist = 0
         return match, dist
 
@@ -245,44 +253,99 @@ def permissive_vertex_search(chromosome, position, strand, sj_pos, pos_type,
     if strand != "+" and strand != "-":
         raise ValueError("Invalid strand specified: %s" % strand)
 
+    # If there is no strict match, look for vertices that are
+    #     (1) On the correct chromosome
+    #     (2) Are not located at or past the adjoining splice junction
+    #     (3) Are within the permitted cutoff distance
+
     if pos_type == "start": 
-        cutoff = run_info.cutoff_5p
+        max_dist = run_info.cutoff_5p
     else:
-        cutoff = run_info.cutoff_3p
+        max_dist = run_info.cutoff_3p
+
+    # For + strand start and - strand end, look for a vertex with a smaller
+    # position first (since degradtion is more biologically likely).
+    # For the + strand, this would be a negative delta, and for the - strand,
+    # it would be a positive delta
+    if (strand == "+" and pos_type == "start") or \
+       (strand == "-" and pos_type == "end"): 
+        direction_priority = -1
+        search_window_start = position - max_dist
+        search_window_end = sj_pos
+    else:
+        direction_priority = 1
+        search_window_start = sj_pos
+        search_window_end = position + max_dist
+
+    for dist in range(1,max_dist):
+        curr_pos = position + dist*direction_priority
+        if curr_pos > search_window_start and curr_pos < search_window_end: 
+            match = search_for_vertex_at_pos(chromosome, curr_pos, locations)
+            if match != None:
+                if strand == "+":
+                    if curr_pos < position:
+                        return match, dist*(-1)  
+                    else:
+                        return match, dist  
+                else:
+                    if curr_pos < position:
+                        return match, dist
+                    else:
+                        return match, dist*(-1)
+
+        curr_pos = position - dist*direction_priority
+        if curr_pos > search_window_start and curr_pos < search_window_end:
+            match = search_for_vertex_at_pos(chromosome, curr_pos, locations)
+            if match != None:
+                if strand == "+":
+                    if curr_pos < position:
+                        return match, dist*(-1)
+                    else:
+                        return match, dist
+                else:
+                    if curr_pos < position:
+                        return match, dist
+                    else:
+                        return match, dist*(-1)
+
+    return None, None       
+      
 
     # If there is no strict match, look for vertices that are
     #     (1) On the correct chromosome
     #     (2) Are not located at or past the adjoining splice junction
     #     (3) Are within the permitted cutoff distance
 
-    if (strand == "+" and pos_type == "start") or \
-       (strand == "-" and pos_type == "end"):
-        location_keys = list(filter(lambda t: t[0]==chromosome and
-                             abs(t[1] - position) <= cutoff and
-                             t[1] < sj_pos,
-                             list(locations.keys())))
-    else:
-        location_keys = list(filter(lambda t: t[0]==chromosome and
-                             abs(t[1] - position) <= cutoff and
-                             t[1] > sj_pos,
-                             list(locations.keys())))
+    
 
-    min_dist = cutoff*2
-    closest = None
-    for candidate_match in location_keys:
-        if strand == "+":
-            dist = candidate_match[1] - position
-        else:
-            dist = position - candidate_match[1]
+    #if (strand == "+" and pos_type == "start") or \
+    #   (strand == "-" and pos_type == "end"):
+    #    location_keys = list(filter(lambda t: t[0]==chromosome and
+    #                         abs(t[1] - position) <= cutoff and
+    #                         t[1] < sj_pos,
+    #                         list(locations.keys())))
+    #else:
+    #    location_keys = list(filter(lambda t: t[0]==chromosome and
+    #                         abs(t[1] - position) <= cutoff and
+    #                         t[1] > sj_pos,
+    #                         list(locations.keys())))
 
-        if abs(dist) <= abs(min_dist):
-            min_dist = dist
-            closest = locations[candidate_match]
+    #min_dist = cutoff*2
+    #closest = None
+    #for candidate_match in location_keys:
+    #    if strand == "+":
+    #        dist = candidate_match[1] - position
+    #    else:
+    #        dist = position - candidate_match[1]
+    #
+    #    if abs(dist) <= abs(min_dist):
+    #        min_dist = dist
+    #        closest = locations[candidate_match]
 
-    if closest == None:
-        min_dist = None
+    #if closest == None:
+    #    min_dist = None
 
-    return closest, min_dist
+    #return closest, min_dist
 
             
 def create_vertex(chromosome, position, run_info, location_dict):
@@ -294,7 +357,8 @@ def create_vertex(chromosome, position, run_info, location_dict):
                   'chromosome': chromosome,
                   'position': position}
 
-    location_dict[(chromosome, position)] = new_vertex
+    location_dict[chromosome][position] = new_vertex
+    #location_dict[(chromosome, position)] = new_vertex
 
     return new_vertex
 
