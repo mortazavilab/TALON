@@ -7,7 +7,6 @@
 
 import cProfile
 import argparse
-#from import collections import namedtuple
 from functools import reduce
 import sqlite3
 import dstruct
@@ -58,14 +57,6 @@ def make_transcript_dict(cursor):
     """
     transcript_dict = {}
     query = """SELECT * FROM transcripts """
-    #query = """ SELECT t.*, 
-    #                   ta.value AS annot_status 
-    #	            FROM transcripts AS t
-    #	            LEFT JOIN transcript_annotations AS ta 
-    #                    ON t.transcript_ID = ta.ID
-    #	            AND ta.attribute = 'transcript_status' 
-    #                AND ta.value = 'KNOWN'
-    #        """
     cursor.execute(query)
     for transcript in cursor.fetchall():
         transcript_path = transcript["path"].split(",")
@@ -92,10 +83,6 @@ def make_location_dict(genome_build, cursor):
             location_dict[chromosome][position] = location
         except:
             location_dict[chromosome] = {position: location} 
-        #chromosome = location["chromosome"]
-        #position = location["position"]
-        #key = (chromosome, position)
-        #location_dict[key] = location
 
     return location_dict
     
@@ -170,10 +157,8 @@ def search_for_vertex_at_pos(chromosome, position, location_dict):
         location dict to determine whether a vertex 
         fitting those criteria exists. Returns the row if yes, and __ if no.
     """
-    #query_key = (chromosome, position)
     try:
         return location_dict[chromosome][position]
-        #return location_dict[query_key]
     except:
         return None
 
@@ -308,46 +293,7 @@ def permissive_vertex_search(chromosome, position, strand, sj_pos, pos_type,
                         return match, dist
                     else:
                         return match, dist*(-1)
-
     return None, None       
-      
-
-    # If there is no strict match, look for vertices that are
-    #     (1) On the correct chromosome
-    #     (2) Are not located at or past the adjoining splice junction
-    #     (3) Are within the permitted cutoff distance
-
-    
-
-    #if (strand == "+" and pos_type == "start") or \
-    #   (strand == "-" and pos_type == "end"):
-    #    location_keys = list(filter(lambda t: t[0]==chromosome and
-    #                         abs(t[1] - position) <= cutoff and
-    #                         t[1] < sj_pos,
-    #                         list(locations.keys())))
-    #else:
-    #    location_keys = list(filter(lambda t: t[0]==chromosome and
-    #                         abs(t[1] - position) <= cutoff and
-    #                         t[1] > sj_pos,
-    #                         list(locations.keys())))
-
-    #min_dist = cutoff*2
-    #closest = None
-    #for candidate_match in location_keys:
-    #    if strand == "+":
-    #        dist = candidate_match[1] - position
-    #    else:
-    #        dist = position - candidate_match[1]
-    #
-    #    if abs(dist) <= abs(min_dist):
-    #        min_dist = dist
-    #        closest = locations[candidate_match]
-
-    #if closest == None:
-    #    min_dist = None
-
-    #return closest, min_dist
-
             
 def create_vertex(chromosome, position, run_info, location_dict):
     """ Creates a novel vertex and adds it to the location data structure. """
@@ -362,7 +308,6 @@ def create_vertex(chromosome, position, run_info, location_dict):
         location_dict[chromosome][position] = new_vertex
     except:
         location_dict[chromosome] = { position: new_vertex }
-    #location_dict[(chromosome, position)] = new_vertex
 
     return new_vertex
 
@@ -388,8 +333,6 @@ def create_gene(chromosome, start, end, strand, memory_cursor, run_info):
 
     new_gene = ( new_ID, chromosome, min(start, end), max(start, end), strand )
     cols = '("gene_ID", "chromosome", "start", "end", "strand")' 
-    #cols = " (" + ", ".join([str_wrap_double(x) for x in ["gene_ID", 
-    #       "chromosome", "start", "end", "strand"]]) + ") "
     command = 'INSERT INTO temp_gene ' + cols + ' VALUES ' + '(?,?,?,?,?)'
     memory_cursor.execute(command, new_gene)
     return new_ID
@@ -527,11 +470,6 @@ def search_without_transcript_ends(edge_IDs, transcript_dict):
     try:
         matches = [ transcript_dict[x] for x in transcript_dict if edge_IDs.issubset(x)]
 
-                              #list(filter(lambda t: edge_IDs.issubset(t),
-                              #       list(transcript_dict.keys())))
-        #matches = list(filter(lambda t: edge_IDs == t[1:-1],
-        #                             list(transcript_dict.keys())))
-        #transcripts = [ transcript_dict[match] for match in matches ]
         gene_ID = transcripts[0]["gene_ID"]
         return gene_ID, transcripts
 
@@ -546,12 +484,8 @@ def search_for_ISM(edge_IDs, transcript_dict):
 
     if len(edge_IDs) > 1:
         edges = frozenset(edge_IDs[1:-1])
-        #ISM_matches = list(filter(lambda t: set(edge_IDs) <= set(t),
-        #                      list(transcript_dict.keys())))
     else:
         edges = frozenset(edge_IDs)
-        #ISM_matches = list(filter(lambda t: set(edge_IDs) <= set(t),
-        #                      list(transcript_dict.keys())))
 
     ISM_matches = [ transcript_dict[x] for x in transcript_dict if edges.issubset(x)]
 
@@ -559,13 +493,6 @@ def search_for_ISM(edge_IDs, transcript_dict):
         return ISM_matches
     else:
         return None
-    #if len(ISM_matches) == 0:
-    #    return None, None
-
-    #else:
-    #    match = ISM_matches[0]
-    #    gene_ID = transcript_dict[match]["gene_ID"]
-    #    return gene_ID, ISM_matches
 
  
 def search_for_overlap_with_gene(chromosome, start, end, strand, 
