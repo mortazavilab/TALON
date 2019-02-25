@@ -19,7 +19,7 @@ try:
     subprocess.check_output(
        ["python", "../initialize_talon_database.py",
         "--f", "input_files/Canx_example/Canx.gtf",
-        "--a",  "gencodeM7",
+        "--a",  "gencode_vM7",
         "--l", "0",
         "--g",  "mm10", "--o", "scratch/Canx"])
 except Exception as e:
@@ -30,9 +30,24 @@ try:
     subprocess.check_output(
        ["python", "../initialize_talon_database.py",
         "--f", "input_files/Map2k4_example/Map2k4.gtf",
-        "--a",  "gencodeM7",
+        "--a",  "gencode_vM7",
         "--l", "0",
         "--g",  "mm10", "--o", "scratch/Map2k4"])
 except Exception as e:
     print(e)
     sys.exit("Database initialization failed on Map2k4 annotation")
+
+try:
+    subprocess.check_output(
+       ["python", "../initialize_talon_database.py",
+        "--f", "input_files/chr11/chr11.gtf",
+        "--a",  "gencode_vM7",
+        "--5p", "500",
+        "--3p", "300",
+        "--idprefix", "ENCODE-mouse",
+        "--l", "0",
+        "--g",  "mm10", "--o", "scratch/chr11"])
+except Exception as e:
+    print(e)
+    sys.exit("Database initialization failed on chr11 annotation")
+

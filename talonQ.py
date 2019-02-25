@@ -14,6 +14,7 @@ import dstruct
 import operator
 import warnings
 import transcript_utils as tutils
+import query_utils as qutils
 
 def get_args():
     """ Fetches the arguments for the program """
@@ -897,7 +898,7 @@ def identify_transcript(chrom, positions, strand, cursor, location_dict, edge_di
         else:
             transcript_novelty.append((transcript_ID, run_info.idprefix, "TALON",
                                   "genomic_transcript", "TRUE"))
-       
+
     # Add all novel vertices to vertex_2_gene now that we have the gene ID
     # TODO: we might be able to run this operation fewer times by screening novelty
     update_vertex_2_gene(gene_ID, vertex_IDs, strand, vertex_2_gene)
@@ -1606,14 +1607,11 @@ def write_counts_log_file(cursor, outprefix):
     cursor.execute(""" SELECT dataset_name FROM dataset """)
     datasets = [ str(x[0]) for x in cursor.fetchall() ]
     for dataset in datasets:
-        print(dataset)
         # Get number of reads in the dataset
-        #query = """SELECT * FROM location WHERE genome_build = ? """
-        #cursor.execute(query, [genome_build])
-        query = """ SELECT COUNT(obs_ID)
-                                   FROM observed WHERE dataset = ? """
-        cursor.execute(query, [dataset])
-        print(cursor.fetchone()[0])
+        reads = qutils.count_observed_reads(cursor, dataset)
+
+        # Get the number of known genes detected
+        #known_genes = 
     
     o.close()
 
