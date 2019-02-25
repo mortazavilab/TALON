@@ -9,6 +9,7 @@ import cProfile
 import argparse
 from functools import reduce
 import sqlite3
+import sys
 import dstruct
 import operator
 import warnings
@@ -347,7 +348,7 @@ def create_transcript(gene_ID, edge_IDs, vertex_IDs, transcript_dict, run_info):
                       'path': ",".join(map(str, edge_IDs)),
                       'start_vertex': vertex_IDs[0],
                       'end_vertex': vertex_IDs[-1],
-                      'n_exons': (len(edge_IDs) + 1)/2}
+                      'n_exons': (len(edge_IDs) + 1)/2 }
 
     transcript_dict[frozenset(edge_IDs)] = new_transcript
 
@@ -660,113 +661,36 @@ def process_FSM_or_ISM(edge_IDs, vertex_IDs, transcript_dict, run_info):
 
     novel_transcript = create_transcript(gene_ID, edge_IDs, vertex_IDs,
                                          transcript_dict, run_info)
-
     transcript_ID = novel_transcript['transcript_ID']
 
     if FSM != []:
         FSM_str = ",".join(FSM)
-        novelty.append((transcript_ID, run_info.idprefix, "TALON", "transcript_novelty", "FSM_transcript", FSM_str))  
+        novelty.append((transcript_ID, run_info.idprefix, "TALON", 
+                        "FSM_transcript", "TRUE"))
+        novelty.append((transcript_ID, run_info.idprefix, "TALON",
+                        "FSM_to_IDs", FSM_str))
         return gene_ID, transcript_ID, novelty
     else:
         ISM_str = ",".join(ISM)
-        novelty.append((transcript_ID, run_info.idprefix, "TALON", "transcript_novelty", "ISM_transcript", ISM_str))
+        novelty.append((transcript_ID, run_info.idprefix, "TALON", 
+                        "ISM_transcript", "TRUE"))
+        novelty.append((transcript_ID, run_info.idprefix, "TALON",
+                        "ISM_to_IDs", ISM_str))
         if prefix != []:
             prefix_str = ",".join(prefix)
-            novelty.append((transcript_ID, run_info.idprefix, "TALON", "transcript_novelty", "ISM-prefix_transcript", prefix_str))
+            novelty.append((transcript_ID, run_info.idprefix, "TALON", 
+                            "ISM-prefix_transcript", "TRUE"))
+            novelty.append((transcript_ID, run_info.idprefix, "TALON",
+                            "ISM-prefix_to_IDs", prefix_str))
         if suffix != []:
             suffix_str = ",".join(suffix)
-            novelty.append((transcript_ID, run_info.idprefix, "TALON", "transcript_novelty", "ISM-suffix_transcript", suffix_str))
-    
+            novelty.append((transcript_ID, run_info.idprefix, "TALON",
+                            "ISM-suffix_transcript", "TRUE"))
+            novelty.append((transcript_ID, run_info.idprefix, "TALON",
+                            "ISM-suffix_to_IDs", suffix_str))   
+ 
     return gene_ID, transcript_ID, novelty
     
-
-def process_FSM_old(edge_IDs, vertex_IDs, transcript_dict, run_info ):
-    """ Given a transcript, try to find an FSM gene and transcript match for it. 
-        In the case of an FSM with end novelty, a novel transcript will be 
-        created. Returns None if no FSM matches are found."""
-
-    novelty = []
-
-    # Look for exact FSM first
-    full_edge_set = frozenset(edge_IDs)
-    gene_ID, transcript_match = search_for_transcript(full_edge_set, transcript_dict)
-    if transcript_match != None:
-        transcript_ID = transcript_match['transcript_ID']
-        return gene_ID, transcript_ID, []
-
-    # At this point, return None for a monoexonic transcript, because different
-    # ends are not allowed
-    if len(edge_IDs) == 1:
-        return None, None, novelty
-    
-    # Next, look for FSM with different ends. This triggers a novel transcript
-    # that has novel 5' or 3' ends
-    gene_ID, transcript_matches = search_without_transcript_ends(edge_IDs,
-                                                               transcript_dict)
-    if transcript_matches != None:
-        # Create a new transcript
-        novel_transcript = create_transcript(gene_ID, edge_IDs, vertex_IDs,
-                                             transcript_dict, run_info)
-
-        transcript_IDs = ",".join([str(match["transcript_ID"]) for match in transcript_matches])
-        novelty.append((novel_transcript['transcript_ID'], run_info.idprefix, 
-                        "TALON", "FSM_transcript", "TRUE"))
-        novelty.append((novel_transcript['transcript_ID'], run_info.idprefix, 
-                        "TALON", "related_transcript_IDs", transcript_IDs))
-                
-        return gene_ID, novel_transcript["transcript_ID"], novelty
-
-    return None,None,novelty
-
-#def process_ISM(edge_IDs, vertex_IDs, transcript_dict, run_info ):
-#    """ Given a transcript, find the best gene and transcript match for it. 
-#        Also delineate its type(s) of novelty, which will later be added to 
-#        the database. If the transcript is identified as an ISM, a novel 
-#        transcript will be created."""
-
-#    suffix_ISM = False
-#    prefix_ISM = False
-
-#    gene_ID, ISM_matches = search_for_ISM(edge_IDs, transcript_dict)
-#    if ISM_matches == None:
-#        return None,None,[]
-
-#    # Look for suffix ISM novelty
-#    suffix_gene_ID, suffix_matches = search_for_transcript_suffix(edge_IDs, 
-#                                                               transcript_dict)
-#    if suffix_matches != None:
-#        suffix_ISM = True
-
-    # Look for prefix ISM novelty
-#    prefix_gene_ID, prefix_matches = search_for_transcript_prefix(edge_IDs,
-#                                                               transcript_dict)
-#    if prefix_matches != None:
-#        prefix_ISM = True
-
-    # Create a new transcript. Must wait until here to do it because otherwise 
-    # the transcript can find suffix or prefix matches to itself!
-#    novel_transcript = create_transcript(gene_ID, edge_IDs, vertex_IDs,
-#                                         transcript_dict, run_info)["transcript_ID"]
-#    ISM_IDs = [str(match[0]) for match in ISM_matches]
-#    novelty = [(novel_transcript, run_info.idprefix, "TALON", "ISM_transcript","TRUE")]  
- 
-    # Add novelty types
-#    if suffix_ISM == True:
-#        suffix_IDs = [str(match[0]) for match in suffix_matches]
-#        ISM_IDs += suffix_IDs
-#        novelty.append(((novel_transcript, run_info.idprefix, "TALON",
-#                         "ISM-suffix_transcript","TRUE"))) 
-#    if prefix_ISM == True:
-#        prefix_IDs = [str(match[0]) for match in prefix_matches]
-#        ISM_IDs += prefix_IDs
-#        novelty.append(((novel_transcript, run_info.idprefix, "TALON",
-#                         "ISM-prefix_transcript","TRUE")))
-    
-#    ISM_IDs = ",".join(set(ISM_IDs))
-#    novelty.append(((novel_transcript, run_info.idprefix, "TALON",
-#                         "related_transcript_IDs", ISM_IDs)))
-
-#    return gene_ID, novel_transcript, novelty
     
 def process_NIC(edge_IDs, vertex_IDs, strand, transcript_dict, vertex_2_gene, run_info):
     """ For a transcript that has been determined to be novel in catalog, find
@@ -794,10 +718,11 @@ def process_NIC(edge_IDs, vertex_IDs, strand, transcript_dict, vertex_2_gene, ru
     # Create a new transcript of that gene
     novel_transcript = create_transcript(gene_ID, edge_IDs, vertex_IDs,
                                          transcript_dict, run_info)
-    novelty = [(novel_transcript, run_info.idprefix, "TALON",
+    transcript_ID = novel_transcript["transcript_ID"]
+    novelty = [(transcript_ID, run_info.idprefix, "TALON",
                          "NIC_transcript","TRUE")]
 
-    return gene_ID, novel_transcript["transcript_ID"], novelty    
+    return gene_ID, transcript_ID, novelty    
 
 
 def find_gene_match_on_vertex_basis(vertex_IDs, strand, vertex_2_gene):
@@ -887,7 +812,10 @@ def identify_transcript(chrom, positions, strand, cursor, location_dict, edge_di
     if all_SJs_known or (n_exons == 1 and all_exons_known):
 
         # Look for FSM first
-        gene_ID, transcript_ID, transcript_novelty = process_FSM_or_ISM(edge_IDs, vertex_IDs, transcript_dict, run_info)
+        gene_ID, transcript_ID, transcript_novelty = process_FSM_or_ISM(edge_IDs, 
+                                                                vertex_IDs, 
+                                                                transcript_dict, 
+                                                                run_info)
 
         if gene_ID == None:
             gene_ID, transcript_ID, transcript_novelty = process_NIC(edge_IDs,
@@ -920,22 +848,25 @@ def identify_transcript(chrom, positions, strand, cursor, location_dict, edge_di
         transcript_ID = create_transcript(gene_ID, edge_IDs, vertex_IDs,
                                          transcript_dict, run_info)["transcript_ID"]
 
-        gene_novelty = [(gene_ID, run_info.idprefix, "TALON",
-                         "antisense_gene","TRUE")]
+        # Handle gene annotations
         gene_novelty.append((gene_ID, run_info.idprefix, "TALON",
-                         "related_gene_IDs", anti_gene_ID))
-        transcript_novelty = [(transcript_ID, run_info.idprefix, "TALON", 
-                               "antisense_transcript", "TRUE")]
+                             "antisense_gene","TRUE"))
+        gene_novelty.append((gene_ID, run_info.idprefix, "TALON",
+                         "gene_antisense_to_IDs",anti_gene_ID))
+
+        # Handle transcript annotations
+        transcript_novelty.append((transcript_ID, run_info.idprefix, "TALON", 
+                                   "antisense_transcript", "TRUE"))
 
     # Novel not in catalog transcripts contain new splice donors/acceptors
-    # and contain at least one splice junction. They may belong to an existing
-    # gene, but not necessarily.
+    # and contain at least one splice junction.
     elif not(splice_vertices_known) and n_exons > 1 and not(all_exons_novel): 
         gene_ID = find_gene_match_on_vertex_basis(vertex_IDs, strand, vertex_2_gene)
         transcript_ID = create_transcript(gene_ID, edge_IDs, vertex_IDs,
                                          transcript_dict, run_info)["transcript_ID"]
-        transcript_novelty = [(transcript_ID, run_info.idprefix, "TALON",
-                               "NNC_transcript", "TRUE")]
+
+        transcript_novelty.append((transcript_ID, run_info.idprefix, "TALON",
+                               "NNC_transcript", "TRUE"))
 
     # Transcripts that don't match the previous categories end up here
     else:
@@ -945,26 +876,27 @@ def identify_transcript(chrom, positions, strand, cursor, location_dict, edge_di
         if gene_ID == None:
             gene_ID = create_gene(chrom, positions[0], positions[-1],
                               strand, cursor, run_info)
-            gene_novelty = [(gene_ID, run_info.idprefix, "TALON",
-                         "intergenic_novel","TRUE")]
+
+            gene_novelty.append((gene_ID, run_info.idprefix, "TALON",
+                         "intergenic_novel","TRUE"))
 
         elif match_strand != strand:
             anti_gene_ID = gene_ID
             gene_ID = create_gene(chrom, positions[0], positions[-1],
                               strand, cursor, run_info)
-            gene_novelty = [(gene_ID, run_info.idprefix, "TALON",
-                         "antisense_gene","TRUE")]
             gene_novelty.append((gene_ID, run_info.idprefix, "TALON",
-                         "related_gene_IDs",anti_gene_ID))
+                         "antisense_gene","TRUE"))
+            gene_novelty.append((gene_ID, run_info.idprefix, "TALON",
+                         "gene_antisense_to_IDs",anti_gene_ID))
 
         transcript_ID = create_transcript(gene_ID, edge_IDs, vertex_IDs,
                                          transcript_dict, run_info)["transcript_ID"]
         if match_strand != strand:
-            transcript_novelty = [(transcript_ID, run_info.idprefix, "TALON",
-                                  "antisense_transcript", "TRUE")]
+            transcript_novelty.append((transcript_ID, run_info.idprefix, "TALON",
+                                  "antisense_transcript", "TRUE"))
         else:
-            transcript_novelty = [(transcript_ID, run_info.idprefix, "TALON",
-                                  "genomic_transcript", "TRUE")]
+            transcript_novelty.append((transcript_ID, run_info.idprefix, "TALON",
+                                  "genomic_transcript", "TRUE"))
        
     # Add all novel vertices to vertex_2_gene now that we have the gene ID
     # TODO: we might be able to run this operation fewer times by screening novelty
@@ -974,24 +906,27 @@ def identify_transcript(chrom, positions, strand, cursor, location_dict, edge_di
     if v_novelty[0] == 1:
         transcript_novelty.append((transcript_ID, run_info.idprefix, "TALON",
                                   "5p_novel", "TRUE"))
-        transcript_novelty.append((transcript_ID,"5p_novelty", None))
     if v_novelty[-1] == 1:
         transcript_novelty.append((transcript_ID, run_info.idprefix, "TALON",
                                   "3p_novel", "TRUE"))
 
     # For novel genes and transcripts, add names to novelty entries
     if len(gene_novelty) > 0:
+        gene_novelty.append((gene_ID, run_info.idprefix, "TALON",
+                                   "gene_status", "NOVEL"))
         gene_name = run_info.idprefix + "-gene_%d" % gene_ID
         gene_novelty.append((gene_ID, run_info.idprefix, "TALON",
-                         "gene_name", gene_name, None))
+                         "gene_name", gene_name))
         gene_novelty.append((gene_ID, run_info.idprefix, "TALON",
-                         "gene_id", gene_name, None))
+                         "gene_id", gene_name))
     if len(transcript_novelty) > 0:
+        transcript_novelty.append((transcript_ID, run_info.idprefix, "TALON",
+                                   "transcript_status", "NOVEL"))
         transcript_name = run_info.idprefix + "-transcript_%d" % transcript_ID
         transcript_novelty.append((transcript_ID, run_info.idprefix, "TALON",
-                         "transcript_name", transcript_name, None))
+                         "transcript_name", transcript_name))
         transcript_novelty.append((transcript_ID, run_info.idprefix, "TALON",
-                         "transcript_id", transcript_name, None))
+                         "transcript_id", transcript_name))
 
     # Add annotation entries for any novel exons
     exon_novelty = []
@@ -999,7 +934,7 @@ def identify_transcript(chrom, positions, strand, cursor, location_dict, edge_di
         for exon,is_novel in zip(edge_IDs, e_novelty):
             if is_novel:
                 exon_novelty.append((exon, run_info.idprefix, "TALON", 
-                                     "exon_status", "NOVEL", None))
+                                     "exon_status", "NOVEL"))
 
     # Package up information for output
     annotations = {'gene_ID': gene_ID,
@@ -1121,7 +1056,6 @@ def prepare_data_structures(cursor, build, min_coverage, min_identity):
     return struct_collection
 
 def process_all_sam_files(sam_files, dataset_list, cursor, struct_collection, 
-
                           outprefix):
     """ Iterates over the provided sam files. """
 
@@ -1146,7 +1080,9 @@ def process_all_sam_files(sam_files, dataset_list, cursor, struct_collection,
     o.write("\t".join(["dataset", "read_ID", "passed_QC", "primary_mapped", 
                        "read_length", "fraction_aligned", "identity"]) + "\n")
 
+
     for sam, d_metadata in zip(sam_files, dataset_list):
+        print("Working with dataset %s..." % d_metadata[0])
 
         # Create annotation entry for this dataset
         struct_collection.run_info['dataset'] += 1
@@ -1158,11 +1094,11 @@ def process_all_sam_files(sam_files, dataset_list, cursor, struct_collection,
         exon_annotations, abundance = annotate_sam_transcripts(sam, d_id, cursor, struct_collection, o)
  
         # Consolidate the outputs
-        all_observed_transcripts += observed_transcripts
-        all_gene_annotations += gene_annotations
-        all_transcript_annotations += transcript_annotations
-        all_exon_annotations += exon_annotations
-        all_abundance += abundance
+        all_observed_transcripts.extend(observed_transcripts)
+        all_gene_annotations.extend(gene_annotations)
+        all_transcript_annotations.extend(transcript_annotations)
+        all_exon_annotations.extend(exon_annotations)
+        all_abundance.extend(abundance)
 
     o.close()
     
@@ -1365,12 +1301,10 @@ def update_database(cursor, batch_size, datasets, observed_transcripts,
     print("Updating counters...")
     update_counter(cursor, struct_collection.run_info)
 
-    # TODO: I need to fix our notation for describing the annotations
-    
-    #print("Updating gene, transcript, and exon annotations...")
-    #batch_add_annotations(cursor, gene_annotations, "gene", batch_size)
-    #batch_add_annotations(cursor, transcript_annotations, "transcript", batch_size)
-    #batch_add_annotations(cursor, exon_annotations, "exon", batch_size)
+    print("Updating gene, transcript, and exon annotations...")
+    batch_add_annotations(cursor, gene_annotations, "gene", batch_size)
+    batch_add_annotations(cursor, transcript_annotations, "transcript", batch_size)
+    batch_add_annotations(cursor, exon_annotations, "exon", batch_size)
 
     return
  
@@ -1421,7 +1355,7 @@ def batch_add_vertex2gene(cursor, vertex_2_gene, batch_size):
 
         except Exception as e:
             print(e)
-
+            sys.exit(1)
     return
 
 def batch_add_locations(cursor, location_dict, batch_size):
@@ -1452,7 +1386,7 @@ def batch_add_locations(cursor, location_dict, batch_size):
 
         except Exception as e:
             print(e)
-
+            sys.exit(1)
     return
     
 
@@ -1482,6 +1416,7 @@ def batch_add_edges(cursor, edge_dict, batch_size):
 
         except Exception as e:
             print(e)
+            sys.exit(1)
 
     return
 
@@ -1514,6 +1449,7 @@ def batch_add_transcripts(cursor, transcript_dict, batch_size):
             cursor.executemany(command, transcript_batch)
         except Exception as e:
             print(e)
+            sys.exit(1)
 
     return
 
@@ -1536,12 +1472,13 @@ def add_datasets(cursor, datasets):
 
     except Exception as e:
         print(e)
+        sys.exit(1)
     return
 
 def batch_add_annotations(cursor, annotations, annot_type, batch_size):
     """ Add gene/transcript/exon annotations to the appropriate annotation table
     """
-
+    
     if annot_type not in ["gene", "transcript", "exon"]:
         raise ValueError("When running batch annot update, must specify " + \
                          "annot_type as 'gene', 'exon', or 'transcript'.")
@@ -1563,6 +1500,7 @@ def batch_add_annotations(cursor, annotations, annot_type, batch_size):
 
         except Exception as e:
             print(e)
+            sys.exit(1)
     return
 
 def batch_add_observed(cursor, observed, batch_size):
@@ -1590,6 +1528,7 @@ def batch_add_observed(cursor, observed, batch_size):
 
         except Exception as e:
             print(e)
+            sys.exit(1)
     return
 
 def batch_add_abundance(cursor, abundances, batch_size):
@@ -1611,6 +1550,7 @@ def batch_add_abundance(cursor, abundances, batch_size):
             cursor.executemany(command, batch)
         except Exception as e:
             print(e)
+            sys.exit(1)
     return 
 
 def check_database_integrity(cursor):
@@ -1621,8 +1561,6 @@ def check_database_integrity(cursor):
     counter_query = "SELECT * FROM counters"
     cursor.execute(counter_query)
     counters = cursor.fetchall()
-
-    
 
     for table_name, curr_counter in counters:
         curr_counter = int(curr_counter)
@@ -1643,6 +1581,31 @@ def check_database_integrity(cursor):
                   " Discarding changes to database and exiting...")
 
     return
+
+def write_counts_log_file(cursor, outprefix):
+    """ Create a log file with the following columns:
+            - dataset name
+            - Number of reads annotated
+            - Number of known genes detected
+            - Number of antisense genes detected
+            - Number of intergenic genes detected
+            - Number of FSM transcripts detected (perfect + with novelty)
+            - Number of total ISM transcripts detected
+            - Number of suffix ISMs detected
+            - Number of antisense transcripts detected
+            - Number of genomic transcripts detected
+    """
+    o = open(outprefix + "_talon_summary.tsv")
+    columns = [ "dataset", "reads_annotated", "known_genes", "antisense_genes",
+                "intergenic_novel_genes", "FSMs", "total_ISMs", "suffix_ISMs",
+                "prefix_ISMs", "antisense_transcripts", "genomic_transcripts" ]
+    o.write("\t".join(columns)) 
+
+    # Get dataset names
+
+    
+    o.close()
+
 
 def main():
     """ Runs program """
@@ -1669,9 +1632,11 @@ def main():
 
     # Read and annotate input sam files. Also, write output QC log file.
     print("Processing SAM files...")
+    print("-------------------------------------")
     datasets, observed_transcripts, gene_annotations, transcript_annotations, \
     exon_annotations, abundance = process_all_sam_files(sam_files, dataset_list, cursor, 
                                       struct_collection, outprefix)
+    print("-------------------------------------")
 
     # Update database
     batch_size = 10000
@@ -1679,14 +1644,16 @@ def main():
                     gene_annotations, transcript_annotations, exon_annotations,
                     abundance, struct_collection)
 
-    # TODO: Validate database
+    # Validate database
     check_database_integrity(cursor) 
+    conn.commit()
 
-    # conn.commit()
-
-    # Generate output files if desired
-
+    # TODO: output files
+    # Write a file enumerating how many known/novel genes and transcripts
+    # were detected in each dataset
+    #write_counts_log_file(cursor, outprefix)
     conn.close()
+
 
 if __name__ == '__main__':
     #pr = cProfile.Profile()
