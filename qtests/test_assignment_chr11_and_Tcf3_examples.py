@@ -150,10 +150,84 @@ class TestAssignments(object):
             assert assignment['end_delta'] == 15
 
         # Now make sure that the novel transcript was annotated correctly
-        annot_dict = make_annot_dict(cursor, assignment['transcript_ID'])
+        annot_dict = make_annot_dict(cursor, 8455)
         assert annot_dict["NIC_transcript"] == "TRUE"
         assert annot_dict["transcript_status"] == "NOVEL"
         conn.close()
+
+    def test_FSM_of_Drg1(self):
+        """ Read m54284_180814_002203/40042763/ccs is an FSM of the Drg1 gene
+            (BC017) """
+        
+        conn = sqlite3.connect("scratch/chr11_and_Tcf3.db")
+        conn.row_factory = sqlite3.Row
+        cursor = conn.cursor()
+
+        dataset = "PB65_B017"
+        read_ID = "m54284_180814_002203/40042763/ccs"
+        
+        # Fetch observed entry from table
+        query = """SELECT * from observed WHERE dataset = ? AND read_name = ?"""
+        assignment = cursor.execute(query, [dataset, read_ID]).fetchall()[0]
+
+        correct_gene_ID = fetch_correct_ID("Drg1", "gene", cursor)
+        assert assignment['gene_ID'] == correct_gene_ID
+        assert assignment['transcript_ID'] == 8456
+        assert assignment['start_delta'] == -16
+        assert assignment['end_delta'] == 15
+
+        # Now make sure that the novel transcript was annotated correctly
+        # TODO: in the future, I would like this transcript to prioritize
+        # the known transcript ID 28. Just a thought
+        annot_dict = make_annot_dict(cursor, assignment['transcript_ID'])
+        assert annot_dict["FSM_transcript"] == "TRUE"
+        assert annot_dict["FSM_to_IDs"] == "28"
+        assert annot_dict["transcript_status"] == "NOVEL"
+        conn.close()
+
+    def antisense_to_Grb10(self):
+        """ Read m54284_180814_002203/8126905/ccs from BC017 """
+
+        conn = sqlite3.connect("scratch/chr11_and_Tcf3.db")
+        conn.row_factory = sqlite3.Row
+        cursor = conn.cursor()
+
+        dataset = "PB65_B017"
+        read_ID = "m54284_180814_002203/8126905/ccs"
+
+        # Fetch observed entry from table
+        query = """SELECT * from observed WHERE dataset = ? AND read_name = ?"""
+        assignment = cursor.execute(query, [dataset, read_ID]).fetchall()[0]
+
+        correct_antisense_gene_ID = fetch_correct_ID("Grb10", "gene", cursor)
+        assert assignment['gene_ID'] == 2988
+        assert assignment['transcript_ID'] == 8457
+
+        # Now make sure that the novel gene was annotated correctly
+        annot_dict_gene = make_annot_dict(cursor, 8457)
+        assert annot_dict_gene["antisense_gene"] == "TRUE"
+        assert annot_dict_gene["gene_status"] == "NOVEL"
+        assert annot_dict_gene["gene_antisense_to_IDs"] == str(correct_antisense_gene_ID)
+
+        # Now make sure that the novel transcript was annotated correctly
+        annot_dict = make_annot_dict(cursor, assignment['transcript_ID'])
+        assert annot_dict["antisense_transcript"] == "TRUE"
+        assert annot_dict["transcript_status"] == "NOVEL"
+        conn.close()
+        
+        
+
+def make_annot_dict_gene(cursor, gene_ID):
+    """ Extracts all gene annotations for the transcript ID and puts
+        them in a dict """
+    query = """SELECT * from gene_annotations WHERE ID = ?"""
+    annotations = cursor.execute(query, [gene_ID]).fetchall()
+    annot_dict = {}
+    for annot in annotations:
+        attribute = annot["attribute"]
+        value = annot["value"]
+        annot_dict[attribute] = value
+    return annot_dict
 
 def make_annot_dict(cursor, transcript_ID):
     """ Extracts all transcript annotations for the transcript ID and puts
