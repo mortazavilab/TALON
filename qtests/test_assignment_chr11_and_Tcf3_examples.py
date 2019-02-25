@@ -69,6 +69,33 @@ class TestAssignments(object):
         assert annot_dict["ISM-prefix_to_IDs"] == "1744"
         conn.close()
 
+    def test_genomic_of_Tcf3(self):
+        """ m54284_180814_002203/19268005/ccs is a genomic transcript of Tcf3
+            from the BC017 data """
+        conn = sqlite3.connect("scratch/chr11_and_Tcf3.db")
+        conn.row_factory = sqlite3.Row
+        cursor = conn.cursor()
+
+        dataset = "PB65_B017"
+        read_ID = "m54284_180814_002203/19268005/ccs"
+
+        # Fetch observed entry from table
+        query = """SELECT * from observed WHERE dataset = ? AND read_name = ?"""
+        assignment = cursor.execute(query, [dataset, read_ID]).fetchall()[0]
+
+        correct_gene_ID = fetch_correct_ID("Tcf3", "gene", cursor)
+        assert assignment['gene_ID'] == correct_gene_ID
+        assert assignment['transcript_ID'] == 8453
+        assert assignment['start_delta'] == None
+        assert assignment['end_delta'] == -13
+
+        # Now make sure that the novel transcript was annotated correctly
+        annot_dict = make_annot_dict(cursor, assignment['transcript_ID'])
+        assert annot_dict["genomic_transcript"] == "TRUE"
+        assert annot_dict["5p_novel"] == "TRUE"
+        assert annot_dict["transcript_status"] == "NOVEL"
+        conn.close()
+
     def test_suffix_ISM_of_Tcf3(self):
         """ m54284_180814_002203/18809472/ccs is an ISM suffix transcript of Tcf3.
             Comes from BC017 data. """
@@ -97,6 +124,35 @@ class TestAssignments(object):
         assert annot_dict["transcript_status"] == "NOVEL"
         assert annot_dict["ISM_to_IDs"] == "8437,8438,8440,8443,8445,8446"
         assert annot_dict["ISM-suffix_to_IDs"] == "8437,8438,8440,8443,8445,8446"
+        conn.close()
+
+    def test_NIC_of_Drg1(self):
+        """ For this example, the same read was planted in two different 
+            datasets (m54284_180814_002203/49414590/ccs) """
+
+        conn = sqlite3.connect("scratch/chr11_and_Tcf3.db")
+        conn.row_factory = sqlite3.Row
+        cursor = conn.cursor()
+
+        dataset_1 = "PB65_B017"
+        dataset_2 = "PB65_B018"
+        read_ID = "m54284_180814_002203/49414590/ccs"
+
+        # Fetch observed entry from table
+        query = """SELECT * from observed WHERE dataset IN 
+                   ('PB65_B017', 'PB65_B018') AND read_name = ?"""
+        cursor.execute(query, [read_ID])
+        correct_gene_ID = fetch_correct_ID("Drg1", "gene", cursor)
+        for assignment in cursor.fetchall():
+            assert assignment['gene_ID'] == correct_gene_ID
+            assert assignment['transcript_ID'] == 8455
+            assert assignment['start_delta'] == -2
+            assert assignment['end_delta'] == 15
+
+        # Now make sure that the novel transcript was annotated correctly
+        annot_dict = make_annot_dict(cursor, assignment['transcript_ID'])
+        assert annot_dict["NIC_transcript"] == "TRUE"
+        assert annot_dict["transcript_status"] == "NOVEL"
         conn.close()
 
 def make_annot_dict(cursor, transcript_ID):
