@@ -12,6 +12,7 @@ import sqlite3
 import sys
 import dstruct
 import operator
+from pathlib import Path
 import warnings
 import transcript_utils as tutils
 import query_utils as qutils
@@ -955,8 +956,13 @@ def check_inputs(options):
         they are valid. Throw an error with descriptive help message if not."""
     # TODO: add tests to suite
 
+    # Make sure that the input database exists!
+    database = options.database
+    if not Path(database).exists():
+        raise ValueError("Database file '%s' does not exist!" % database)
+
     # Make sure that the genome build exists in the provided TALON database.
-    conn = sqlite3.connect(options.database)
+    conn = sqlite3.connect(database)
     cursor = conn.cursor()
     cursor.execute(""" SELECT DISTINCT name FROM genome_build """)
     builds = [ str(x[0]) for x in cursor.fetchall() ]
@@ -1149,16 +1155,15 @@ def annotate_sam_transcripts(sam_file, dataset, cursor, struct_collection, QC_fi
             transcript_dict = struct_collection.transcript_dict
             vertex_2_gene = struct_collection.vertex_2_gene
             run_info = struct_collection.run_info
-            #try:
-            annotation_info = identify_transcript(chrom, positions, strand, 
+            try:
+                annotation_info = identify_transcript(chrom, positions, strand, 
                                                       cursor, location_dict, 
                                                       edge_dict, transcript_dict, 
                                                       vertex_2_gene, run_info)
-            #except:
-            #    warnings.warn("Problem identifying transcript '%s'. Skipping.."\
-            #                   % read_ID)
-            #    exit()
-            #    continue
+            except:
+                warnings.warn("Problem identifying transcript '%s'. Skipping.."\
+                               % read_ID)    
+                continue
                             
             # Now that transcript has been annotated, unpack values and 
             # create an observed entry and abundance record
