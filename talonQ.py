@@ -1087,11 +1087,12 @@ def process_all_sam_files(sam_files, dataset_list, cursor, struct_collection,
         # Create annotation entry for this dataset
         struct_collection.run_info['dataset'] += 1
         d_id = struct_collection.run_info['dataset']     
-        novel_datasets += [(d_id, d_metadata[0], d_metadata[1], d_metadata[2])]
+        d_name = d_metadata[0]
+        novel_datasets += [(d_id, d_name, d_metadata[1], d_metadata[2])]
 
         # Now process the current sam file
         observed_transcripts, gene_annotations, transcript_annotations, \
-        exon_annotations, abundance = annotate_sam_transcripts(sam, d_id, cursor, struct_collection, o)
+        exon_annotations, abundance = annotate_sam_transcripts(sam, d_name, cursor, struct_collection, o)
  
         # Consolidate the outputs
         all_observed_transcripts.extend(observed_transcripts)
@@ -1595,14 +1596,24 @@ def write_counts_log_file(cursor, outprefix):
             - Number of antisense transcripts detected
             - Number of genomic transcripts detected
     """
-    o = open(outprefix + "_talon_summary.tsv")
+    o = open(outprefix + "_talon_summary.tsv", 'w')
     columns = [ "dataset", "reads_annotated", "known_genes", "antisense_genes",
                 "intergenic_novel_genes", "FSMs", "total_ISMs", "suffix_ISMs",
                 "prefix_ISMs", "antisense_transcripts", "genomic_transcripts" ]
     o.write("\t".join(columns)) 
 
     # Get dataset names
-
+    cursor.execute(""" SELECT dataset_name FROM dataset """)
+    datasets = [ str(x[0]) for x in cursor.fetchall() ]
+    for dataset in datasets:
+        print(dataset)
+        # Get number of reads in the dataset
+        #query = """SELECT * FROM location WHERE genome_build = ? """
+        #cursor.execute(query, [genome_build])
+        query = """ SELECT COUNT(obs_ID)
+                                   FROM observed WHERE dataset = ? """
+        cursor.execute(query, [dataset])
+        print(cursor.fetchone()[0])
     
     o.close()
 
@@ -1651,7 +1662,7 @@ def main():
     # TODO: output files
     # Write a file enumerating how many known/novel genes and transcripts
     # were detected in each dataset
-    #write_counts_log_file(cursor, outprefix)
+    write_counts_log_file(cursor, outprefix)
     conn.close()
 
 
