@@ -1,7 +1,7 @@
 import pytest
 import sys
 sys.path.append("..")
-from transcript_utils import *
+from sam_transcript import *
 @pytest.mark.unit
 
 class TestGetIntrons(object):

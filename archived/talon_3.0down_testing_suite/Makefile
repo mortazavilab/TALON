@@ -1,20 +1,16 @@
 test :
-	set -e;
-	make clean;
-	python build_test_databases.py;
+	if [ -d "scratch" ]; then rm -Rf scratch; fi
+	mkdir scratch;
 	pytest;
 
 unit :
-	set -e;
-	make clean;
 	pytest -v -m unit;
 
 integration :
-	set -e;
-	make clean;
+	if [ -d "scratch" ]; then rm -Rf scratch; fi
+	mkdir scratch;
 	pytest -v -m integration;
 
 clean :
-	set -e; 	
 	if [ -d "scratch" ]; then rm -Rf scratch; fi
 	mkdir scratch;

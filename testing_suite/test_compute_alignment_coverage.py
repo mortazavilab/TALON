@@ -1,7 +1,7 @@
 import pytest
 import sys
 sys.path.append("..")
-import talon as TALON
+import transcript_utils as tu
 @pytest.mark.unit
 
 def test_compute_alignment_coverage():
@@ -9,4 +9,4 @@ def test_compute_alignment_coverage():
         the genome by excluding hard or soft-clipped bases."""
     
     cigar = "5S90M5H"
-    assert TALON.compute_alignment_coverage(cigar) == 0.9
+    assert tu.compute_alignment_coverage(cigar) == 0.9

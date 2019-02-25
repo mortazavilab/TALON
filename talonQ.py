@@ -990,6 +990,10 @@ def check_inputs(options):
                                  '(dataset name, sample description, ' + \
                                  'platform, associated sam file).')
 
+            # Make sure that the sam file exists
+            if not Path(curr_sam).exists():
+                raise ValueError("SAM file '%s' does not exist!" % curr_sam)
+
             metadata = (line[0], line[1], line[2])
             dataname = metadata[0]
             if dataname in existing_datasets:
