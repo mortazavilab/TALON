@@ -6,7 +6,7 @@ The database is initialized from the mouse chromosome 11 annotation plus the Tcf
 # GTF creation
 ```
 awk '{if ($1 == "chr11") print $0}' /bio/dwyman/pacbio_f2016/data/GENCODEvM7/gencode.vM7.annotation.gtf > chr11_and_Tcf3.gtf
-
+grep "Tcf3" /bio/dwyman/pacbio_f2016/data/GENCODEvM7/gencode.vM7.annotation.gtf >> chr11_and_Tcf3.gtf
 ```
 
 # Read assignments:
@@ -32,10 +32,10 @@ Files used:
 * m54284_180814_204240/44761238/ccs is an FSM transcript of Tcf3
 * m54284_180814_002203/49414590/ccs is copied from BC017 (NIC transcript of Drg1) to test that is gets assigned to the same thing this time
 
-## D12 C2C12 (4 reads)
+## D12 C2C12 (5 reads)
 * m54284_181114_004841/51511668/3202_53_CCS is a NNC transcript of Canx
-* m54284_181114_004841/17433269/26_2129_CCS maps to the final exon of Canx. Right now I think this will be treated as an ISM, but it could also reasonably be genomic.
+* m54284_181114_004841/17433269/26_2129_CCS maps to the final exon of Canx but is antisense
 * m54284_180829_231707/19726894/30_2449_CCS is FSM with novel 3p of Canx.
 * m54284_181114_004841/11862379/29_4135_CCS is an FSM of Canx.
-
+* m54284_181114_004841/71172442/1255_244_CCS maps to the final exon of Canx. Right now I think this will be treated as an ISM, but it could also reasonably be genomic.
 

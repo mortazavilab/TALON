@@ -1,3 +1,3 @@
-PB65_B017,PB65-limb-pool-C,PacBio-Sequel,input_files/chr11/BC017.sam
-PB65_B018,PB65-limb-pool-C,PacBio-Sequel,input_files/chr11/BC018.sam
-D12,C2C12,PacBio-Sequel,input_files/chr11/D12.sam
+PB65_B017,PB65-limb-pool-C,PacBio-Sequel,input_files/chr11_and_Tcf3/BC017.sam
+PB65_B018,PB65-limb-pool-C,PacBio-Sequel,input_files/chr11_and_Tcf3/BC018.sam
+D12,C2C12,PacBio-Sequel,input_files/chr11_and_Tcf3/D12.sam

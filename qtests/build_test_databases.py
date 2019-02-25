@@ -40,14 +40,25 @@ except Exception as e:
 try:
     subprocess.check_output(
        ["python", "../initialize_talon_database.py",
-        "--f", "input_files/chr11/chr11.gtf",
+        "--f", "input_files/chr11_and_Tcf3/chr11_and_Tcf3.gtf",
         "--a",  "gencode_vM7",
         "--5p", "500",
         "--3p", "300",
         "--idprefix", "ENCODE-mouse",
         "--l", "0",
-        "--g",  "mm10", "--o", "scratch/chr11"])
+        "--g",  "mm10", "--o", "scratch/chr11_and_Tcf3"])
 except Exception as e:
     print(e)
     sys.exit("Database initialization failed on chr11 annotation")
 
+# Actually perform the chr11_and_Tcf3 TALON run
+try:
+    subprocess.check_output(
+       ["python", "../talonQ.py", 
+        "--f", "input_files/chr11_and_Tcf3/config.csv",
+        "--db", "scratch/chr11_and_Tcf3.db", 
+        "--build", "mm10",
+        "--o", "scratch/chr11_and_Tcf3" ])
+except Exception as e:
+    print(e)
+    sys.exit("TALON run failed on chr11_and_Tcf3")
