@@ -918,12 +918,12 @@ def identify_transcript(chrom, positions, strand, cursor, location_dict, edge_di
     update_vertex_2_gene(gene_ID, vertex_IDs, strand, vertex_2_gene)
  
     # Process 5' and 3' end novelty on relevant transcripts
-    if v_novelty[0] == 1:
-        transcript_novelty.append((transcript_ID, run_info.idprefix, "TALON",
-                                  "5p_novel", "TRUE"))
-    if v_novelty[-1] == 1:
-        transcript_novelty.append((transcript_ID, run_info.idprefix, "TALON",
-                                  "3p_novel", "TRUE"))
+    #if v_novelty[0] == 1:
+    #    transcript_novelty.append((transcript_ID, run_info.idprefix, "TALON",
+    #                              "5p_novel", "TRUE"))
+    #if v_novelty[-1] == 1:
+    #    transcript_novelty.append((transcript_ID, run_info.idprefix, "TALON",
+    #                              "3p_novel", "TRUE"))
 
     # For novel genes and transcripts, add names to novelty entries
     if len(gene_novelty) > 0:
@@ -1502,7 +1502,7 @@ def add_datasets(cursor, datasets):
 def batch_add_annotations(cursor, annotations, annot_type, batch_size):
     """ Add gene/transcript/exon annotations to the appropriate annotation table
     """
-    
+    batch_size = 1
     if annot_type not in ["gene", "transcript", "exon"]:
         raise ValueError("When running batch annot update, must specify " + \
                          "annot_type as 'gene', 'exon', or 'transcript'.")
@@ -1518,7 +1518,7 @@ def batch_add_annotations(cursor, annotations, annot_type, batch_size):
         try:
             cols = " (" + ", ".join([str_wrap_double(x) for x in
                    ["ID", "annot_name", "source", "attribute", "value"]]) + ") "
-            command = 'INSERT INTO "' + annot_type + '_annotations" ' + cols + \
+            command = 'INSERT OR IGNORE INTO "' + annot_type + '_annotations" ' + cols + \
                       "VALUES " + '(?,?,?,?,?)'
             cursor.executemany(command, batch)
 
