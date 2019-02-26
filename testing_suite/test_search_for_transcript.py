@@ -14,7 +14,7 @@ class TestSearchForTranscript(object):
         """
         conn, cursor = get_db_cursor()
         build = "toy_build"
-        transcript_dict = talon.make_transcript_dict(cursor)
+        transcript_dict = talon.make_transcript_dict(cursor, build)
         conn.close()
 
         edges = frozenset({ 1, 3, 4, 5 })
@@ -31,7 +31,7 @@ class TestSearchForTranscript(object):
         """
         conn, cursor = get_db_cursor()
         build = "toy_build"
-        transcript_dict = talon.make_transcript_dict(cursor)
+        transcript_dict = talon.make_transcript_dict(cursor, build)
 
         edges = frozenset({ 12, 13, 14, 15, 16 })
         gene_ID, transcript = talon.search_for_transcript(edges,

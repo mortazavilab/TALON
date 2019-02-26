@@ -50,17 +50,24 @@ def str_wrap_double(s):
     s = str(s)
     return '"' + s + '"'
 
-def make_transcript_dict(cursor):
+def make_transcript_dict(cursor, build):
     """ Format of dict:
             Key: tuple consisting of edges in transcript path
             Value: SQLite3 row from transcript table
-         This query returns the novelty designation of the transcript in 
-         addition to basic attributes (KNOWN if transcript is known, None
-         otherwise).
     """
     transcript_dict = {}
-    query = """SELECT * FROM transcripts """
-    cursor.execute(query)
+    #query = """SELECT * FROM transcripts """
+    query = """SELECT t.*,
+	         loc1.chromosome as chromosome,
+                 loc1.position as start_pos,
+                 loc2.position as end_pos	
+	       FROM transcripts AS t
+	       LEFT JOIN location as loc1 ON t.start_vertex = loc1.location_ID 
+	       LEFT JOIN location as loc2 ON t.end_vertex = loc2.location_ID
+	       WHERE loc1.genome_build = ? AND loc2.genome_build = ?;
+           """
+
+    cursor.execute(query, [build, build])
     for transcript in cursor.fetchall():
         transcript_path = transcript["path"].split(",")
         transcript_path = frozenset([ int(x) for x in transcript_path ])
@@ -1054,7 +1061,7 @@ def prepare_data_structures(cursor, build, min_coverage, min_identity):
     run_info = init_run_info(cursor, build, min_coverage, min_identity)
     location_dict = make_location_dict(build, cursor)
     edge_dict = make_edge_dict(cursor)
-    transcript_dict = make_transcript_dict(cursor)
+    transcript_dict = make_transcript_dict(cursor, build)
     vertex_2_gene = make_vertex_2_gene_dict(cursor)
    
     struct_collection = dstruct.Struct() 
@@ -1597,9 +1604,14 @@ def write_counts_log_file(cursor, outprefix):
     """ Create a log file with the following columns:
             - dataset name
             - Number of reads annotated
-            - Number of known genes detected
+            - Number of known genes detected (total)
+            - Number of novel genes detected (total)
+            - Number of known transcripts detected (total)
+            - Number of novel transcripts detected (total)
+            Breakdowns by category
             - Number of antisense genes detected
             - Number of intergenic genes detected
+            - Number of known transcripts
             - Number of FSM transcripts detected (perfect + with novelty)
             - Number of total ISM transcripts detected
             - Number of suffix ISMs detected

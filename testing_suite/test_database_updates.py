@@ -150,7 +150,7 @@ class TestDatabaseUpdates(object):
         build = "toy_build"
         edge_dict = talon.make_edge_dict(cursor)
         run_info = talon.init_run_info(cursor, build)
-        transcript_dict = talon.make_transcript_dict(cursor)
+        transcript_dict = talon.make_transcript_dict(cursor, build)
         talon.create_transcript( 1, (1,2,3), (1,2,3,4), transcript_dict, run_info)
 
         batch_size = 5

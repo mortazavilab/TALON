@@ -17,7 +17,7 @@ class TestIdentifyNIC(object):
         edge_dict = talon.make_edge_dict(cursor)
         location_dict = talon.make_location_dict(build, cursor)
         run_info = talon.init_run_info(cursor, build)
-        transcript_dict = talon.make_transcript_dict(cursor)
+        transcript_dict = talon.make_transcript_dict(cursor, build)
         vertex2gene = talon.make_vertex_2_gene_dict(cursor)
 
         edge_IDs = (1, 200, 5)
@@ -42,7 +42,7 @@ class TestIdentifyNIC(object):
         edge_dict = talon.make_edge_dict(cursor)
         location_dict = talon.make_location_dict(build, cursor)
         run_info = talon.init_run_info(cursor, build)
-        transcript_dict = talon.make_transcript_dict(cursor)
+        transcript_dict = talon.make_transcript_dict(cursor, build)
         vertex2gene = talon.make_vertex_2_gene_dict(cursor)
 
         # Construct temp novel gene db

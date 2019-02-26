@@ -16,7 +16,7 @@ class TestIdentifyISM(object):
         edge_dict = talon.make_edge_dict(cursor)
         location_dict = talon.make_location_dict(build, cursor)
         run_info = talon.init_run_info(cursor, build)        
-        transcript_dict = talon.make_transcript_dict(cursor)
+        transcript_dict = talon.make_transcript_dict(cursor, build)
 
         edge_IDs = (3, 4, 5)
         vertex_IDs = (3, 4, 5, 6)
@@ -38,7 +38,7 @@ class TestIdentifyISM(object):
         edge_dict = talon.make_edge_dict(cursor)
         location_dict = talon.make_location_dict(build, cursor)
         run_info = talon.init_run_info(cursor, build)
-        transcript_dict = talon.make_transcript_dict(cursor)
+        transcript_dict = talon.make_transcript_dict(cursor, build)
 
         edge_IDs = (200,2,3)
         vertex_IDs = (500, 2, 3, 4) 
@@ -60,7 +60,7 @@ class TestIdentifyISM(object):
         edge_dict = talon.make_edge_dict(cursor)
         location_dict = talon.make_location_dict(build, cursor)
         run_info = talon.init_run_info(cursor, build)
-        transcript_dict = talon.make_transcript_dict(cursor)
+        transcript_dict = talon.make_transcript_dict(cursor, build)
 
         edge_IDs = (5,)
         vertex_IDs = (5, 6)
@@ -82,7 +82,7 @@ class TestIdentifyISM(object):
         edge_dict = talon.make_edge_dict(cursor)
         location_dict = talon.make_location_dict(build, cursor)
         run_info = talon.init_run_info(cursor, build)
-        transcript_dict = talon.make_transcript_dict(cursor)
+        transcript_dict = talon.make_transcript_dict(cursor, build)
 
         edge_IDs = (1, 2, 3, 100, 200) 
         vertex_IDs = (1, 2, 3, 4, 50, 70) 

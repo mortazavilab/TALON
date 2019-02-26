@@ -16,7 +16,7 @@ class TestIdentifyFSM(object):
         edge_dict = talon.make_edge_dict(cursor)
         location_dict = talon.make_location_dict(build, cursor)
         run_info = talon.init_run_info(cursor, build)        
-        transcript_dict = talon.make_transcript_dict(cursor)
+        transcript_dict = talon.make_transcript_dict(cursor, build)
 
         edge_IDs = (1, 2, 3, 4, 5)
         vertex_IDs = (1, 2, 3, 4, 5, 6)
@@ -42,7 +42,7 @@ class TestIdentifyFSM(object):
         edge_dict = talon.make_edge_dict(cursor)
         location_dict = talon.make_location_dict(build, cursor)
         run_info = talon.init_run_info(cursor, build)
-        transcript_dict = talon.make_transcript_dict(cursor)
+        transcript_dict = talon.make_transcript_dict(cursor, build)
 
         edge_IDs = (1, 2, 3, 4, 500) # Last edge is novel
         vertex_IDs = (1, 2, 3, 4, 5, 500) # Last vertex is novel
@@ -65,7 +65,7 @@ class TestIdentifyFSM(object):
         edge_dict = talon.make_edge_dict(cursor)
         location_dict = talon.make_location_dict(build, cursor)
         run_info = talon.init_run_info(cursor, build)
-        transcript_dict = talon.make_transcript_dict(cursor)
+        transcript_dict = talon.make_transcript_dict(cursor, build)
 
         edge_IDs = (1, 200, 3) 
         vertex_IDs = (1, 2, 5, 6) 
