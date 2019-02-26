@@ -621,6 +621,7 @@ def process_FSM_or_ISM(edge_IDs, vertex_IDs, transcript_dict, run_info):
     if all_matches == None:
         return None, None, []
 
+
     FSM = []
     ISM = []
     suffix = []
@@ -633,7 +634,12 @@ def process_FSM_or_ISM(edge_IDs, vertex_IDs, transcript_dict, run_info):
         if match['n_exons'] == n_exons:
             gene_ID = match['gene_ID']
             FSM.append(str(match['transcript_ID']))
-            
+
+            # new
+            gene_ID = match['gene_ID']
+            transcript_ID = match['transcript_ID']
+            novelty = []
+            return gene_ID, transcript_ID, novelty
         else:
             # Add ISM
             ISM.append(str(match['transcript_ID']))

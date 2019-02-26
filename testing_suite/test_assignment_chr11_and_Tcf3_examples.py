@@ -172,17 +172,17 @@ class TestAssignments(object):
 
         correct_gene_ID = fetch_correct_ID("Drg1", "gene", cursor)
         assert assignment['gene_ID'] == correct_gene_ID
-        assert assignment['transcript_ID'] == 8456
-        assert assignment['start_delta'] == -16
-        assert assignment['end_delta'] == 15
+        assert assignment['transcript_ID'] == 28
+        #assert assignment['start_delta'] == -16
+        #assert assignment['end_delta'] == 15
 
         # Now make sure that the novel transcript was annotated correctly
         # TODO: in the future, I would like this transcript to prioritize
         # the known transcript ID 28. Just a thought
         annot_dict = make_annot_dict(cursor, assignment['transcript_ID'])
-        assert annot_dict["FSM_transcript"] == "TRUE"
-        assert annot_dict["FSM_to_IDs"] == "28"
-        assert annot_dict["transcript_status"] == "NOVEL"
+        #assert annot_dict["FSM_transcript"] == "TRUE"
+        #assert annot_dict["FSM_to_IDs"] == "28"
+        assert annot_dict["transcript_status"] == "KNOWN"
         conn.close()
 
     def antisense_to_Grb10(self):
