@@ -12,10 +12,17 @@ import sqlite3
 import sys
 import dstruct
 import operator
+#import os
 from pathlib import Path
 import warnings
 import transcript_utils as tutils
 import query_utils as qutils
+#talon_path = (os.path.abspath(__file__))
+#print(sys.path)
+#main_path = "/".join(talon_path.split("/")[0:-2])
+#sys.path.append(main_path + "/post-TALON_tools")
+#print(sys.path)
+#import summarize_datasets
 
 def get_args():
     """ Fetches the arguments for the program """
@@ -1629,24 +1636,11 @@ def write_counts_log_file(cursor, outprefix):
             - Number of antisense transcripts detected
             - Number of genomic transcripts detected
     """
-    o = open(outprefix + "_talon_summary.tsv", 'w')
-    columns = [ "dataset", "reads_annotated", "known_genes", "antisense_genes",
-                "intergenic_novel_genes", "FSMs", "total_ISMs", "suffix_ISMs",
-                "prefix_ISMs", "antisense_transcripts", "genomic_transcripts" ]
-    o.write("\t".join(columns)) 
 
-    # Get dataset names
-    cursor.execute(""" SELECT dataset_name FROM dataset """)
-    datasets = [ str(x[0]) for x in cursor.fetchall() ]
-    for dataset in datasets:
-        # Get number of reads in the dataset
-        reads = qutils.count_observed_reads(cursor, dataset)
+    # Run utility
+    summarize_datasets.write_counts_file(cursor, outprefix)
 
-        # Get the number of known genes detected
-        #known_genes = 
-    
-    o.close()
-
+    return 
 
 def main():
     """ Runs program """
@@ -1692,7 +1686,7 @@ def main():
     # TODO: output files
     # Write a file enumerating how many known/novel genes and transcripts
     # were detected in each dataset
-    write_counts_log_file(cursor, outprefix)
+    #write_counts_log_file(cursor, outprefix)
     conn.close()
 
 

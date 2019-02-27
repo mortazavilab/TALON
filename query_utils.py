@@ -74,6 +74,138 @@ def fetch_FSM_novel_transcripts(cursor, dataset):
     FSM_transcripts = [x[0] for x in cursor.fetchall()]
     return FSM_transcripts
 
+def fetch_novel_transcripts(cursor, dataset):
+    """ Fetch IDs of novel transcripts observed in the current dataset """
 
+    query = """SELECT DISTINCT(transcript_ID) FROM observed
+                   LEFT JOIN transcript_annotations AS ta ON ta.ID = observed.transcript_ID
+                   WHERE (ta.attribute = 'transcript_status' AND ta.value = 'NOVEL')
+                   AND observed.dataset = ?;"""
+    cursor.execute(query, [dataset])
+    transcripts = [x[0] for x in cursor.fetchall()]
+    return transcripts
 
+def fetch_antisense_genes(cursor, datasets):
+    """ Fetch IDs of antisense genes observed in the dataset(s) """
+
+    datasets = format_for_IN(datasets)
+    query = """SELECT DISTINCT(gene_ID) FROM observed
+                   LEFT JOIN gene_annotations AS ga ON ga.ID = observed.gene_ID
+                   WHERE (ga.attribute = 'antisense_gene')
+                   AND observed.dataset IN """ + datasets
+    cursor.execute(query)
+    genes = [x[0] for x in cursor.fetchall()]
+    return genes
+
+def fetch_intergenic_novel_genes(cursor, datasets):
+    """ Fetch IDs of novel genes denoted as intergenic """
+
+    datasets = format_for_IN(datasets)
+    query = """SELECT DISTINCT(gene_ID) FROM observed
+                   LEFT JOIN gene_annotations AS ga ON ga.ID = observed.gene_ID
+                   WHERE (ga.attribute = 'intergenic_novel')
+                   AND observed.dataset IN """ + datasets
+    cursor.execute(query)
+    genes = [x[0] for x in cursor.fetchall()]
+    return genes
+
+def fetch_all_ISM_transcripts(cursor, datasets):
+    """ Fetch IDs of all ISM transcripts """
     
+    datasets = format_for_IN(datasets)
+    query = """SELECT DISTINCT(transcript_ID) FROM observed
+                   LEFT JOIN transcript_annotations 
+                       AS ta ON ta.ID = observed.transcript_ID
+                   WHERE (ta.attribute = 'ISM_transcript')
+                   AND observed.dataset IN """ + datasets
+    cursor.execute(query)
+    transcripts = [x[0] for x in cursor.fetchall()]
+    return transcripts
+
+def fetch_prefix_ISM_transcripts(cursor, datasets):
+    """ Fetch IDs of all ISM prefix transcripts """
+
+    datasets = format_for_IN(datasets)
+    query = """SELECT DISTINCT(transcript_ID) FROM observed
+                   LEFT JOIN transcript_annotations
+                       AS ta ON ta.ID = observed.transcript_ID
+                   WHERE (ta.attribute = 'ISM-prefix_transcript')
+                   AND observed.dataset IN """ + datasets
+    cursor.execute(query)
+    transcripts = [x[0] for x in cursor.fetchall()]
+    return transcripts
+
+def fetch_suffix_ISM_transcripts(cursor, datasets):
+    """ Fetch IDs of all ISM suffix transcripts """
+
+    datasets = format_for_IN(datasets)
+    query = """SELECT DISTINCT(transcript_ID) FROM observed
+                   LEFT JOIN transcript_annotations
+                       AS ta ON ta.ID = observed.transcript_ID
+                   WHERE (ta.attribute = 'ISM-suffix_transcript')
+                   AND observed.dataset IN """ + datasets
+    cursor.execute(query)
+    transcripts = [x[0] for x in cursor.fetchall()]
+    return transcripts
+
+def fetch_NIC_transcripts(cursor, datasets):
+    """ Fetch IDs of all NIC transcripts """
+
+    datasets = format_for_IN(datasets)
+    query = """SELECT DISTINCT(transcript_ID) FROM observed
+                   LEFT JOIN transcript_annotations
+                       AS ta ON ta.ID = observed.transcript_ID
+                   WHERE (ta.attribute = 'NIC_transcript')
+                   AND observed.dataset IN """ + datasets
+    cursor.execute(query)
+    transcripts = [x[0] for x in cursor.fetchall()]
+    return transcripts
+
+def fetch_NNC_transcripts(cursor, datasets):
+    """ Fetch IDs of all NNC transcripts """
+
+    datasets = format_for_IN(datasets)
+    query = """SELECT DISTINCT(transcript_ID) FROM observed
+                   LEFT JOIN transcript_annotations
+                       AS ta ON ta.ID = observed.transcript_ID
+                   WHERE (ta.attribute = 'NNC_transcript')
+                   AND observed.dataset IN """ + datasets
+    cursor.execute(query)
+    transcripts = [x[0] for x in cursor.fetchall()]
+    return transcripts
+
+def fetch_antisense_transcripts(cursor, datasets):
+    """ Fetch IDs of all antisense transcripts """
+
+    datasets = format_for_IN(datasets)
+    query = """SELECT DISTINCT(transcript_ID) FROM observed
+                   LEFT JOIN transcript_annotations
+                       AS ta ON ta.ID = observed.transcript_ID
+                   WHERE (ta.attribute = 'antisense_transcript')
+                   AND observed.dataset IN """ + datasets
+    cursor.execute(query)
+    transcripts = [x[0] for x in cursor.fetchall()]
+    return transcripts
+
+def fetch_genomic_transcripts(cursor, datasets):
+    """ Fetch IDs of all genomic transcripts """
+
+    datasets = format_for_IN(datasets)
+    query = """SELECT DISTINCT(transcript_ID) FROM observed
+                   LEFT JOIN transcript_annotations
+                       AS ta ON ta.ID = observed.transcript_ID
+                   WHERE (ta.attribute = 'genomic_transcript')
+                   AND observed.dataset IN """ + datasets
+    cursor.execute(query)
+    transcripts = [x[0] for x in cursor.fetchall()]
+    return transcripts
+
+
+#-------------------------------------------------------------------------------
+def format_for_IN(l):
+    """ Converts input to string that can be used for IN database query """
+    
+    if type(l) is not list:
+        l = [str(l)]
+
+    return "(" + ','.join(['"' + x + '"' for x in l]) + ")" 
