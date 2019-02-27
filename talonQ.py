@@ -901,14 +901,10 @@ def identify_transcript(chrom, positions, strand, cursor, location_dict, edge_di
 
             gene_novelty.append((gene_ID, run_info.idprefix, "TALON",
                          "intergenic_novel","TRUE"))
-            transcript_novelty.append((transcript_ID, run_info.idprefix, "TALON",
-                                  "intergenic_transcript", "TRUE"))
             transcript_ID = create_transcript(gene_ID, edge_IDs, vertex_IDs,
                                          transcript_dict, run_info)["transcript_ID"]
             transcript_novelty.append((transcript_ID, run_info.idprefix, "TALON",
                                   "intergenic_transcript", "TRUE"))
-            transcript_novelty.append((transcript_ID, run_info.idprefix, "TALON",
-                                  "transcript_status", "NOVEL"))
 
         elif match_strand != strand:
             anti_gene_ID = gene_ID
@@ -1188,15 +1184,15 @@ def annotate_sam_transcripts(sam_file, dataset, cursor, struct_collection, QC_fi
             transcript_dict = struct_collection.transcript_dict
             vertex_2_gene = struct_collection.vertex_2_gene
             run_info = struct_collection.run_info
-            try:
-                annotation_info = identify_transcript(chrom, positions, strand, 
+            #try:
+            annotation_info = identify_transcript(chrom, positions, strand, 
                                                       cursor, location_dict, 
                                                       edge_dict, transcript_dict, 
                                                       vertex_2_gene, run_info)
-            except:
-                warnings.warn("Problem identifying transcript '%s'. Skipping.."\
-                               % read_ID)    
-                continue
+            #except:
+            #    warnings.warn("Problem identifying transcript '%s'. Skipping.."\
+            #                   % read_ID)    
+            #    continue
                             
             # Now that transcript has been annotated, unpack values and 
             # create an observed entry and abundance record
