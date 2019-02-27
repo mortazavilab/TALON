@@ -5,6 +5,93 @@
 
 import sqlite3
 
+def fetch_reproducible_intergenic(cursor, datasets):
+    """ Return the gene and transcript ID of any intergenic transcripts that were
+        found in at least two of the supplied datasets """
+
+    datasets = format_for_IN(datasets)
+    query = """SELECT gene_ID,
+                      a.transcript_ID
+               FROM abundance as a
+               LEFT JOIN transcript_annotations as ta
+                   ON ta.ID = a.transcript_ID
+               LEFT JOIN transcripts
+                   ON transcripts.transcript_ID = a.transcript_ID
+               WHERE ta.attribute = 'intergenic_transcript'
+               AND a.dataset IN """ + datasets + \
+           """ GROUP BY a.transcript_ID
+               HAVING count(*) > 1;"""
+
+    cursor.execute(query)
+    intergenic = [(x[0], x[1], "intergenic_transcript") for x in cursor.fetchall()]
+    return intergenic
+
+def fetch_reproducible_antisense(cursor, datasets):
+    """ Return the gene and transcript ID of any antisense transcripts that were
+        found in at least two of the supplied datasets """
+
+    datasets = format_for_IN(datasets)
+    query = """SELECT gene_ID,
+                      a.transcript_ID
+               FROM abundance as a
+               LEFT JOIN transcript_annotations as ta
+                   ON ta.ID = a.transcript_ID
+               LEFT JOIN transcripts
+                   ON transcripts.transcript_ID = a.transcript_ID
+               WHERE ta.attribute = 'antisense_transcript'
+               AND a.dataset IN """ + datasets + \
+           """ GROUP BY a.transcript_ID
+               HAVING count(*) > 1;"""
+
+    cursor.execute(query)
+    antisense = [(x[0], x[1], "antisense_transcript") for x in cursor.fetchall()]
+    return antisense
+
+def fetch_reproducible_NNCs(cursor, datasets):
+    """ Return the gene and transcript ID of any NNC transcripts that were
+        found in at least two of the supplied datasets """
+
+    datasets = format_for_IN(datasets)
+    query = """SELECT gene_ID, 
+                      a.transcript_ID 
+               FROM abundance as a
+	       LEFT JOIN transcript_annotations as ta
+	           ON ta.ID = a.transcript_ID
+               LEFT JOIN transcripts
+	           ON transcripts.transcript_ID = a.transcript_ID
+	       WHERE ta.attribute = 'NNC_transcript'
+	       AND a.dataset IN """ + datasets + \
+           """ GROUP BY a.transcript_ID
+               HAVING count(*) > 1;"""
+
+    cursor.execute(query)
+    NNC = [(x[0], x[1], "NNC_transcript") for x in cursor.fetchall()]
+    return NNC
+
+def fetch_known_transcripts_with_gene_label(cursor, datasets):
+    """ Fetch known transcripts along with the gene they belong to """
+
+    datasets = format_for_IN(datasets)
+    query = """SELECT DISTINCT gene_ID,transcript_ID FROM observed
+                   LEFT JOIN transcript_annotations AS ta ON ta.ID = observed.transcript_ID
+                   WHERE (ta.attribute = 'transcript_status' AND ta.value = 'KNOWN')
+                   AND observed.dataset IN """ + datasets
+    cursor.execute(query)
+    known_transcripts = [(x[0], x[1], "FSM_transcript") for x in cursor.fetchall()]
+    return known_transcripts
+
+def fetch_NIC_transcripts_with_gene_label(cursor, datasets):
+    """ Fetch NIC transcripts along with the gene they belong to """
+
+    datasets = format_for_IN(datasets)
+    query = """SELECT DISTINCT gene_ID,transcript_ID FROM observed
+                   LEFT JOIN transcript_annotations AS ta ON ta.ID = observed.transcript_ID
+                   WHERE (ta.attribute = 'NIC_transcript')
+                   AND observed.dataset IN """ + datasets
+    cursor.execute(query)
+    known_transcripts = [(x[0], x[1], "NIC_transcript") for x in cursor.fetchall()]
+    return known_transcripts
+
 def count_observed_reads(cursor, dataset):
     """ Count the number of observed reads for the provided dataset """
 
@@ -13,15 +100,16 @@ def count_observed_reads(cursor, dataset):
                                [dataset]).fetchone()[0]
     return reads
 
-def fetch_all_known_genes_detected(cursor, dataset):
+def fetch_all_known_genes_detected(cursor, datasets):
     """ Get the IDs of all known genes found in a particular dataset (no 
         filter with respect to the type of transcript detected). """
 
+    datasets = format_for_IN(datasets)
     query = """SELECT DISTINCT(gene_ID) FROM observed
                    LEFT JOIN gene_annotations AS ga ON ga.ID = observed.gene_ID
                    WHERE (ga.attribute = 'gene_status' AND ga.value = 'KNOWN')
-                   AND observed.dataset = ?;"""
-    cursor.execute(query, [dataset])
+                   AND observed.dataset IN """ + datasets
+    cursor.execute(query)
     known_genes = [x[0] for x in cursor.fetchall()]
     return known_genes
 
@@ -39,27 +127,29 @@ def count_novel_genes_detected(cursor, dataset):
     novel_genes = fetch_all_novel_genes_detected(cursor, dataset)
     return len(novel_genes)
 
-def fetch_all_novel_genes_detected(cursor, dataset):
+def fetch_all_novel_genes_detected(cursor, datasets):
     """ Get the IDs of all novel genes found in a particular dataset (no
         filter with respect to the type of transcript detected). """
 
+    datasets = format_for_IN(datasets)
     query = """SELECT DISTINCT(gene_ID) FROM observed
                    LEFT JOIN gene_annotations AS ga ON ga.ID = observed.gene_ID
                    WHERE (ga.attribute = 'gene_status' AND ga.value = 'NOVEL')
-                   AND observed.dataset = ?;"""
-    cursor.execute(query, [dataset])
+                   AND observed.dataset IN """ + datasets
+    cursor.execute(query)
     novel_genes = [x[0] for x in cursor.fetchall()]
     return novel_genes
 
-def fetch_all_known_transcripts_detected(cursor, dataset):
+def fetch_all_known_transcripts_detected(cursor, datasets):
     """ Get the IDs of all transcripts annotated as known. Does not include 
         novel FSMs """
-
+ 
+    datasets = format_for_IN(datasets)
     query = """SELECT DISTINCT(transcript_ID) FROM observed
                    LEFT JOIN transcript_annotations AS ta ON ta.ID = observed.transcript_ID
                    WHERE (ta.attribute = 'transcript_status' AND ta.value = 'KNOWN')
-                   AND observed.dataset = ?;"""
-    cursor.execute(query, [dataset])
+                   AND observed.dataset IN """ + datasets
+    cursor.execute(query)
     known_transcripts = [x[0] for x in cursor.fetchall()]
     return known_transcripts
 

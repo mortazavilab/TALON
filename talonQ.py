@@ -901,8 +901,12 @@ def identify_transcript(chrom, positions, strand, cursor, location_dict, edge_di
 
             gene_novelty.append((gene_ID, run_info.idprefix, "TALON",
                          "intergenic_novel","TRUE"))
+            transcript_novelty.append((transcript_ID, run_info.idprefix, "TALON",
+                                  "intergenic_transcript", "TRUE"))
             transcript_ID = create_transcript(gene_ID, edge_IDs, vertex_IDs,
                                          transcript_dict, run_info)["transcript_ID"]
+            transcript_novelty.append((transcript_ID, run_info.idprefix, "TALON",
+                                  "intergenic_transcript", "TRUE"))
             transcript_novelty.append((transcript_ID, run_info.idprefix, "TALON",
                                   "transcript_status", "NOVEL"))
 

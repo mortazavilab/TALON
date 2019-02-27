@@ -64,7 +64,7 @@ class TestIdentifyFSM(object):
         novelty_types = [ x[-2] for x in annotation['transcript_novelty']]
         assert annotation['gene_ID'] == correct_gene_ID
         #assert "FSM_transcript" in novelty_types
-        assert "3p_novel" in novelty_types
+        #assert "3p_novel" in novelty_types
         assert annotation['end_delta'] == None
         conn.close()
 
@@ -297,7 +297,7 @@ class TestIdentifyFSM(object):
         assert annotation['transcript_ID'] == 8
         novelty_types = [ x[-2] for x in annotation['transcript_novelty']]
         assert "NIC_transcript" in novelty_types
-        assert "3p_novel" in novelty_types
+        #assert "3p_novel" in novelty_types
 
         conn.close()
 

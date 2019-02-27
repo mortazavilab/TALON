@@ -8,13 +8,18 @@
 
 from optparse import OptionParser
 import sqlite3
+import sys
 import warnings
+import os
+script_path = os.path.abspath(__file__)
+main_path = "/".join(script_path.split("/")[0:-2])
+sys.path.append(main_path)
+import query_utils as qutils
 
 def filter_talon_transcripts(database, annot, dataset_pairings = None,
-                                              known_filtered = False, 
+                                              known_filtered = False,
                                               novel_filtered = True,
                                               novel_multiexon_reqmt = True):
-
     # Create a set to keep track of whitelisted transcripts
     # Each entry is a gene-transcript tuple
     transcript_whitelist = set()
@@ -33,63 +38,26 @@ def filter_talon_transcripts(database, annot, dataset_pairings = None,
         pairing_list = dataset_pairings
 
     # Filter transcripts separately for each dataset group
-    for pairing in pairing_list:  
-        pairing_string = "(" + ','.join(['"' + x + '"' for x in pairing]) + ")"
-        print "Processing group: " + pairing_string + "..."
-        
+    for pairing in pairing_list:
         if len(pairing) <= 1 and novel_filtered == True:
-            print "Warning: Only one dataset in group. This means that no " + \
-                   "novel transcripts will pass the filter for this group." 
-
-        # Query that joins transcript table to gene/transcript status, and also 
-        # counts the number of datasets each transcript was detected in
-        query = """
-                SELECT 
-                   t.gene_ID,
-                   t.transcript_ID,
-                   t.path,
-                   ga.value,
-                   ta.value,
-                   COUNT(*)
-               FROM transcripts t
-               LEFT JOIN gene_annotations ga ON t.gene_ID = ga.ID
-               LEFT JOIN transcript_annotations ta ON t.transcript_ID = ta.ID 
-               INNER JOIN abundance ON t.transcript_ID = abundance.transcript_ID
-               WHERE (ga.annot_name = %s OR ga.annot_name = "talon_run")
-                   AND ga.attribute = "gene_status" 
-                   AND (ta.annot_name = %s  OR ta.annot_name = "talon_run") 
-                   AND ta.attribute = "transcript_status"
-                   AND abundance.dataset IN %s
-               GROUP BY t.transcript_ID;
-            """
-        annot_str = '"' + annot + '"'
-        cursor.execute(query % (annot_str, annot_str, pairing_string))
-        transcripts = cursor.fetchall()
-
-        # Iterate over transcripts
-        for transcript in transcripts:
-            gene_ID = str(transcript[0])
-            transcript_ID = str(transcript[1])
-            path = transcript[2] 
-            gene_status = transcript[3] 
-            transcript_status = transcript[4]
-            n_datasets = transcript[5]
-           
-            # Decide whether to add transcript to whitelist or not 
-            if transcript_status == "KNOWN" or novel_filtered == False:
-                transcript_whitelist.add((gene_ID, transcript_ID))
-            else:
-                n_exons = (len(path.split(",")) + 1)/2
-                if n_datasets >= 2:
-                    if novel_multiexon_reqmt == False or gene_status == "NOVEL":
-                        transcript_whitelist.add((gene_ID, transcript_ID))
-
-                    elif n_exons > 1:
-                        transcript_whitelist.add((gene_ID, transcript_ID))
-                
-
-    # Disconnect from database
-    conn.close()
+            print("""Warning: Only one dataset in group. This means that
+                   "only known transcripts and NICs will pass the filter 
+                    for this group.""")
+        
+        # First, accept all known transcripts and all NICs
+        known_transcripts = qutils.fetch_known_transcripts_with_gene_label(cursor, datasets) 
+        NIC_transcripts = qutils.fetch_NIC_transcripts_with_gene_label(cursor, datasets)
+        transcript_whitelist.update(known_transcripts)
+        transcript_whitelist.update(NIC_transcripts)
+        
+        # Now, conditionally accept NNC, antisense, and intergenic transcripts 
+        # (must be reproducible)
+        reproducible_NNCs = qutils.fetch_reproducible_NNCs(cursor, datasets)
+        reproducible_antisense = qutils.fetch_reproducible_antisense(cursor, datasets)
+        reproducible_intergenic = qutils.fetch_reproducible_intergenic(cursor, datasets)
+        transcript_whitelist.update(reproducible_NNCs)
+        transcript_whitelist.update(reproducible_antisense)
+        transcript_whitelist.update(reproducible_intergenic)
 
     return transcript_whitelist
 
@@ -143,9 +111,9 @@ def main():
 
     # Write transcript IDs to file
     o = open(options.outfile, 'w')
-    print "Writing whitelisted gene-transcript pairs to " + options.outfile + "..."
+    print("Writing whitelisted gene-transcript-category pairs to " + options.outfile + "...")
     for transcript in whitelist:
-        o.write(transcript[0] + "," + transcript[1] + "\n")
+        o.write(",".join([str(x) for x in transcript]) + "\n")
     o.close()
     
 

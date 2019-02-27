@@ -36,6 +36,6 @@ Files used:
 * m54284_181114_004841/51511668/3202_53_CCS is a NNC transcript of Canx
 * m54284_181114_004841/17433269/26_2129_CCS maps to the final exon of Canx but is antisense
 * m54284_180829_231707/19726894/30_2449_CCS is FSM with novel 3p of Canx.
-* m54284_181114_004841/11862379/29_4135_CCS is an FSM of Canx.
+* m54284_181114_004841/11862379/29_4135_CCS is an NNC of Canx.
 * m54284_181114_004841/71172442/1255_244_CCS maps to the final exon of Canx. Right now, TALON treats it as genomic, but I can see how we might want to call it an ISM at some point. 
 
