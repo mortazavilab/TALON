@@ -894,22 +894,27 @@ def identify_transcript(chrom, positions, strand, cursor, location_dict, edge_di
 
             gene_novelty.append((gene_ID, run_info.idprefix, "TALON",
                          "intergenic_novel","TRUE"))
+            transcript_ID = create_transcript(gene_ID, edge_IDs, vertex_IDs,
+                                         transcript_dict, run_info)["transcript_ID"]
+            transcript_novelty.append((transcript_ID, run_info.idprefix, "TALON",
+                                  "transcript_status", "NOVEL"))
 
         elif match_strand != strand:
             anti_gene_ID = gene_ID
             gene_ID = create_gene(chrom, positions[0], positions[-1],
                               strand, cursor, run_info)
+            transcript_ID = create_transcript(gene_ID, edge_IDs, vertex_IDs,
+                                         transcript_dict, run_info)["transcript_ID"]
+
             gene_novelty.append((gene_ID, run_info.idprefix, "TALON",
                          "antisense_gene","TRUE"))
             gene_novelty.append((gene_ID, run_info.idprefix, "TALON",
                          "gene_antisense_to_IDs",anti_gene_ID))
-
-        transcript_ID = create_transcript(gene_ID, edge_IDs, vertex_IDs,
-                                         transcript_dict, run_info)["transcript_ID"]
-        if match_strand != strand:
             transcript_novelty.append((transcript_ID, run_info.idprefix, "TALON",
                                   "antisense_transcript", "TRUE"))
         else:
+            transcript_ID = create_transcript(gene_ID, edge_IDs, vertex_IDs,
+                                         transcript_dict, run_info)["transcript_ID"]
             transcript_novelty.append((transcript_ID, run_info.idprefix, "TALON",
                                   "genomic_transcript", "TRUE"))
 
