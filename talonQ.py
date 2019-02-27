@@ -1266,6 +1266,7 @@ def parse_transcript(sam_read):
     else:
         strand = "+"
 
+
     return read_ID, chromosome, positions, strand, read_length
     
 
