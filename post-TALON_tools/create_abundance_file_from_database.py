@@ -62,8 +62,8 @@ def handle_filtering(options):
 
     # If filtering is turned on, run filtering step to get whitelisted transcripts
     if options.filtering == True:
-        print "--------------------------------------"
-        print "Running transcript filtering process:"
+        print("--------------------------------------")
+        print("Running transcript filtering process:")
         if pairings != None:
             pairings_list = []
             with open(pairings, 'r') as f:
@@ -74,7 +74,7 @@ def handle_filtering(options):
                                   dataset_pairings = pairings_list)
         else:
             whitelist = filt.filter_talon_transcripts(database, annot)
-        print "--------------------------------------"
+        print("--------------------------------------")
 
     # Otherwise, the whitelist will be every transcript ID in the database
     else:
@@ -154,9 +154,20 @@ def fetch_abundances(database, datasets, annot, whitelist):
     conn.row_factory = sqlite3.Row
     cursor = conn.cursor()
 
-    dataset_cols = ",\n".join([ "abd_" + x + ".count AS " + x for x in datasets ])
+    # Create a mapping to allow us to escape possible special characters in
+    # dataset names
+    dataset_id_mapper = {}
+    new_dataset_names = []
+    count = 1
+    for dataset in datasets:
+        name = "abd_" + str(count)
+        dataset_id_mapper[name] = dataset
+        new_dataset_names.append(name)
+        count += 1
+
+    dataset_cols = ",\n".join([ name + ".count AS " + name for name in new_dataset_names ])
     whitelist_string = "WHERE t.transcript_ID IN (" + ','.join(whitelist) + ");"
- 
+
     name_status_query = """        
                 FROM transcripts t
                 LEFT JOIN gene_annotations ga_id ON t.gene_ID = ga_id.ID
@@ -180,10 +191,11 @@ def fetch_abundances(database, datasets, annot, whitelist):
                 """ % (annot, annot, annot, annot, annot, annot)
 
     # Create an abundance query for every dataset  
-    abundance_queries = "\n".join(["LEFT JOIN abundance abd_" + x + \
-                                   " ON t.transcript_ID = abd_" + x + \
-                                   ".transcript_ID AND abd_" + x + \
-                                   ".dataset = '" + x + "'" for x in datasets])
+    abundance_queries = "\n".join(["LEFT JOIN abundance AS " + x + \
+                                   " ON t.transcript_ID = " + x + \
+                                   ".transcript_ID AND " + x + \
+                                   ".dataset = '" + dataset_id_mapper[x] \
+                                   + "'" for x in new_dataset_names])
 
     # Combine the subparts of the query into one and run it
     full_query = "\n".join([col_query, dataset_cols, name_status_query, 
@@ -192,7 +204,7 @@ def fetch_abundances(database, datasets, annot, whitelist):
     try:
         abundance_tuples = (cursor.execute(full_query)).fetchall()
     except Exception as e:
-        print e
+        print(e)
         raise RuntimeError("Something went wrong with the database query")
 
     conn.close() 
