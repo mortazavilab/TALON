@@ -165,7 +165,7 @@ def fetch_abundances(database, datasets, annot, whitelist):
         new_dataset_names.append(name)
         count += 1
 
-    dataset_cols = ",\n".join([ name + ".count AS " + name for name in new_dataset_names ])
+    dataset_cols = ",\n".join([ name + ".count AS '" + dataset_id_mapper[name] + "'" for name in new_dataset_names ])
     whitelist_string = "WHERE t.transcript_ID IN (" + ','.join(whitelist) + ");"
 
     name_status_query = """        
