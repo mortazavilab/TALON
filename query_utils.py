@@ -68,6 +68,74 @@ def fetch_reproducible_NNCs(cursor, datasets):
     NNC = [(x[0], x[1], "NNC_transcript") for x in cursor.fetchall()]
     return NNC
 
+def fetch_reproducible_ISMs(cursor, datasets):
+    """ Return the gene and transcript ID of any ISM transcripts that were
+        found in at least two of the supplied datasets """
+
+    datasets = format_for_IN(datasets)
+    transcripts_seen = {}
+
+    # To label novelty, perform queries separately for suffix, prefix, and
+    # regular ISMs
+    query = """SELECT gene_ID,
+                      a.transcript_ID
+               FROM abundance as a
+               LEFT JOIN transcript_annotations as ta
+                   ON ta.ID = a.transcript_ID
+               LEFT JOIN transcripts
+                   ON transcripts.transcript_ID = a.transcript_ID
+               WHERE ta.attribute = 'ISM-prefix_transcript'
+               AND a.dataset IN """ + datasets + \
+           """ GROUP BY a.transcript_ID
+               HAVING count(*) > 1;"""
+
+    cursor.execute(query)
+    ISMs = [(x[0], x[1], "ISM-prefix_transcript") for x in cursor.fetchall()]
+    for entry in ISMs:
+        transcripts_seen[entry[1]] = 1
+
+    query = """SELECT gene_ID,
+                      a.transcript_ID
+               FROM abundance as a
+               LEFT JOIN transcript_annotations as ta
+                   ON ta.ID = a.transcript_ID
+               LEFT JOIN transcripts
+                   ON transcripts.transcript_ID = a.transcript_ID
+               WHERE ta.attribute = 'ISM-suffix_transcript'
+               AND a.dataset IN """ + datasets + \
+           """ GROUP BY a.transcript_ID
+               HAVING count(*) > 1;"""
+
+    cursor.execute(query)
+    suffix_ISMs = [(x[0], x[1], "ISM-suffix_transcript") for x in cursor.fetchall()]
+    # Only add suffix ISM transcript if it isn't already on the list
+    for entry in suffix_ISMs:
+        if entry[1] not in transcripts_seen:
+            ISMs.append(entry)
+            transcripts_seen[entry[1]] = 1
+
+    query = """SELECT gene_ID,
+                      a.transcript_ID
+               FROM abundance as a
+               LEFT JOIN transcript_annotations as ta
+                   ON ta.ID = a.transcript_ID
+               LEFT JOIN transcripts
+                   ON transcripts.transcript_ID = a.transcript_ID
+               WHERE ta.attribute = 'ISM_transcript'
+               AND a.dataset IN """ + datasets + \
+           """ GROUP BY a.transcript_ID
+               HAVING count(*) > 1;"""
+
+    cursor.execute(query)
+    all_ISMs = [(x[0], x[1], "other_ISM_transcript") for x in cursor.fetchall()]
+    # Only add ISM transcript if it isn't already on the list
+    for entry in all_ISMs:
+        if entry[1] not in transcripts_seen:
+            ISMs.append(entry)
+            transcripts_seen[entry[1]] = 1
+
+    return ISMs
+
 def fetch_known_transcripts_with_gene_label(cursor, datasets):
     """ Fetch known transcripts along with the gene they belong to """
 
