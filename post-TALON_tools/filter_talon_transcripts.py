@@ -43,6 +43,8 @@ def filter_talon_transcripts(database, annot, dataset_pairings = None,
             print("""Warning: Only one dataset in group. This means that
                    "only known transcripts and NICs will pass the filter 
                     for this group.""")
+        else:
+            print("Group: %s" % ", ".join([str(x) for x in datasets]))
 
         # First, accept all known transcripts and all NICs
         known_transcripts = qutils.fetch_known_transcripts_with_gene_label(cursor, datasets) 

@@ -2,7 +2,7 @@
 # Author: Dana Wyman
 # -----------------------------------------------------------------------------
 # create_abundance_file_from_database.py is a utility that outputs the abundance 
-# for each transcript in the TALON database across dataasets. Modified by 
+# for each transcript in the TALON database across datasets. Modified by 
 # filtering option.
 
 from optparse import OptionParser
