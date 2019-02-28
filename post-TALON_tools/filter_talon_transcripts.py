@@ -56,6 +56,7 @@ def filter_talon_transcripts(database, annot, dataset_pairings = None,
         reproducible_NNCs = qutils.fetch_reproducible_NNCs(cursor, datasets)
         reproducible_antisense = qutils.fetch_reproducible_antisense(cursor, datasets)
         reproducible_intergenic = qutils.fetch_reproducible_intergenic(cursor, datasets)
+        transcript_whitelist.update(reproducible_ISMs)
         transcript_whitelist.update(reproducible_NNCs)
         transcript_whitelist.update(reproducible_antisense)
         transcript_whitelist.update(reproducible_intergenic)

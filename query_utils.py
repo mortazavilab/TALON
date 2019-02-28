@@ -91,6 +91,7 @@ def fetch_reproducible_ISMs(cursor, datasets):
 
     cursor.execute(query)
     ISMs = [(x[0], x[1], "ISM-prefix_transcript") for x in cursor.fetchall()]
+
     for entry in ISMs:
         transcripts_seen[entry[1]] = 1
 
