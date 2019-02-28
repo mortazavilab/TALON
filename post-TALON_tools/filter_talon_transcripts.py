@@ -48,16 +48,16 @@ def filter_talon_transcripts(database, annot, dataset_pairings = None,
 
         # First, accept all known transcripts and all NICs
         known_transcripts = qutils.fetch_known_transcripts_with_gene_label(cursor, datasets) 
-        NIC_transcripts = qutils.fetch_NIC_transcripts_with_gene_label(cursor, datasets)
         transcript_whitelist.update(known_transcripts)
-        transcript_whitelist.update(NIC_transcripts)
         
         # Now, conditionally accept ISM, NNC, antisense, and intergenic transcripts 
         # (must be reproducible)
+        NIC_transcripts = qutils.fetch_reproducible_NICs(cursor, datasets)
         reproducible_ISMs = qutils.fetch_reproducible_ISMs(cursor, datasets)
         reproducible_NNCs = qutils.fetch_reproducible_NNCs(cursor, datasets)
         reproducible_antisense = qutils.fetch_reproducible_antisense(cursor, datasets)
         reproducible_intergenic = qutils.fetch_reproducible_intergenic(cursor, datasets)
+        transcript_whitelist.update(NIC_transcripts)
         transcript_whitelist.update(reproducible_ISMs)
         transcript_whitelist.update(reproducible_NNCs)
         transcript_whitelist.update(reproducible_antisense)

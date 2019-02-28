@@ -68,6 +68,27 @@ def fetch_reproducible_NNCs(cursor, datasets):
     NNC = [(x[0], x[1], "NNC_transcript") for x in cursor.fetchall()]
     return NNC
 
+def fetch_reproducible_NICs(cursor, datasets):
+    """ Return the gene and transcript ID of any NIC transcripts that were
+        found in at least two of the supplied datasets """
+
+    datasets = format_for_IN(datasets)
+    query = """SELECT gene_ID,
+                      a.transcript_ID
+               FROM abundance as a
+               LEFT JOIN transcript_annotations as ta
+                   ON ta.ID = a.transcript_ID
+               LEFT JOIN transcripts
+                   ON transcripts.transcript_ID = a.transcript_ID
+               WHERE ta.attribute = 'NIC_transcript'
+               AND a.dataset IN """ + datasets + \
+           """ GROUP BY a.transcript_ID
+               HAVING count(*) > 1;"""
+
+    cursor.execute(query)
+    NIC = [(x[0], x[1], "NIC_transcript") for x in cursor.fetchall()]
+    return NIC
+
 def fetch_reproducible_ISMs(cursor, datasets):
     """ Return the gene and transcript ID of any ISM transcripts that were
         found in at least two of the supplied datasets """
