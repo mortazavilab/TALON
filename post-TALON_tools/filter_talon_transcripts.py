@@ -38,12 +38,12 @@ def filter_talon_transcripts(database, annot, dataset_pairings = None,
         pairing_list = dataset_pairings
 
     # Filter transcripts separately for each dataset group
-    for pairing in pairing_list:
-        if len(pairing) <= 1 and novel_filtered == True:
+    for datasets in pairing_list:
+        if len(datasets) <= 1 and novel_filtered == True:
             print("""Warning: Only one dataset in group. This means that
                    "only known transcripts and NICs will pass the filter 
                     for this group.""")
-        
+
         # First, accept all known transcripts and all NICs
         known_transcripts = qutils.fetch_known_transcripts_with_gene_label(cursor, datasets) 
         NIC_transcripts = qutils.fetch_NIC_transcripts_with_gene_label(cursor, datasets)
