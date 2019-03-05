@@ -17,13 +17,14 @@ class TestIdentifyISM(object):
         location_dict = talon.make_location_dict(build, cursor)
         run_info = talon.init_run_info(cursor, build)        
         transcript_dict = talon.make_transcript_dict(cursor, build)
+        gene_starts, gene_ends = talon.make_gene_start_and_end_dict(cursor)
 
         edge_IDs = (3, 4, 5)
         vertex_IDs = (3, 4, 5, 6)
         v_novelty = (0, 0, 0, 0)
 
         gene_ID, transcript_ID, novelty = talon.process_FSM_or_ISM(edge_IDs, vertex_IDs,
-                                                      transcript_dict,
+                                                      transcript_dict, gene_starts, gene_ends,
                                                       run_info)
 
         correct_gene_ID = fetch_correct_ID("TG1", "gene", cursor) 
@@ -39,12 +40,13 @@ class TestIdentifyISM(object):
         location_dict = talon.make_location_dict(build, cursor)
         run_info = talon.init_run_info(cursor, build)
         transcript_dict = talon.make_transcript_dict(cursor, build)
+        gene_starts, gene_ends = talon.make_gene_start_and_end_dict(cursor)
 
         edge_IDs = (200,2,3)
         vertex_IDs = (500, 2, 3, 4) 
         v_novelty = (1, 0, 0, 0)
         gene_ID, transcript_ID, novelty = talon.process_FSM_or_ISM(edge_IDs, vertex_IDs,
-                                                            transcript_dict,
+                                                            transcript_dict, gene_starts, gene_ends,
                                                             run_info)
 
         correct_gene_ID = fetch_correct_ID("TG1", "gene", cursor)
@@ -61,13 +63,14 @@ class TestIdentifyISM(object):
         location_dict = talon.make_location_dict(build, cursor)
         run_info = talon.init_run_info(cursor, build)
         transcript_dict = talon.make_transcript_dict(cursor, build)
+        gene_starts, gene_ends = talon.make_gene_start_and_end_dict(cursor)
 
         edge_IDs = (5,)
         vertex_IDs = (5, 6)
         v_novelty = (0, 0)
 
         gene_ID, transcript_ID, novelty = talon.process_FSM_or_ISM(edge_IDs, vertex_IDs,
-                                                            transcript_dict,
+                                                            transcript_dict, gene_starts, gene_ends,
                                                             run_info)
 
         correct_gene_ID = fetch_correct_ID("TG1", "gene", cursor)
@@ -83,13 +86,14 @@ class TestIdentifyISM(object):
         location_dict = talon.make_location_dict(build, cursor)
         run_info = talon.init_run_info(cursor, build)
         transcript_dict = talon.make_transcript_dict(cursor, build)
+        gene_starts, gene_ends = talon.make_gene_start_and_end_dict(cursor)
 
         edge_IDs = (1, 2, 3, 100, 200) 
         vertex_IDs = (1, 2, 3, 4, 50, 70) 
         v_novelty = (0, 0, 0, 0, 1, 1)
 
         gene_ID, transcript_ID, novelty = talon.process_FSM_or_ISM(edge_IDs, vertex_IDs,
-                                                            transcript_dict,
+                                                            transcript_dict, gene_starts, gene_ends,
                                                             run_info)
         assert gene_ID == transcript_ID == None 
         conn.close()       

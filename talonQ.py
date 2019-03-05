@@ -57,6 +57,43 @@ def str_wrap_double(s):
     s = str(s)
     return '"' + s + '"'
 
+def make_gene_start_and_end_dict(cursor):
+    """ Format of dicts:
+            Key: gene ID from database
+            Value: set object containing start vertices (or end vertices) of 
+                   KNOWN transcripts from that gene
+    """
+    gene_starts = {}
+    gene_ends = {}
+    query = """SELECT DISTINCT gene_ID, 
+                               start_vertex, 
+                               end_vertex 
+               FROM transcripts
+               LEFT JOIN transcript_annotations as ta 
+                   ON ta.ID = transcripts.transcript_ID
+	       WHERE ta.attribute = 'transcript_status' 
+                     AND ta.value = 'KNOWN'"""
+
+    cursor.execute(query)
+    for entry in cursor.fetchall():
+        gene_ID = entry['gene_ID']
+        start = entry['start_vertex']
+        end = entry['end_vertex']
+        try:
+            gene_starts[gene_ID].add(start)
+        except:
+            gene_starts[gene_ID] = set()
+            gene_starts[gene_ID].add(start)
+
+        try:
+            gene_ends[gene_ID].add(end)
+        except:
+            gene_ends[gene_ID] = set()
+            gene_ends[gene_ID].add(end)
+
+    return gene_starts, gene_ends
+           
+
 def make_transcript_dict(cursor, build):
     """ Format of dict:
             Key: tuple consisting of edges in transcript path
@@ -605,7 +642,8 @@ def search_for_transcript(edge_IDs, transcript_dict):
     except:
         return None, None
 
-def process_FSM_or_ISM(edge_IDs, vertex_IDs, transcript_dict, run_info):
+def process_FSM_or_ISM(edge_IDs, vertex_IDs, transcript_dict, gene_starts,
+                       gene_ends, run_info):
     """ Given a transcript, try to find an FSM gene and transcript match for it.
         In the case of an FSM with end novelty, a novel transcript will be
         created. Returns None if no FSM matches are found."""
@@ -629,24 +667,38 @@ def process_FSM_or_ISM(edge_IDs, vertex_IDs, transcript_dict, run_info):
         return None, None, []
 
 
-    FSM = []
+    #FSM = []
     ISM = []
     suffix = []
     prefix = []
     gene_ID = all_matches[0]['gene_ID']
 
+    # Check if the start and end vertices match known vertices for this gene.
+    # If so, the transcript is eligible to be an NIC instead of ISM
+    start_known = vertex_IDs[0] in gene_starts[gene_ID]
+    end_known = vertex_IDs[-1] in gene_ends[gene_ID]
+
     for match in all_matches:
         transcript_ID = run_info.transcripts + 1
         
+        # Transcript is FSM
         if match['n_exons'] == n_exons:
             gene_ID = match['gene_ID']
-            FSM.append(str(match['transcript_ID']))
+            #FSM.append(str(match['transcript_ID']))
 
-            # new
-            gene_ID = match['gene_ID']
             transcript_ID = match['transcript_ID']
             novelty = []
             return gene_ID, transcript_ID, novelty
+
+        # Transcript is NIC
+        elif start_known and end_known:
+            novel_transcript = create_transcript(gene_ID, edge_IDs, vertex_IDs,
+                                         transcript_dict, run_info)
+            transcript_ID = novel_transcript['transcript_ID']
+            novelty = [(transcript_ID, run_info.idprefix, "TALON",
+                        "NIC_transcript", "TRUE")]  
+            return gene_ID, transcript_ID, novelty   
+
         else:
             # Add ISM
             ISM.append(str(match['transcript_ID']))
@@ -661,8 +713,8 @@ def process_FSM_or_ISM(edge_IDs, vertex_IDs, transcript_dict, run_info):
                 # Look for suffix
                 if match_path.endswith(exon):
                     suffix.append(str(match['transcript_ID']))
-                    if len(FSM) == 0:
-                        gene_ID = match['gene_ID']   
+                    #if len(FSM) == 0:
+                    gene_ID = match['gene_ID']   
                 continue     
  
             # Multi-exon case
@@ -676,8 +728,8 @@ def process_FSM_or_ISM(edge_IDs, vertex_IDs, transcript_dict, run_info):
 
             # Look for suffix    
             if match_without_end.endswith(edge_str):
-                if len(FSM) == 0:
-                    gene_ID = match['gene_ID']
+                #if len(FSM) == 0:
+                gene_ID = match['gene_ID']
                 suffix.append(str(match['transcript_ID']))
            
 
@@ -685,31 +737,32 @@ def process_FSM_or_ISM(edge_IDs, vertex_IDs, transcript_dict, run_info):
                                          transcript_dict, run_info)
     transcript_ID = novel_transcript['transcript_ID']
 
-    if FSM != []:
-        FSM_str = ",".join(FSM)
+    # 
+    #if FSM != []:
+    #    FSM_str = ",".join(FSM)
+    #    novelty.append((transcript_ID, run_info.idprefix, "TALON", 
+    #                    "FSM_transcript", "TRUE"))
+    #    novelty.append((transcript_ID, run_info.idprefix, "TALON",
+    #                    "FSM_to_IDs", FSM_str))
+    #    return gene_ID, transcript_ID, novelty
+    #else:
+    ISM_str = ",".join(ISM)
+    novelty.append((transcript_ID, run_info.idprefix, "TALON", 
+                    "ISM_transcript", "TRUE"))
+    novelty.append((transcript_ID, run_info.idprefix, "TALON",
+                    "ISM_to_IDs", ISM_str))
+    if prefix != []:
+        prefix_str = ",".join(prefix)
         novelty.append((transcript_ID, run_info.idprefix, "TALON", 
-                        "FSM_transcript", "TRUE"))
+                        "ISM-prefix_transcript", "TRUE"))
         novelty.append((transcript_ID, run_info.idprefix, "TALON",
-                        "FSM_to_IDs", FSM_str))
-        return gene_ID, transcript_ID, novelty
-    else:
-        ISM_str = ",".join(ISM)
-        novelty.append((transcript_ID, run_info.idprefix, "TALON", 
-                        "ISM_transcript", "TRUE"))
+                        "ISM-prefix_to_IDs", prefix_str))
+    if suffix != []:
+        suffix_str = ",".join(suffix)
         novelty.append((transcript_ID, run_info.idprefix, "TALON",
-                        "ISM_to_IDs", ISM_str))
-        if prefix != []:
-            prefix_str = ",".join(prefix)
-            novelty.append((transcript_ID, run_info.idprefix, "TALON", 
-                            "ISM-prefix_transcript", "TRUE"))
-            novelty.append((transcript_ID, run_info.idprefix, "TALON",
-                            "ISM-prefix_to_IDs", prefix_str))
-        if suffix != []:
-            suffix_str = ",".join(suffix)
-            novelty.append((transcript_ID, run_info.idprefix, "TALON",
-                            "ISM-suffix_transcript", "TRUE"))
-            novelty.append((transcript_ID, run_info.idprefix, "TALON",
-                            "ISM-suffix_to_IDs", suffix_str))   
+                        "ISM-suffix_transcript", "TRUE"))
+        novelty.append((transcript_ID, run_info.idprefix, "TALON",
+                        "ISM-suffix_to_IDs", suffix_str))   
  
     return gene_ID, transcript_ID, novelty
     
@@ -786,7 +839,8 @@ def update_vertex_2_gene(gene_ID, vertex_IDs, strand, vertex_2_gene):
             
 
 def identify_transcript(chrom, positions, strand, cursor, location_dict, edge_dict,
-                        transcript_dict, vertex_2_gene, run_info):
+                        transcript_dict, vertex_2_gene, gene_starts, gene_ends,
+                        run_info):
     """ Inputs:
         - Information about the query transcript
           - chromosome
@@ -797,6 +851,8 @@ def identify_transcript(chrom, positions, strand, cursor, location_dict, edge_di
           - edge_dict (v1_v2_edgetype --> edge)
           - transcript_dict
           - vertex_2_gene (maps vertices to the gene(s) they are part of)
+          - gene_starts (maps gene IDs to known start vertices)
+          - gene_ends (maps gene IDs to known end vertices) 
           - run_info
 
        Outputs:
@@ -836,7 +892,9 @@ def identify_transcript(chrom, positions, strand, cursor, location_dict, edge_di
         # Look for FSM first
         gene_ID, transcript_ID, transcript_novelty = process_FSM_or_ISM(edge_IDs, 
                                                                 vertex_IDs, 
-                                                                transcript_dict, 
+                                                                transcript_dict,
+                                                                gene_starts,
+                                                                gene_ends, 
                                                                 run_info)
 
         if gene_ID == None:
@@ -1081,13 +1139,16 @@ def prepare_data_structures(cursor, build, min_coverage, min_identity):
     edge_dict = make_edge_dict(cursor)
     transcript_dict = make_transcript_dict(cursor, build)
     vertex_2_gene = make_vertex_2_gene_dict(cursor)
-   
+    gene_starts, gene_ends = make_gene_start_and_end_dict(cursor)   
+
     struct_collection = dstruct.Struct() 
     struct_collection['run_info'] = run_info
     struct_collection['location_dict'] = location_dict
     struct_collection['edge_dict'] = edge_dict
     struct_collection['transcript_dict'] = transcript_dict
     struct_collection['vertex_2_gene'] = vertex_2_gene 
+    struct_collection['gene_starts'] = gene_starts
+    struct_collection['gene_ends'] = gene_ends
 
     return struct_collection
 
@@ -1183,12 +1244,16 @@ def annotate_sam_transcripts(sam_file, dataset, cursor, struct_collection, QC_fi
             edge_dict = struct_collection.edge_dict
             transcript_dict = struct_collection.transcript_dict
             vertex_2_gene = struct_collection.vertex_2_gene
+            gene_starts = struct_collection.gene_starts
+            gene_ends = struct_collection.gene_ends
             run_info = struct_collection.run_info
             #try:
             annotation_info = identify_transcript(chrom, positions, strand, 
                                                       cursor, location_dict, 
                                                       edge_dict, transcript_dict, 
-                                                      vertex_2_gene, run_info)
+                                                      vertex_2_gene, 
+                                                      gene_starts, gene_ends,
+                                                      run_info)
             #except:
             #    warnings.warn("Problem identifying transcript '%s'. Skipping.."\
             #                   % read_ID)    
