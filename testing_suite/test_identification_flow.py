@@ -70,6 +70,34 @@ class TestIdentifyFSM(object):
         assert annotation['end_delta'] == None
         conn.close()
 
+    def test_NIC_instead_of_ISM(self):
+        """ Test case where the transcript looks like an ISM, but is NIC on
+            account of having known starts and ends """
+        conn, cursor = get_db_cursor()
+        build = "toy_build"
+        talon.make_temp_novel_gene_table(cursor, build)
+        edge_dict = talon.make_edge_dict(cursor)
+        location_dict = talon.make_location_dict(build, cursor)
+        run_info = talon.init_run_info(cursor, build)
+        transcript_dict = talon.make_transcript_dict(cursor, build)
+        vertex_2_gene = talon.make_vertex_2_gene_dict(cursor)
+        gene_starts, gene_ends = talon.make_gene_start_and_end_dict(cursor)
+
+        chrom = "chr3"
+        strand = "+"
+        positions = ( 800, 1000, 1200, 1400, 1600, 1800, 2000, 2200 )
+
+        annotation = talon.identify_transcript(chrom, positions, strand, cursor,
+                                               location_dict, edge_dict,
+                                               transcript_dict, vertex_2_gene,
+                                               gene_starts, gene_ends, run_info) 
+
+        correct_gene_ID = fetch_correct_ID("TG5", "gene", cursor)
+        novelty_types = [ x[-2] for x in annotation['transcript_novelty']]
+        assert annotation['gene_ID'] == correct_gene_ID
+        assert "NIC_transcript" in novelty_types
+        conn.close()
+
     def test_ISM_suffix(self):
         """ Example where the transcript is a suffix ISM
         """

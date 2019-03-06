@@ -134,12 +134,12 @@ class TestDatabaseUpdates(object):
 
         talon.add_genes(cursor)
 
-        # Test if gene with ID 5 is there, but make sure we didn't add 
+        # Test if gene with ID 6 is there, but make sure we didn't add 
         # duplicates of the other genes
         query = "SELECT * FROM genes"
         gene_IDs = [ x['gene_ID'] for x in cursor.execute(query)]
-        assert 5 in gene_IDs
-        assert len(gene_IDs) == 5
+        assert 6 in gene_IDs
+        assert len(gene_IDs) == 6
         conn.close()
 
     def test_transcript_update(self):
@@ -156,13 +156,13 @@ class TestDatabaseUpdates(object):
         batch_size = 5
         talon.batch_add_transcripts(cursor, transcript_dict, batch_size)
 
-        # Test if transcript with ID 5 is there, but make sure we didn't add
+        # Test if transcript with ID 7 is there, but make sure we didn't add
         # duplicates of the others
         query = "SELECT * FROM transcripts"
         cursor.execute(query)
         transcript_IDs = [ x['transcript_ID'] for x in cursor.fetchall()]
-        assert 5 in transcript_IDs
-        assert len(transcript_IDs) == 5
+        assert 7 in transcript_IDs
+        assert len(transcript_IDs) == 7
         conn.close()
 
     def test_edge_update(self):

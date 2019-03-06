@@ -67,4 +67,3 @@ class TestIdentifyNIC(object):
 
         conn.close()
 
-
