@@ -675,8 +675,12 @@ def process_FSM_or_ISM(edge_IDs, vertex_IDs, transcript_dict, gene_starts,
 
     # Check if the start and end vertices match known vertices for this gene.
     # If so, the transcript is eligible to be an NIC instead of ISM
-    start_known = vertex_IDs[0] in gene_starts[gene_ID]
-    end_known = vertex_IDs[-1] in gene_ends[gene_ID]
+    if gene_ID in gene_starts and gene_ID in gene_ends:
+        start_known = vertex_IDs[0] in gene_starts[gene_ID]
+        end_known = vertex_IDs[-1] in gene_ends[gene_ID]
+    else:
+        start_known = False
+        end_known = False
 
     for match in all_matches:
         transcript_ID = run_info.transcripts + 1
