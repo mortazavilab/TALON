@@ -1504,7 +1504,8 @@ def batch_add_edges(cursor, edge_dict, batch_size):
             edge_entries.append((edge['edge_ID'],
                                  edge['v1'],
                                  edge['v2'],
-                                 edge['edge_type']))
+                                 edge['edge_type'],
+                                 edge['strand']))
 
     index = 0
     while index < len(edge_entries):
@@ -1516,8 +1517,8 @@ def batch_add_edges(cursor, edge_dict, batch_size):
 
         try:
             cols = " (" + ", ".join([str_wrap_double(x) for x in
-                   ["edge_ID", "v1", "v2", "edge_type"]]) + ") "
-            command = 'INSERT INTO "edge"' + cols + "VALUES " + '(?,?,?,?)'
+                   ["edge_ID", "v1", "v2", "edge_type", "strand"]]) + ") "
+            command = 'INSERT INTO "edge"' + cols + "VALUES " + '(?,?,?,?,?)'
             cursor.executemany(command, batch)
 
         except Exception as e:
