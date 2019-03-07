@@ -658,7 +658,7 @@ def process_FSM_or_ISM(edge_IDs, vertex_IDs, transcript_dict, gene_starts,
     gene_ID, transcript_match = search_for_transcript(full_edge_set, transcript_dict)
     if transcript_match != None:
         transcript_ID = transcript_match['transcript_ID']
-        return gene_ID, transcript_ID, []
+        return gene_ID, transcript_ID, novelty
 
     # Now extract ISM matches of all kinds and then characterize them
     all_matches = search_for_ISM(edge_IDs, transcript_dict)     
@@ -673,6 +673,15 @@ def process_FSM_or_ISM(edge_IDs, vertex_IDs, transcript_dict, gene_starts,
     prefix = []
     gene_ID = all_matches[0]['gene_ID']
 
+    # Check if any of the matches have the same number of exons as the query.
+    # Such a match should be prioritized because it's an FSM
+    FSM_matches = [ x for x in all_matches if x['n_exons'] == n_exons ]
+    if len(FSM_matches) != 0:
+        match = FSM_matches[0]
+        gene_ID = match['gene_ID']
+        transcript_ID = match['transcript_ID']
+        return gene_ID, transcript_ID, novelty
+
     # Check if the start and end vertices match known vertices for this gene.
     # If so, the transcript is eligible to be an NIC instead of ISM
     if gene_ID in gene_starts and gene_ID in gene_ends:
@@ -682,74 +691,56 @@ def process_FSM_or_ISM(edge_IDs, vertex_IDs, transcript_dict, gene_starts,
         start_known = False
         end_known = False
 
+    # If transcript is not a FSM but has a known start and end, return NIC
+    if start_known and end_known:
+        novel_transcript = create_transcript(gene_ID, edge_IDs, vertex_IDs,
+                                         transcript_dict, run_info)
+        transcript_ID = novel_transcript['transcript_ID']
+        novelty = [(transcript_ID, run_info.idprefix, "TALON",
+                        "NIC_transcript", "TRUE")]
+        return gene_ID, transcript_ID, novelty
+
+    # Otherwise, iterate over matches to characterize ISMs
     for match in all_matches:
         transcript_ID = run_info.transcripts + 1
         
-        # Transcript is FSM
-        if match['n_exons'] == n_exons:
-            gene_ID = match['gene_ID']
-            #FSM.append(str(match['transcript_ID']))
+        # Add ISM
+        ISM.append(str(match['transcript_ID']))
 
-            transcript_ID = match['transcript_ID']
-            novelty = []
-            return gene_ID, transcript_ID, novelty
-
-        # Transcript is NIC
-        elif start_known and end_known:
-            novel_transcript = create_transcript(gene_ID, edge_IDs, vertex_IDs,
-                                         transcript_dict, run_info)
-            transcript_ID = novel_transcript['transcript_ID']
-            novelty = [(transcript_ID, run_info.idprefix, "TALON",
-                        "NIC_transcript", "TRUE")]  
-            return gene_ID, transcript_ID, novelty   
-
-        else:
-            # Add ISM
-            ISM.append(str(match['transcript_ID']))
-
-            # Single-exon case
-            if n_exons == 1:
-                match_path = match['path']
-                exon = str(edge_IDs[0])
-                # Look for prefix
-                if match_path.startswith(exon):
-                    prefix.append(str(match['transcript_ID']))
-                # Look for suffix
-                if match_path.endswith(exon):
-                    suffix.append(str(match['transcript_ID']))
-                    #if len(FSM) == 0:
-                    gene_ID = match['gene_ID']   
-                continue     
- 
-            # Multi-exon case
-            edge_str = ",".join([str(x) for x in edge_IDs[1:-1]])
-            match_without_start = ",".join((match['path']).split(",")[1:])
-            match_without_end = ",".join((match['path']).split(",")[:-1])
-
+        # Single-exon case
+        if n_exons == 1:
+            match_path = match['path']
+            exon = str(edge_IDs[0])
             # Look for prefix
-            if match_without_start.startswith(edge_str):
+            if match_path.startswith(exon):
                 prefix.append(str(match['transcript_ID']))
-
-            # Look for suffix    
-            if match_without_end.endswith(edge_str):
-                #if len(FSM) == 0:
-                gene_ID = match['gene_ID']
+            # Look for suffix
+            if match_path.endswith(exon):
                 suffix.append(str(match['transcript_ID']))
+                #if len(FSM) == 0:
+                gene_ID = match['gene_ID']   
+            continue     
+ 
+        # Multi-exon case
+        edge_str = ",".join([str(x) for x in edge_IDs[1:-1]])
+        match_without_start = ",".join((match['path']).split(",")[1:])
+        match_without_end = ",".join((match['path']).split(",")[:-1])
+
+        # Look for prefix
+        if match_without_start.startswith(edge_str):
+            prefix.append(str(match['transcript_ID']))
+
+        # Look for suffix    
+        if match_without_end.endswith(edge_str):
+            #if len(FSM) == 0:
+            gene_ID = match['gene_ID']
+            suffix.append(str(match['transcript_ID']))
            
 
     novel_transcript = create_transcript(gene_ID, edge_IDs, vertex_IDs,
                                          transcript_dict, run_info)
     transcript_ID = novel_transcript['transcript_ID']
 
-    # 
-    #if FSM != []:
-    #    FSM_str = ",".join(FSM)
-    #    novelty.append((transcript_ID, run_info.idprefix, "TALON", 
-    #                    "FSM_transcript", "TRUE"))
-    #    novelty.append((transcript_ID, run_info.idprefix, "TALON",
-    #                    "FSM_to_IDs", FSM_str))
-    #    return gene_ID, transcript_ID, novelty
-    #else:
     ISM_str = ",".join(ISM)
     novelty.append((transcript_ID, run_info.idprefix, "TALON", 
                     "ISM_transcript", "TRUE"))
