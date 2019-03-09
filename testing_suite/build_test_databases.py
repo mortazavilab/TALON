@@ -54,7 +54,7 @@ except Exception as e:
 # Actually perform the chr11_and_Tcf3 TALON run
 try:
     subprocess.check_output(
-       ["python", "../talonQ.py", 
+       ["python", "../talon.py", 
         "--f", "input_files/chr11_and_Tcf3/config.csv",
         "--db", "scratch/chr11_and_Tcf3.db", 
         "--build", "mm10",
