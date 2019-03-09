@@ -14,6 +14,7 @@ import filter_talon_transcripts as filt
 import pdb
 import sys
 import os
+from pathlib import Path
 script_dir = os.path.dirname(os.path.realpath(__file__))
 sys.path.append(os.path.abspath(os.path.join(script_dir, os.pardir)))
 #import talonQ as TALON
@@ -618,6 +619,33 @@ def get_exon_GTF_entry(gene_ID, transcript_ID, exon_ID, exon_num, exon_ID_2_loca
                      frame, attributes])
     return GTF
 
+def check_annot_validity(annot, database):
+    """ Make sure that the user has entered a correct annotation name """
+
+    conn = sqlite3.connect(database)
+    cursor = conn.cursor()
+
+    cursor.execute("SELECT DISTINCT annot_name FROM gene_annotations")
+    annotations = [str(x[0]) for x in cursor.fetchall()]
+    conn.close()
+
+    if "TALON" in annotations:
+        annotations.remove("TALON")
+
+    if annot == None:
+        message = "Please provide a valid annotation name. " + \
+                  "In this database, your options are: " + \
+                  ", ".join(annotations)
+        raise ValueError(message)
+
+    if annot not in annotations:
+        message = "Annotation name '" + annot + \
+                  "' not found in this database. Try one of the following: " + \
+                  ", ".join(annotations)
+        raise ValueError(message)
+
+    return
+
 def main():
     options = getOptions()
     database = options.database
@@ -625,10 +653,16 @@ def main():
     build = options.build
     outfile = create_outname(options)
 
+
     if build == None:
         raise ValueError("Please provide a valid genome build name")
     if annot == None:
         raise ValueError("Please provide a valid annotation name")
+    check_annot_validity(annot, database)
+
+    # Make sure that the input database exists!
+    if not Path(database).exists():
+        raise ValueError("Database file '%s' does not exist!" % database)
 
 
     # Determine which transcripts to include

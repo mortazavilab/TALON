@@ -11,6 +11,7 @@ import sqlite3
 import sys
 import warnings
 import os
+from pathlib import Path
 script_path = os.path.abspath(__file__)
 main_path = "/".join(script_path.split("/")[0:-2])
 sys.path.append(main_path)
@@ -103,12 +104,48 @@ def getOptions():
     (options, args) = parser.parse_args()
     return options
 
+def check_annot_validity(annot, database):
+    """ Make sure that the user has entered a correct annotation name """
+
+    conn = sqlite3.connect(database)
+    cursor = conn.cursor()
+
+    cursor.execute("SELECT DISTINCT annot_name FROM gene_annotations")
+    annotations = [str(x[0]) for x in cursor.fetchall()]
+    conn.close()
+
+    if "TALON" in annotations:
+        annotations.remove("TALON")
+
+    if annot == None:
+        message = "Please provide a valid annotation name. " + \
+                  "In this database, your options are: " + \
+                  ", ".join(annotations)
+        raise ValueError(message)
+
+    if annot not in annotations:
+        message = "Annotation name '" + annot + \
+                  "' not found in this database. Try one of the following: " + \
+                  ", ".join(annotations)
+        raise ValueError(message)
+
+    return
+
 def main():
     options = getOptions()
+    database = options.database
+    annot = options.annot
+
+    # Make sure that the input database exists!
+    if not Path(database).exists():
+        raise ValueError("Database file '%s' does not exist!" % database)    
+
+    # Make sure that the provided annotation name is valid
+    check_annot_validity(annot, database)
 
     if options.pairings_file != None:
         pairings = process_pairings(options.pairings_file)
-        whitelist = filter_talon_transcripts(options.database, options.annot,
+        whitelist = filter_talon_transcripts(database, annot,
                                              dataset_pairings = pairings)
     else:
         whitelist = filter_talon_transcripts(options.database, options.annot)

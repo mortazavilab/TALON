@@ -10,6 +10,7 @@ import sqlite3
 import sys
 import os
 import filter_talon_transcripts as filt
+from pathlib import Path
 script_dir = os.path.dirname(os.path.realpath(__file__))
 sys.path.append(os.path.abspath(os.path.join(script_dir, os.pardir)))
 
@@ -251,8 +252,8 @@ def check_annot_validity(annot, database):
     annotations = [str(x[0]) for x in cursor.fetchall()]
     conn.close()
 
-    if "talon_run" in annotations:
-        annotations.remove("talon_run") 
+    if "TALON" in annotations:
+        annotations.remove("TALON") 
 
     if annot == None:
         message = "Please provide a valid annotation name. " + \
@@ -275,6 +276,10 @@ def main():
     outfile = create_outname(options)
 
     check_annot_validity(annot, database)
+
+    # Make sure that the input database exists!
+    if not Path(database).exists():
+        raise ValueError("Database file '%s' does not exist!" % database)
 
     # Determine which transcripts to include
     transcript_whitelist = handle_filtering(options)

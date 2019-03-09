@@ -1032,7 +1032,6 @@ def identify_transcript(chrom, positions, strand, cursor, location_dict, edge_di
 def check_inputs(options):
     """ Checks the input options provided by the user and makes sure that
         they are valid. Throw an error with descriptive help message if not."""
-    # TODO: add tests to suite
 
     # Make sure that the input database exists!
     database = options.database

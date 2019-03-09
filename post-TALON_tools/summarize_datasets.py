@@ -2,6 +2,7 @@ import argparse
 import sys
 import sqlite3
 import os
+from pathlib import Path
 script_path = os.path.abspath(__file__)
 main_path = "/".join(script_path.split("/")[0:-2])
 sys.path.append(main_path)
@@ -48,7 +49,7 @@ def write_counts_file(cursor, outprefix, verbose = False):
                 "other_novel_genes", "known_transcripts", "novel_transcripts",
                  "ISMs", "prefix_ISMs", "suffix_ISMs", "NICs", "NNCs",
                 "antisense_transcripts", "genomic_transcripts" ]
-    o.write("\t".join(columns))
+    o.write("\t".join(columns) + "\n")
 
     # Get dataset names
     cursor.execute(""" SELECT dataset_name FROM dataset """)
@@ -65,9 +66,6 @@ def write_counts_file(cursor, outprefix, verbose = False):
 
         # Get the number of known transcripts detected
         known_transcripts = len(qutils.fetch_all_known_transcripts_detected(cursor, dataset))
-
-        # Get the number of FSMs with end novelty detected
-        #FSM = len(qutils.fetch_FSM_novel_transcripts(cursor, dataset))
 
         # Get the number of novel transcripts
         novel_transcripts = len(qutils.fetch_novel_transcripts(cursor, dataset))
@@ -117,12 +115,19 @@ def write_counts_file(cursor, outprefix, verbose = False):
             print("----antisense transcripts: %d" % antisense_transcripts)
             print("----genomic transcripts: %d" % genomic_transcripts)
 
-    o.write("\t".join([str(x) for x in outputs]) + "\n")
+        o.write("\t".join([str(x) for x in outputs]) + "\n")
+
     o.close()
 
 def main():
     options = get_args()
-    conn = sqlite3.connect(options.database)
+
+    # Make sure that the input database exists!
+    database = options.database
+    if not Path(database).exists():
+        raise ValueError("Database file '%s' does not exist!" % database)
+
+    conn = sqlite3.connect(database)
     conn.row_factory = sqlite3.Row
     cursor = conn.cursor()
 
