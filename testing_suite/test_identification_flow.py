@@ -2,7 +2,7 @@ import pytest
 import sys
 import sqlite3
 sys.path.append("..")
-import talonQ as talon
+import talon as talon
 from helper_fns import *
 @pytest.mark.integration
 

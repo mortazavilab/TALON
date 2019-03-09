@@ -1,7 +1,7 @@
 import pytest
 import sys
 sys.path.append("..")
-import talonQ as talon
+import talon as talon
 @pytest.mark.unit
 
 class TestGetOverlap(object):
