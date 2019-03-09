@@ -1241,17 +1241,17 @@ def annotate_sam_transcripts(sam_file, dataset, cursor, struct_collection, QC_fi
             gene_starts = struct_collection.gene_starts
             gene_ends = struct_collection.gene_ends
             run_info = struct_collection.run_info
-            #try:
-            annotation_info = identify_transcript(chrom, positions, strand, 
+            try:
+                annotation_info = identify_transcript(chrom, positions, strand, 
                                                       cursor, location_dict, 
                                                       edge_dict, transcript_dict, 
                                                       vertex_2_gene, 
                                                       gene_starts, gene_ends,
                                                       run_info)
-            #except:
-            #    warnings.warn("Problem identifying transcript '%s'. Skipping.."\
-            #                   % read_ID)    
-            #    continue
+            except:
+                warnings.warn("Problem identifying transcript '%s'. Skipping.."\
+                               % read_ID)    
+                continue
                             
             # Now that transcript has been annotated, unpack values and 
             # create an observed entry and abundance record
