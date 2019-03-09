@@ -39,11 +39,14 @@ python talon.py --h
 Usage: talon.py [options]
 
 Options:
-  -h, --help           Show help message and exit  
-  --f                  Comma-delimited dataset config file providing sam files for TALON to run on, as well as metadata that   will be tracked in the dataset table. The required format is: dataset name, sample description, platform, sam file (full path).  
-  -a, --annot          TALON database. Created using build_talon_annotation.py  
-  -b, --build          Genome build to use. Note: must be in the TALON database.  
-  --o                  Outfile name
+-h, --help            Show help message and exit
+--f                   Comma-delimited dataset config file providing sam files for TALON to run on, as well as metadata that   will be tracked in the dataset table. The required format is: dataset name, sample description, platform, sam file (full path).
+  --db FILE,            TALON database. Created using build_talon_annotation.py
+  --build STRING,       Genome build (i.e. hg38) to use. Must be in the
+                        database.
+  --cov, -c             Minimum alignment coverage in order to use a SAM entry. Default = 0.9
+  --identity, -i        Minimum alignment identity in order to use a SAM entry. Default = 0
+  --o OUTPREFIX         Prefix for output files
 ```
 
 ## Post-TALON utilities
