@@ -4,10 +4,7 @@ works from mapped SAM files, allowing data from different sequencing platforms
 (i.e. PacBio and Oxford Nanopore) to be analyzed side by side. 
 
 # Installation
-TALON is designed to be run with Python version 2.7.
-
-Requires:
-* intervaltree (v2.1.0)
+TALON is designed to be run with Python 3.7 (tested on version 3.7.2).
 
 To install TALON, simply download the files using Github's "Download ZIP" button, then unzip them in the directory where you would like to install the program. Alternately, you can download a specific version of the program from the Releases tab. The TALON scripts can now be run directly from the command line- just include the path.
 
@@ -24,8 +21,12 @@ Usage: initialize_talon_database.py [options]
 Options:
   -h, --help           Show help message and exit
   --f                  GTF annotation file
-  --a                  The name of the annotation (for metadata purposes)
   --g                  The name of the reference genome build that the annotation describes. Use a short and memorable name since you will need to specify the genome build when you run TALON later.
+  --a                  The name of the annotation (for metadata purposes)
+  --l                  Minimum required transcript length (default = 300 bp)
+  --idprefix           Prefix for naming novel discoveries in eventual TALON runs (default = 'TALON')
+  --5p                 Maximum allowable distance (bp) at the 5' end during annotation (default = 500 bp)
+  --3p                 Maximum allowable distance (bp) at the 3' end during annotation (default = 300 bp)
   --o                  Output prefix for the database
 ```
 
