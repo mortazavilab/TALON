@@ -109,24 +109,29 @@ class TestIdentifyFSM(object):
         assert start_end_info["end_vertex"] == 5
         conn.close() 
 
-#    def test_no_match(self):
-#        """ Example with no FSM or ISM match """
+    def test_no_match(self):
+        """ Example with no FSM match """
 
-       # conn, cursor = get_db_cursor()
-      #  build = "toy_build"
-     #   edge_dict = talon.make_edge_dict(cursor)
-    #    location_dict = talon.make_location_dict(build, cursor)
-   #     run_info = talon.init_run_info(cursor, build)
-  #      transcript_dict = talon.make_transcript_dict(cursor, build)
- #       gene_starts, gene_ends = talon.make_gene_start_and_end_dict(cursor)
+        conn, cursor = get_db_cursor()
+        build = "toy_build"
+        edge_dict = talon.make_edge_dict(cursor)
+        location_dict = talon.make_location_dict(build, cursor)
+        run_info = talon.init_run_info(cursor, build)
+        transcript_dict = talon.make_transcript_dict(cursor, build)
 
-#        edge_IDs = [ 200 ] 
-#        vertex_IDs = [2, 5 ]
-#        v_novelty = [ 0, 0 ]
+        chrom = "chr1"
+        positions = [1, 100, 500, 600] 
+        strand = "+"
+        edge_IDs = [2]
+        vertex_IDs = [2,3,4,5]
+        v_novelty = [0, 0, 0, 0]
 
-#        gene_ID, transcript_ID, novelty = talon.process_FSM(edge_IDs, vertex_IDs,
-#                                                            transcript_dict, gene_starts, gene_ends,
-#                                                            run_info)
-#        assert gene_ID == transcript_ID == None 
-#        conn.close()       
+        gene_ID, transcript_ID, novelty, start_end_info = talon.process_FSM(chrom,
+                                                            positions, strand,
+                                                            edge_IDs, vertex_IDs,
+                                                            transcript_dict,
+                                                            edge_dict,
+                                                            location_dict, run_info)
+        assert gene_ID == transcript_ID == None 
+        conn.close()       
 

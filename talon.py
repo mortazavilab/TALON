@@ -57,39 +57,49 @@ def str_wrap_double(s):
     s = str(s)
     return '"' + s + '"'
 
-def make_gene_start_and_end_dict(cursor):
+def make_gene_start_and_end_dict(cursor, build):
     """ Format of dicts:
             Key: gene ID from database
-            Value: set object containing start vertices (or end vertices) of 
+            Value: dict mapping positions to start vertices (or end vertices) of 
                    KNOWN transcripts from that gene
     """
     gene_starts = {}
     gene_ends = {}
     query = """SELECT DISTINCT gene_ID, 
                                start_vertex, 
-                               end_vertex 
+                               end_vertex,
+                               loc1.position as start,
+                               loc2.position as end 
                FROM transcripts
                LEFT JOIN transcript_annotations as ta 
                    ON ta.ID = transcripts.transcript_ID
+               LEFT JOIN location as loc1
+                   ON transcripts.start_vertex = loc1.location_ID
+               LEFT JOIN location as loc2
+                   ON transcripts.end_vertex = loc2.location_ID
 	       WHERE ta.attribute = 'transcript_status' 
-                     AND ta.value = 'KNOWN'"""
+                     AND ta.value = 'KNOWN'
+                     AND loc1.genome_build = '%s'
+                     AND loc2.genome_build = '%s'"""
 
-    cursor.execute(query)
+    cursor.execute(query % (build, build))
     for entry in cursor.fetchall():
         gene_ID = entry['gene_ID']
-        start = entry['start_vertex']
-        end = entry['end_vertex']
+        start_vertex = entry['start_vertex']
+        end_vertex = entry['end_vertex']
+        start_pos = entry['start']
+        end_pos = entry['end']
         try:
-            gene_starts[gene_ID].add(start)
+            gene_starts[gene_ID][start_pos] = start_vertex
         except:
-            gene_starts[gene_ID] = set()
-            gene_starts[gene_ID].add(start)
+            gene_starts[gene_ID] = {}
+            gene_starts[gene_ID][start_pos] = start_vertex
 
         try:
-            gene_ends[gene_ID].add(end)
+            gene_ends[gene_ID][end_pos] = end_vertex
         except:
-            gene_ends[gene_ID] = set()
-            gene_ends[gene_ID].add(end)
+            gene_ends[gene_ID] = {}
+            gene_ends[gene_ID][end_pos] = end_vertex
 
     return gene_starts, gene_ends
            
@@ -389,6 +399,58 @@ def match_all_transcript_vertices(chromosome, positions, strand, location_dict,
 
     return tuple(vertex_matches), tuple(novelty), diff_5p, diff_3p
 
+def permissive_match_with_gene_priority(chromosome, position, strand, sj_pos, 
+                                        pos_type, gene_ID, gene_locs, locations, run_info):
+    """ Tries to match a position to a known start/end vertex from the same 
+        gene. If none is found, the normal permissive match procedure is
+        invoked.
+    """
+    # Check inputs
+    if pos_type != "start" and pos_type != "end":
+        raise ValueError("Please set pos_type to either 'start' or 'end'.")
+    if strand != "+" and strand != "-":
+        raise ValueError("Invalid strand specified: %s" % strand)
+
+    # This approach only works when there are known starts/ends for this gene
+    if gene_ID in gene_locs:
+
+        # Get cutoff distance
+        if pos_type == "start":
+            max_dist = run_info.cutoff_5p
+        else:
+            max_dist = run_info.cutoff_3p
+
+        if (strand == "+" and pos_type == "start") or \
+           (strand == "-" and pos_type == "end"):
+            search_window_start = position - max_dist
+            search_window_end = sj_pos
+        else:
+            search_window_start = sj_pos
+            search_window_end = position + max_dist
+
+        # Compute distance to all of the gene positions on file
+        min_abs_dist = max_dist + 1
+        best_dist = None
+        closest_vertex = None
+        for known_location in gene_locs:
+            if known_location < search_window_start or known_location > search_window_end:
+                continue
+        curr_dist = compute_delta(known_location, position, strand)
+        if abs(curr_dist) < min_abs_dist:
+            best_dist = curr_dist
+            min_abs_dist = abs(curr_dist)
+            closest_vertex = gene_locs[known_location]
+        # If a valid match is found, return it
+        if min_abs_dist <= max_dist:
+            return closest_vertex, best_dist
+
+    # Otherwise, revert to permissive match approach.
+    match, dist = permissive_vertex_search(chromosome, position, strand, 
+                                           sj_pos, pos_type,
+                                           locations, run_info)
+    return match, dist
+    
+
 def permissive_vertex_search(chromosome, position, strand, sj_pos, pos_type,
                              locations, run_info):
     """ Given a position, this function tries to find a vertex match within the
@@ -399,7 +461,7 @@ def permissive_vertex_search(chromosome, position, strand, sj_pos, pos_type,
     if chromosome in locations and position in locations[chromosome]:
         match = locations[chromosome][position]
         dist = 0
-        return match, dist
+        return match['location_ID'], dist
 
     if pos_type != "start" and pos_type != "end":
         raise ValueError("Please set pos_type to either 'start' or 'end'.") 
@@ -436,14 +498,14 @@ def permissive_vertex_search(chromosome, position, strand, sj_pos, pos_type,
             match = search_for_vertex_at_pos(chromosome, curr_pos, locations)
             if match != None:
                 dist = compute_delta(curr_pos, position, strand)
-                return match, dist
+                return match['location_ID'], dist
 
         curr_pos = position - dist*direction_priority
         if curr_pos > search_window_start and curr_pos < search_window_end:
             match = search_for_vertex_at_pos(chromosome, curr_pos, locations)
             if match != None:
                 dist = compute_delta(curr_pos, position, strand)
-                return match, dist
+                return match['location_ID'], dist
 
     return None, None       
             
@@ -776,10 +838,14 @@ def process_FSM(chrom, positions, strand, edge_IDs, vertex_IDs, transcript_dict,
             diff_5p = curr_5p_diff
         else:
             # First get a permissively matched start vertex
-            start_vertex, diff_5p = permissive_vertex_search(chrom, positions[0], 
-                                                            strand, positions[1], 
-                                                            "start",
-                                                            locations, run_info)
+            start_vertex, diff_5p = permissive_match_with_gene_priority(chromosome, 
+                                                          position, strand, sj_pos,
+                                                          pos_type, gene_ID, gene_starts, 
+                                                          locations, run_info)
+                                                            #permissive_vertex_search(chrom, positions[0], 
+                                                            #strand, positions[1], 
+                                                            #"start",
+                                                            #locations, run_info)
             if start_vertex == None:
                 start_vertex = create_vertex(chrom, positions[0], run_info,
                                              locations)['location_ID']
@@ -817,6 +883,36 @@ def process_FSM(chrom, positions, strand, edge_IDs, vertex_IDs, transcript_dict,
                       "diff_3p": diff_3p}
 
     return gene_ID, transcript_ID, novelty, start_end_info
+
+def process_ISM(chrom, positions, strand, edge_IDs, vertex_IDs, transcript_dict,
+                gene_starts, gene_ends, edge_dict, locations, run_info):
+    """ Given a transcript, try to find an ISM match for it. If the
+        best match is an ISM with known ends, that will be promoted to NIC. """
+
+    gene_ID = None
+    transcript_ID = None
+    novelty = []
+    start_end_info = {"start_vertex": None,
+                      "end_vertex": None,
+                      "start_exon": None,
+                      "end_exon": None,
+                      "diff_5p": None,
+                      "diff_3p": None}
+
+    # Now extract ISM matches of all kinds and then characterize them
+    all_matches = search_for_ISM(edge_IDs, transcript_dict)
+
+    if all_matches == None:
+        return None, None, [], start_end_info
+
+    # If there is 
+
+    ISM = []
+    suffix = []
+    prefix = []
+    #gene_ID = all_matches[0]['gene_ID']
+
+    
 
 def process_FSM_or_ISM(edge_IDs, vertex_IDs, transcript_dict, gene_starts,
                        gene_ends, run_info):
@@ -1054,20 +1150,24 @@ def identify_transcript(chrom, positions, strand, cursor, location_dict, edge_di
     if all_SJs_known:
 
         # Look for FSM first
-        gene_ID, transcript_ID, transcript_novelty = process_FSM_or_ISM(edge_IDs, 
-                                                                vertex_IDs, 
-                                                                transcript_dict,
-                                                                gene_starts,
-                                                                gene_ends, 
-                                                                run_info)
-
+        gene_ID, transcript_ID, novelty, start_end_info = process_FSM(chrom,
+                                                            positions, strand,
+                                                            edge_IDs, vertex_IDs,
+                                                            transcript_dict,
+                                                            edge_dict,
+                                                            location_dict, run_info)
+        # Now look for ISM
         if gene_ID == None:
-            gene_ID, transcript_ID, transcript_novelty = process_NIC(edge_IDs,
-                                                                 vertex_IDs,
-                                                                 strand,
-                                                                 transcript_dict,
-                                                                 vertex_2_gene,
-                                                                 run_info)
+            pass
+            # ISM    
+        # Look for NIC
+        #if gene_ID == None:
+        #    gene_ID, transcript_ID, transcript_novelty = process_NIC(edge_IDs,
+        #                                                         vertex_IDs,
+        #                                                         strand,
+        #                                                         transcript_dict,
+        #                                                         vertex_2_gene,
+        #                                                         run_info)
            
     # Novel in catalog transcripts have known splice donors and acceptors,
     # but new connections between them. 
@@ -1295,7 +1395,7 @@ def prepare_data_structures(cursor, build, min_coverage, min_identity):
     edge_dict = make_edge_dict(cursor)
     transcript_dict = make_transcript_dict(cursor, build)
     vertex_2_gene = make_vertex_2_gene_dict(cursor)
-    gene_starts, gene_ends = make_gene_start_and_end_dict(cursor)   
+    gene_starts, gene_ends = make_gene_start_and_end_dict(cursor, build)   
 
     struct_collection = dstruct.Struct() 
     struct_collection['run_info'] = run_info

@@ -29,7 +29,7 @@ class TestPermissiveMatch(object):
                                                             "start", 
                                                             location_dict, 
                                                             run_info)
-        assert vertex_match['location_ID'] == fetch_correct_vertex_ID(chrom, 1, cursor)
+        assert vertex_match == fetch_correct_vertex_ID(chrom, 1, cursor)
         assert diff == 0
         conn.close()
 
@@ -55,7 +55,7 @@ class TestPermissiveMatch(object):
                                                             location_dict,
                                                             run_info)
 
-        assert vertex_match['location_ID'] == fetch_correct_vertex_ID(chrom, 2000, cursor)
+        assert vertex_match == fetch_correct_vertex_ID(chrom, 2000, cursor)
         assert diff == 250
         conn.close()
 
@@ -114,9 +114,9 @@ class TestPermissiveMatch(object):
                                                             location_dict,
                                                             run_info)
 
-        assert start_match['location_ID'] == fetch_correct_vertex_ID(chrom, 900, cursor)
+        assert start_match == fetch_correct_vertex_ID(chrom, 900, cursor)
         assert start_diff == 20
-        assert end_match['location_ID'] == fetch_correct_vertex_ID(chrom, 1000, cursor)
+        assert end_match == fetch_correct_vertex_ID(chrom, 1000, cursor)
         assert end_diff == -30
         conn.close()    
 
@@ -151,5 +151,5 @@ class TestPermissiveMatch(object):
                                                             location_dict,
                                                             run_info)      
 
-        assert start_match['location_ID'] == 3
-        assert end_match['location_ID'] == 4
+        assert start_match == 3
+        assert end_match == 4
