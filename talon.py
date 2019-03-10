@@ -100,18 +100,18 @@ def make_transcript_dict(cursor, build):
             Value: SQLite3 row from transcript table
     """
     transcript_dict = {}
-    #query = """SELECT * FROM transcripts """
-    query = """SELECT t.*,
-	         loc1.chromosome as chromosome,
-                 loc1.position as start_pos,
-                 loc2.position as end_pos	
-	       FROM transcripts AS t
-	       LEFT JOIN location as loc1 ON t.start_vertex = loc1.location_ID 
-	       LEFT JOIN location as loc2 ON t.end_vertex = loc2.location_ID
-	       WHERE loc1.genome_build = ? AND loc2.genome_build = ?;
-           """
+    query = """SELECT * FROM transcripts """
+    #query = """SELECT t.*,
+    #	         loc1.chromosome as chromosome,
+    #             loc1.position as start_pos,
+    #             loc2.position as end_pos	
+    #	       FROM transcripts AS t
+    #	       LEFT JOIN location as loc1 ON t.start_vertex = loc1.location_ID 
+    #	       LEFT JOIN location as loc2 ON t.end_vertex = loc2.location_ID
+    #	       WHERE loc1.genome_build = ? AND loc2.genome_build = ?;
+    #       """
 
-    cursor.execute(query, [build, build])
+    cursor.execute(query)#, [build, build])
     for transcript in cursor.fetchall():
         transcript_path = transcript["path"].split(",")
         transcript_path = frozenset([ int(x) for x in transcript_path ])
@@ -175,6 +175,36 @@ def make_vertex_2_gene_dict(cursor):
             vertex_2_gene[vertex].add((gene, strand))
 
     return vertex_2_gene
+
+def make_temp_monoexonic_transcript_table(cursor, build):
+    """ Attaches a temporary database with a table that has the following fields:
+            - gene_ID
+            - transcript_ID
+            - chromosome
+            - start (min position)
+            - end (max position)
+            - strand
+        The purpose is to allow location-based matching for monoexonic query
+        transcripts. """
+
+    command = """ CREATE TEMPORARY TABLE IF NOT EXISTS temp_monoexon AS
+                  SELECT t.gene_ID, 
+                         t.transcript_ID, 
+			 loc1.chromosome, 
+			 loc1.position as start,
+                         loc2.position as end,
+			 genes.strand,
+                         t.start_vertex,
+                         t.end_vertex
+                  FROM transcripts as t
+	          LEFT JOIN location as loc1 ON loc1.location_ID = t.start_vertex
+	          LEFT JOIN location as loc2 ON loc2.location_ID = t.end_vertex
+	          LEFT JOIN genes ON genes.gene_ID = t.gene_ID
+                  WHERE n_exons = 1 AND loc1.genome_build = '%s' 
+	          AND loc2.genome_build = '%s' """
+    cursor.execute(command % (build, build))
+    
+    return
 
 def make_temp_novel_gene_table(cursor, build):
     """ Attaches a temporary database with a table that has the following fields:
@@ -322,31 +352,16 @@ def permissive_vertex_search(chromosome, position, strand, sj_pos, pos_type,
         if curr_pos > search_window_start and curr_pos < search_window_end: 
             match = search_for_vertex_at_pos(chromosome, curr_pos, locations)
             if match != None:
-                if strand == "+":
-                    if curr_pos < position:
-                        return match, dist*(-1)  
-                    else:
-                        return match, dist  
-                else:
-                    if curr_pos < position:
-                        return match, dist
-                    else:
-                        return match, dist*(-1)
+                dist = compute_delta(curr_pos, position, strand)
+                return match, dist
 
         curr_pos = position - dist*direction_priority
         if curr_pos > search_window_start and curr_pos < search_window_end:
             match = search_for_vertex_at_pos(chromosome, curr_pos, locations)
             if match != None:
-                if strand == "+":
-                    if curr_pos < position:
-                        return match, dist*(-1)
-                    else:
-                        return match, dist
-                else:
-                    if curr_pos < position:
-                        return match, dist
-                    else:
-                        return match, dist*(-1)
+                dist = compute_delta(curr_pos, position, strand)
+                return match, dist
+
     return None, None       
             
 def create_vertex(chromosome, position, run_info, location_dict):
@@ -473,46 +488,6 @@ def match_all_transcript_edges(vertices, strand, edge_dict, run_info):
         edge_matches.append(edge_match['edge_ID'])
 
     return tuple(edge_matches), tuple(novelty)
-
-#def search_for_transcript_suffix(edge_IDs, transcript_dict):
-#    """ Given a list of edges in a query transcript, determine whether it is
-#        a suffix for any transcript in the dict. It is OK for the final exon ID
-#        to be different (and the first one in case there is a 5' end difference), 
-#        but the splice junctions must match.
-#    """  
-
-#    if len(edge_IDs) > 1:
-#        #suffix_matches = 
-#        suffix_matches = list(filter(lambda t: edge_IDs[1:-1] == t[-len(edge_IDs) + 1:-1],
-#                                     list(transcript_dict.keys())))
-#    else:
-#        suffix_matches = list(filter(lambda t: edge_IDs[0] == t[-1],
-#                                     list(transcript_dict.keys())))
-
-#    if len(suffix_matches) == 0:
-#        return None, None
-
-#    gene_ID = transcript_dict[suffix_matches[0]]["gene_ID"]
-#    return gene_ID, suffix_matches
-
-#def search_for_transcript_prefix(edge_IDs, transcript_dict):
-#    """ Given a list of edges in a query transcript, determine whether it is
-#        a prefix for any transcript in the dict. It is OK for the first and 
-#        last exon IDs to be different, but the splice junctions must match.
-#    """
-
-#    if len(edge_IDs) > 1:
-#        prefix_matches = list(filter(lambda t: edge_IDs[1:-1] == t[1:len(edge_IDs)-1],
-#                                     list(transcript_dict.keys())))
-#    else: 
-#        prefix_matches = list(filter(lambda t: edge_IDs[0] == t[0],
-#                                     list(transcript_dict.keys())))
-
-#    if len(prefix_matches) == 0:
-#        return None, None
-
-#    gene_ID = transcript_dict[prefix_matches[0]]["gene_ID"]
-#    return gene_ID, prefix_matches
 
 
 def search_without_transcript_ends(edge_IDs, transcript_dict):
@@ -982,14 +957,6 @@ def identify_transcript(chrom, positions, strand, cursor, location_dict, edge_di
     # TODO: we might be able to run this operation fewer times by screening novelty
     update_vertex_2_gene(gene_ID, vertex_IDs, strand, vertex_2_gene)
  
-    # Process 5' and 3' end novelty on relevant transcripts
-    #if v_novelty[0] == 1:
-    #    transcript_novelty.append((transcript_ID, run_info.idprefix, "TALON",
-    #                              "5p_novel", "TRUE"))
-    #if v_novelty[-1] == 1:
-    #    transcript_novelty.append((transcript_ID, run_info.idprefix, "TALON",
-    #                              "3p_novel", "TRUE"))
-
     # For novel genes and transcripts, add names to novelty entries
     if len(gene_novelty) > 0:
         gene_novelty.append((gene_ID, run_info.idprefix, "TALON",
@@ -1128,6 +1095,7 @@ def prepare_data_structures(cursor, build, min_coverage, min_identity):
     """
 
     make_temp_novel_gene_table(cursor, build)
+    make_temp_monoexonic_transcript_table(cursor, build)
     run_info = init_run_info(cursor, build, min_coverage, min_identity)
     location_dict = make_location_dict(build, cursor)
     edge_dict = make_edge_dict(cursor)
@@ -1197,6 +1165,176 @@ def process_all_sam_files(sam_files, dataset_list, cursor, struct_collection,
     return novel_datasets, all_observed_transcripts, all_gene_annotations, \
            all_transcript_annotations, all_exon_annotations, all_abundance
 
+
+def compute_delta(orig_pos, new_pos, strand):
+    """ Given a starting position and a new position, compute the distance
+        between them. The sign indicates whether the second point is 
+        upstream or downstream of the original with respect to strand. """
+
+    abs_dist = abs(orig_pos - new_pos)
+    if strand == "+":
+        if new_pos < orig_pos:
+            return -1*abs_dist
+        else:
+            return abs_dist
+    elif strand == "-":
+        if new_pos < orig_pos:
+            return abs_dist
+        else:
+            return -1*abs_dist
+    else:
+        raise ValueError("Strand must be either + or -")
+    
+
+def identify_monoexon_transcript(chrom, positions, strand, cursor, location_dict,
+                                 edge_dict, transcript_dict, vertex_2_gene,
+                                 gene_starts, gene_ends, run_info):
+
+    gene_novelty = []
+    transcript_novelty = []
+    exon_novelty = []
+
+    cutoff_5p = run_info.cutoff_5p
+    cutoff_3p = run_info.cutoff_3p
+
+    start = positions[0]
+    end = positions[-1]
+    # First, look for a monoexonic FSM transcript match that meets the cutoff
+    # distance criteria
+    query = """ SELECT * 
+                    FROM temp_monoexon AS tm
+                    WHERE tm.chromosome = '%s'
+                    AND tm.strand = '%s'
+                    AND tm.start >= %d
+                    AND tm.start <= %d
+                    AND tm.end >= %d
+                    AND tm.end <= %d  
+               """
+    lower_start_bound = start - cutoff_5p
+    upper_start_bound = start + cutoff_5p
+    lower_end_bound = end - cutoff_3p
+    upper_end_bound = end + cutoff_3p
+    cursor.execute(query % (chrom, strand, lower_start_bound, upper_start_bound,
+                            lower_end_bound, upper_end_bound))
+    matches = cursor.fetchall()
+
+    # If there is more than one match, apply a tiebreaker (pick the one with 
+    # the most overlap
+    if len(matches) > 0:
+        best_overlap = 0
+        best_match = None
+        for match in matches:
+            # get overlap and compare
+            match_interval = [match['start'], match['end']]
+            overlap = get_overlap([start, end], match_interval)
+            if overlap >= best_overlap:
+                best_overlap = overlap
+                best_match = match
+
+        gene_ID = best_match['gene_ID']
+        transcript_ID = best_match['transcript_ID']
+        vertex_IDs = (best_match['start_vertex'], best_match['end_vertex'])
+        diff_5p = compute_delta(best_match['start'], start, strand)
+        diff_3p = compute_delta(best_match['end'], end, strand)
+
+    # If there is no match, proceed to genomic/antisense style matching.
+    else:
+        # Start by performing vertex match               
+        vertex_IDs, v_novelty, diff_5p, diff_3p = match_all_transcript_vertices(
+                                                                 chrom,
+                                                                 positions,
+                                                                 strand,
+                                                                 location_dict,
+                                                                 run_info)
+
+        # Get edge match (or create new edge)
+        edge_IDs, e_novelty = match_all_transcript_edges(vertex_IDs, strand,
+                                                     edge_dict, run_info)
+
+        # Find best gene match
+        gene_ID, match_strand = search_for_overlap_with_gene(chrom, positions[0],
+                                                             positions[1], strand,
+                                                             cursor, run_info) 
+        # Add annotations
+        if gene_ID == None:
+            gene_ID = create_gene(chrom, positions[0], positions[-1],
+                              strand, cursor, run_info)
+
+            gene_novelty.append((gene_ID, run_info.idprefix, "TALON",
+                         "intergenic_novel","TRUE"))
+            transcript_ID = create_transcript(gene_ID, edge_IDs, vertex_IDs,
+                                         transcript_dict, run_info)["transcript_ID"]
+            transcript_novelty.append((transcript_ID, run_info.idprefix, "TALON",
+                                  "intergenic_transcript", "TRUE"))     
+        # Antisense case
+        elif match_strand != strand:
+            anti_gene_ID = gene_ID
+            gene_ID = create_gene(chrom, positions[0], positions[-1],
+                              strand, cursor, run_info)
+            transcript_ID = create_transcript(gene_ID, edge_IDs, vertex_IDs,
+                                         transcript_dict, run_info)["transcript_ID"]
+
+            gene_novelty.append((gene_ID, run_info.idprefix, "TALON",
+                         "antisense_gene","TRUE"))
+            gene_novelty.append((gene_ID, run_info.idprefix, "TALON",
+                         "gene_antisense_to_IDs",anti_gene_ID))
+            transcript_novelty.append((transcript_ID, run_info.idprefix, "TALON",
+                         "antisense_transcript", "TRUE"))
+
+        # Same strand
+        else:
+            transcript_ID = create_transcript(gene_ID, edge_IDs, vertex_IDs,
+                                         transcript_dict, run_info)["transcript_ID"]
+            transcript_novelty.append((transcript_ID, run_info.idprefix, "TALON",
+                                  "genomic_transcript", "TRUE"))
+
+        # Add all novel vertices to vertex_2_gene now that we have the gene ID
+        update_vertex_2_gene(gene_ID, vertex_IDs, strand, vertex_2_gene)
+
+        # Add novel gene annotation attributes
+        if len(gene_novelty) > 0:
+            gene_novelty.append((gene_ID, run_info.idprefix, "TALON",
+                         "gene_status", "NOVEL"))
+            gene_name = run_info.idprefix + "-gene_%d" % gene_ID
+            gene_novelty.append((gene_ID, run_info.idprefix, "TALON",
+                         "gene_name", gene_name))
+            gene_novelty.append((gene_ID, run_info.idprefix, "TALON",
+                         "gene_id", gene_name))
+
+        # Add novel transcript annotation attributes
+        transcript_novelty.append((transcript_ID, run_info.idprefix, "TALON",
+                                   "transcript_status", "NOVEL"))
+        transcript_name = run_info.idprefix + "-transcript_%d" % transcript_ID
+        transcript_novelty.append((transcript_ID, run_info.idprefix, "TALON",
+                         "transcript_name", transcript_name))
+        transcript_novelty.append((transcript_ID, run_info.idprefix, "TALON",
+                         "transcript_id", transcript_name))
+
+        # Add annotation entries for any novel exons
+        if e_novelty[0] == 1:
+            exon_novelty.append((edge_IDs[0], run_info.idprefix, "TALON",
+                                     "exon_status", "NOVEL"))
+        
+        # Add the novel transcript to the temporary monoexon table
+        new_mono = ( gene_ID, transcript_ID, chrom, start, end, strand, 
+                     vertex_IDs[0], vertex_IDs[-1] )
+        cols = '("gene_ID", "transcript_ID", "chromosome", "start", "end",' + \
+                 '"strand", "start_vertex", "end_vertex")'
+        command = 'INSERT INTO temp_monoexon ' + cols + ' VALUES ' + '(?,?,?,?,?,?,?,?)'
+        cursor.execute(command, new_mono)
+
+    # Package annotation information
+    annotations = {'gene_ID': gene_ID,
+                   'transcript_ID': transcript_ID,
+                   'gene_novelty': gene_novelty,
+                   'transcript_novelty': transcript_novelty,
+                   'exon_novelty': exon_novelty,
+                   'start_vertex': vertex_IDs[0],
+                   'end_vertex': vertex_IDs[-1],
+                   'start_delta': diff_5p,
+                   'end_delta': diff_3p}
+    return annotations
+
 def annotate_sam_transcripts(sam_file, dataset, cursor, struct_collection, QC_file):
     """ Process SAM transcripts and annotate the ones that pass QC """
 
@@ -1241,13 +1379,23 @@ def annotate_sam_transcripts(sam_file, dataset, cursor, struct_collection, QC_fi
             gene_starts = struct_collection.gene_starts
             gene_ends = struct_collection.gene_ends
             run_info = struct_collection.run_info
+
             try:
-                annotation_info = identify_transcript(chrom, positions, strand, 
+                n_exons = len(positions)/2
+                if n_exons > 1:
+                    annotation_info = identify_transcript(chrom, positions, strand, 
                                                       cursor, location_dict, 
                                                       edge_dict, transcript_dict, 
                                                       vertex_2_gene, 
                                                       gene_starts, gene_ends,
                                                       run_info)
+                else:
+                    annotation_info = identify_monoexon_transcript(chrom, positions, strand,
+                                                                   cursor, location_dict,
+                                                                   edge_dict, transcript_dict,
+                                                                   vertex_2_gene,
+                                                                   gene_starts, gene_ends,
+                                                                   run_info)
             except:
                 warnings.warn("Problem identifying transcript '%s'. Skipping.."\
                                % read_ID)    

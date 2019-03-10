@@ -28,8 +28,8 @@ class TestAssignments(object):
         correct_gene_ID = fetch_correct_ID("Canx", "gene", cursor)
         assert assignment['gene_ID'] == correct_gene_ID
         assert assignment['transcript_ID'] == 8451
-        assert assignment['start_delta'] == 4
-        assert assignment['end_delta'] == 40
+        assert assignment['start_delta'] == -4
+        assert assignment['end_delta'] == -40
 
         # Now make sure that the novel transcript was annotated correctly
         annot_dict = make_annot_dict(cursor, assignment['transcript_ID'])
@@ -57,8 +57,8 @@ class TestAssignments(object):
         correct_gene_ID = fetch_correct_ID("Canx", "gene", cursor)
         assert assignment['gene_ID'] == correct_gene_ID
         assert assignment['transcript_ID'] == 8452
-        assert assignment['start_delta'] == -64
-        assert assignment['end_delta'] == -1
+        assert assignment['start_delta'] == 64
+        assert assignment['end_delta'] == 1
 
         # Now make sure that the novel transcript was annotated correctly
         annot_dict = make_annot_dict(cursor, assignment['transcript_ID'])
@@ -92,7 +92,6 @@ class TestAssignments(object):
         # Now make sure that the novel transcript was annotated correctly
         annot_dict = make_annot_dict(cursor, assignment['transcript_ID'])
         assert annot_dict["genomic_transcript"] == "TRUE"
-        #assert annot_dict["5p_novel"] == "TRUE"
         assert annot_dict["transcript_status"] == "NOVEL"
         conn.close()
 
@@ -114,8 +113,8 @@ class TestAssignments(object):
         correct_gene_ID = fetch_correct_ID("Tcf3", "gene", cursor)
         assert assignment['gene_ID'] == correct_gene_ID
         assert assignment['transcript_ID'] == 8454
-        assert assignment['start_delta'] == -77
-        assert assignment['end_delta'] == -8
+        assert assignment['start_delta'] == 77
+        assert assignment['end_delta'] == 8
 
         # Now make sure that the novel transcript was annotated correctly
         annot_dict = make_annot_dict(cursor, assignment['transcript_ID'])
@@ -146,8 +145,8 @@ class TestAssignments(object):
         for assignment in cursor.fetchall():
             assert assignment['gene_ID'] == correct_gene_ID
             assert assignment['transcript_ID'] == 8455
-            assert assignment['start_delta'] == -2
-            assert assignment['end_delta'] == 15
+            assert assignment['start_delta'] == 2
+            assert assignment['end_delta'] == -15
 
         # Now make sure that the novel transcript was annotated correctly
         annot_dict = make_annot_dict(cursor, 8455)

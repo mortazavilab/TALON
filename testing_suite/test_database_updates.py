@@ -138,8 +138,8 @@ class TestDatabaseUpdates(object):
         # duplicates of the other genes
         query = "SELECT * FROM genes"
         gene_IDs = [ x['gene_ID'] for x in cursor.execute(query)]
-        assert 6 in gene_IDs
-        assert len(gene_IDs) == 6
+        assert 7 in gene_IDs
+        assert len(gene_IDs) == 7
         conn.close()
 
     def test_transcript_update(self):
@@ -161,8 +161,8 @@ class TestDatabaseUpdates(object):
         query = "SELECT * FROM transcripts"
         cursor.execute(query)
         transcript_IDs = [ x['transcript_ID'] for x in cursor.fetchall()]
-        assert 7 in transcript_IDs
-        assert len(transcript_IDs) == 7
+        assert 8 in transcript_IDs
+        assert len(transcript_IDs) == 8
         conn.close()
 
     def test_edge_update(self):

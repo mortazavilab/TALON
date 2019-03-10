@@ -56,7 +56,7 @@ class TestPermissiveMatch(object):
                                                             run_info)
 
         assert vertex_match['location_ID'] == fetch_correct_vertex_ID(chrom, 2000, cursor)
-        assert diff == -250
+        assert diff == 250
         conn.close()
 
     def test_beyond_cutoff_distance(self):
@@ -115,15 +115,14 @@ class TestPermissiveMatch(object):
                                                             run_info)
 
         assert start_match['location_ID'] == fetch_correct_vertex_ID(chrom, 900, cursor)
-        assert start_diff == -20
+        assert start_diff == 20
         assert end_match['location_ID'] == fetch_correct_vertex_ID(chrom, 1000, cursor)
-        assert end_diff == 30
+        assert end_diff == -30
         conn.close()    
 
     def test_monoexonic_edge_case(self):
         """ Case I observed during testing where start and end accidentally 
             ended up being assigned to the same vertex """
-        # TODO: solve this case. It isn't working right now.
      
         conn, cursor = get_db_cursor()
         build = "toy_build"
@@ -152,5 +151,5 @@ class TestPermissiveMatch(object):
                                                             location_dict,
                                                             run_info)      
 
-        #assert start_match['location_ID'] == 3
-        #assert end_match['location_ID'] == 4
+        assert start_match['location_ID'] == 3
+        assert end_match['location_ID'] == 4

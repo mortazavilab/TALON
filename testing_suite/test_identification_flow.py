@@ -65,8 +65,6 @@ class TestIdentifyFSM(object):
         correct_gene_ID = fetch_correct_ID("TG2", "gene", cursor)
         novelty_types = [ x[-2] for x in annotation['transcript_novelty']]
         assert annotation['gene_ID'] == correct_gene_ID
-        #assert "FSM_transcript" in novelty_types
-        #assert "3p_novel" in novelty_types
         assert annotation['end_delta'] == None
         conn.close()
 
@@ -125,7 +123,7 @@ class TestIdentifyFSM(object):
         assert annotation['gene_ID'] == correct_gene_ID
         assert "ISM_transcript" in novelty_types 
         assert "ISM-suffix_transcript" in novelty_types
-        assert annotation['start_delta'] == -50
+        assert annotation['start_delta'] == 50
         conn.close()
 
     def test_ISM_prefix(self):
@@ -302,7 +300,7 @@ class TestIdentifyFSM(object):
         novelty_types = [ x[-2] for x in annotation['transcript_novelty']]
         assert annotation['gene_ID'] == correct_gene_ID
         assert "genomic_transcript" in novelty_types
-        assert annotation['end_delta'] == 10
+        assert annotation['end_delta'] == -10
         conn.close()        
 
     def test_NIC_with_all_known_edges(self):
@@ -334,7 +332,6 @@ class TestIdentifyFSM(object):
         assert annotation['transcript_ID'] == 8
         novelty_types = [ x[-2] for x in annotation['transcript_novelty']]
         assert "NIC_transcript" in novelty_types
-        #assert "3p_novel" in novelty_types
 
         conn.close()
 
