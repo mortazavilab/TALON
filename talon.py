@@ -98,23 +98,26 @@ def make_transcript_dict(cursor, build):
     """ Format of dict:
             Key: tuple consisting of edges in transcript path
             Value: SQLite3 row from transcript table
+        Ignore database transcripts that have only one exon since these will
+        be handled by a different data structure
     """
     transcript_dict = {}
-    query = """SELECT * FROM transcripts """
-    #query = """SELECT t.*,
-    #	         loc1.chromosome as chromosome,
-    #             loc1.position as start_pos,
-    #             loc2.position as end_pos	
-    #	       FROM transcripts AS t
-    #	       LEFT JOIN location as loc1 ON t.start_vertex = loc1.location_ID 
-    #	       LEFT JOIN location as loc2 ON t.end_vertex = loc2.location_ID
-    #	       WHERE loc1.genome_build = ? AND loc2.genome_build = ?;
-    #       """
+    #query = """SELECT * FROM transcripts """
+    query = """SELECT t.*,
+    	         loc1.chromosome as chromosome,
+                 loc1.position as start_pos,
+                 loc2.position as end_pos	
+    	       FROM transcripts AS t
+    	       LEFT JOIN location as loc1 ON t.start_vertex = loc1.location_ID 
+    	       LEFT JOIN location as loc2 ON t.end_vertex = loc2.location_ID
+    	       WHERE loc1.genome_build = ? AND loc2.genome_build = ?
+               AND t.n_exons > 1;
+           """
 
-    cursor.execute(query)#, [build, build])
+    cursor.execute(query, [build, build])
     for transcript in cursor.fetchall():
-        transcript_path = transcript["path"].split(",")
-        transcript_path = frozenset([ int(x) for x in transcript_path ])
+        transcript_path = transcript["jn_path"].split(",")
+        transcript_path = frozenset([ int(x) for x in transcript_path])
         transcript_dict[transcript_path] = transcript
 
     return transcript_dict
@@ -302,6 +305,38 @@ def match_monoexon_vertices(chromosome, positions, strand, location_dict,
 
     return tuple(vertex_matches), tuple(novelty), diff_5p, diff_3p
 
+def match_splice_vertices(chromosome, positions, strand, location_dict,
+                                  run_info):
+    """ Given a chromosome and a list of positions from the transcript in 5' to
+        3' end order, this function looks for a matching vertex for each splice
+        junction position (so it ignores the ends). Also returns a list where 
+        each index indicates whether that vertex is novel to the data structure 
+        (0 for known, 1 for novel) """
+
+    # Returned by function
+    vertex_matches = []
+    novelty = []
+  
+    # Iterate over positions
+    for curr_index in range(1,len(positions)-1):
+        position = positions[curr_index]
+
+        vertex_match = search_for_vertex_at_pos(chromosome, position,
+                                                     location_dict)
+        if vertex_match == None:
+            # If no vertex matches the position, one is created.
+            vertex_match = create_vertex(chromosome, position, run_info,
+                                         location_dict)
+            novelty.append(1)
+        else:
+            novelty.append(0)
+
+        # Add to running list of matches
+        vertex_matches.append(vertex_match['location_ID'])
+
+    return vertex_matches, novelty
+   
+
 def match_all_transcript_vertices(chromosome, positions, strand, location_dict, 
                                   run_info):
     """ Given a chromosome and a list of positions from the transcript in 5' to
@@ -474,12 +509,12 @@ def check_all_exons_known(novelty):
     """ Given a list in which each element represents the novelty (1) or
         known-ness of a transcript edge (0), determine whether all of the
         exons are known or not. Return True if all are known, and False
-        otherwise """
+        otherwise. Input should not include first or last exon. """
 
     if len(novelty) == 1:
         return novelty[0] == 0
 
-    exons = novelty[::2]
+    exons = novelty[1::2]
 
     if sum(exons) > 0:
         return False
@@ -490,52 +525,96 @@ def check_all_SJs_known(novelty):
     """ Given a list in which each element represents the novelty (1) or 
         known-ness of a transcript edge (0), determine whether all of the
         introns are known or not. Return True if all are known, and False 
-        otherwise """
+        otherwise. Input should not include first or last exon. """
 
     if len(novelty) == 1:
         return None
 
-    introns = novelty[1::2]
+    introns = novelty[::2]
         
     if sum(introns) > 0:
         return False
     else:
         return True
 
-def match_all_transcript_edges(vertices, strand, edge_dict, run_info):
-    """ Given a list of vertex IDs from the transcript in 5' to
+def match_all_splice_edges(vertices, strand, edge_dict, run_info):
+    """ Given a list of splice junction-only vertex IDs from the transcript in 5' to
         3' end order, this function looks for a matching edge ID for each
         position. If none exists, it creates one. """
 
     edge_matches = []
     novelty = []
-    edge_type = "exon"
+    edge_type = "intron"
 
     for index_1 in range(0, len(vertices) - 1):
         index_2 = index_1 + 1
 
         if index_1 % 2 != 0:
-            edge_type = "intron"
-        else:
             edge_type = "exon"
-       
+        else:
+            edge_type = "intron"
+
         vertex_1 = vertices[index_1]
         vertex_2 = vertices[index_2]
-        
-        edge_match = search_for_edge(vertex_1, vertex_2, edge_type, edge_dict)
-                                                
-        if edge_match == None:
-            # If no edge matches the position, one is created.
-            edge_match = create_edge(vertex_1, vertex_2, edge_type, strand, 
+
+        edge_match, curr_novelty = match_or_create_edge(vertex_1, vertex_2, 
+                                                        edge_type, strand, 
+                                                        edge_dict, run_info)
+        edge_matches.append(edge_match['edge_ID'])
+        novelty.append(curr_novelty)
+
+    return edge_matches, novelty
+
+def match_or_create_edge(vertex_1, vertex_2, edge_type, strand, edge_dict, run_info):
+    """ Searches for edge match to provided set of vertices. If none found, 
+        creates a new edge. """
+    novelty = 0
+    edge_match = search_for_edge(vertex_1, vertex_2, edge_type, edge_dict)
+
+    if edge_match == None:
+        # If no edge matches the position, one is created.
+        edge_match = create_edge(vertex_1, vertex_2, edge_type, strand,
                                      edge_dict, run_info)
-            novelty.append(1)
-        else:
-            novelty.append(0)
+        novelty = 1
+    return edge_match, novelty
+
+#def match_all_transcript_edges(vertices, strand, edge_dict, run_info):
+#    """ Given a list of vertex IDs from the transcript in 5' to
+#        3' end order, this function looks for a matching edge ID for each
+#        position. If none exists, it creates one. """
+
+#    edge_matches = []
+#    novelty = []
+#    edge_type = "exon"
+
+#    for index_1 in range(0, len(vertices) - 1):
+#        index_2 = index_1 + 1
+
+#        if index_1 % 2 != 0:
+#            edge_type = "intron"
+#        else:
+#            edge_type = "exon"
+       
+#        vertex_1 = vertices[index_1]
+#        vertex_2 = vertices[index_2]
+        
+#        edge_match, curr_novelty = match_or_create_edge(vertex1, vertex2, edge_type, strand) 
+#        edge_matches.append(edge_match['edge_ID'])
+#        novelty.append(curr_novelty)
+        #edge_match = search_for_edge(vertex_1, vertex_2, edge_type, edge_dict)
+                                                
+        #if edge_match == None:
+            # If no edge matches the position, one is created.
+        #    edge_match = create_edge(vertex_1, vertex_2, edge_type, strand, 
+        #                             edge_dict, run_info)
+        #    novelty.append(1)
+        #else:
+        #    novelty.append(0)
 
         # Add to running list of matches
-        edge_matches.append(edge_match['edge_ID'])
+        #edge_matches.append(edge_match['edge_ID'])
 
-    return tuple(edge_matches), tuple(novelty)
+#    return tuple(edge_matches), tuple(novelty)
 
 
 def search_without_transcript_ends(edge_IDs, transcript_dict):
@@ -665,18 +744,91 @@ def search_for_transcript(edge_IDs, transcript_dict):
     except:
         return None, None
 
+def process_FSM(chrom, positions, strand, edge_IDs, vertex_IDs, transcript_dict,
+                edge_dict, locations, run_info):
+    """ Given a transcript, try to find an FSM match for it """
+    gene_ID = None
+    transcript_ID = None
+    novelty = []
+    start_vertex = None
+    end_vertex = None
+    start_exon = None
+    end_exon = None
+    diff_5p = None 
+    diff_3p = None   
+
+    # Check if there is a perfect match for the splice junctions
+    full_edge_set = frozenset(edge_IDs)
+    gene_ID, transcript_match = search_for_transcript(full_edge_set, transcript_dict)
+    if transcript_match != None:
+        transcript_ID = transcript_match['transcript_ID']
+ 
+        # Check whether the query's 5' and 3' ends are within range of those of
+        # the match. If not, perform a permissive match assignment
+        curr_5p_diff = compute_delta(transcript_match['start_pos'], positions[0],
+                                     strand)
+        curr_3p_diff = compute_delta(transcript_match['end_pos'], positions[-1],
+                                     strand) 
+        # ---------------- 5' end ---------------------------------
+        if abs(curr_5p_diff) <= run_info.cutoff_5p:
+            start_vertex = transcript_match['start_vertex']
+            start_exon = transcript_match['start_exon']
+            diff_5p = curr_5p_diff
+        else:
+            # First get a permissively matched start vertex
+            start_vertex, diff_5p = permissive_vertex_search(chrom, positions[0], 
+                                                            strand, positions[1], 
+                                                            "start",
+                                                            locations, run_info)
+            if start_vertex == None:
+                start_vertex = create_vertex(chrom, positions[0], run_info,
+                                             locations)['location_ID']
+              
+            # Then get the start exon
+            start_exon, start_novelty = match_or_create_edge(start_vertex,
+                                                             vertex_IDs[0], 
+                                                             "exon", strand, 
+                                                             edge_dict, run_info)
+        # ---------------- 3' end ---------------------------------
+        if abs(curr_3p_diff) <= run_info.cutoff_3p:
+            end_vertex = transcript_match['end_vertex']
+            end_exon = transcript_match['end_exon']
+            diff_3p = curr_3p_diff
+        else:
+            # First get a permissively matched end vertex
+            end_vertex, diff_3p = permissive_vertex_search(chrom, positions[-1],
+                                                            strand, positions[-2],
+                                                            "end",
+                                                            locations, run_info)
+            if end_vertex == None:
+                end_vertex = create_vertex(chrom, positions[-1], run_info,
+                                             locations)['location_ID']
+            # Then get the end exon
+            end_exon, end_novelty = match_or_create_edge(end_vertex,
+                                                         vertex_IDs[-1],
+                                                         "exon", strand,
+                                                          edge_dict, run_info) 
+    # Package information for output
+    start_end_info = {"start_vertex": start_vertex,
+                      "end_vertex": end_vertex,
+                      "start_exon": start_exon,
+                      "end_exon": end_exon,
+                      "diff_5p": diff_5p,
+                      "diff_3p": diff_3p}
+
+    return gene_ID, transcript_ID, novelty, start_end_info
+
 def process_FSM_or_ISM(edge_IDs, vertex_IDs, transcript_dict, gene_starts,
                        gene_ends, run_info):
-    """ Given a transcript, try to find an FSM gene and transcript match for it.
-        In the case of an FSM with end novelty, a novel transcript will be
-        created. Returns None if no FSM matches are found."""
+    """ Given a transcript, try to find an FSM or ISM match for it. If the 
+        best match is an ISM with known ends, that will be promoted to NIC."""
 
     gene_ID = None
     transcript_ID = None
     novelty = []
     n_exons = (len(edge_IDs) + 1)/2.0
 
-    # Look for exact FSM first because it's a fast search
+    # Look for FSM first (see if there is a perfect match for the splice junctions)
     full_edge_set = frozenset(edge_IDs)
     gene_ID, transcript_match = search_for_transcript(full_edge_set, transcript_dict)
     if transcript_match != None:
@@ -883,27 +1035,23 @@ def identify_transcript(chrom, positions, strand, cursor, location_dict, edge_di
     n_exons = len(positions)/2.0
  
     # Get vertex matches for the transcript positions
-    vertex_IDs, v_novelty, diff_5p, diff_3p = match_all_transcript_vertices(
-                                                                 chrom, 
-                                                                 positions,
-                                                                 strand,
-                                                                 location_dict,
-                                                                 run_info)
+    vertex_IDs, v_novelty = match_splice_vertices(chrom, positions, strand,
+                                                   location_dict, run_info)
 
     # Get edge matches for transcript exons and introns based on the vertices
-    edge_IDs, e_novelty = match_all_transcript_edges(vertex_IDs, strand,
+    edge_IDs, e_novelty = match_all_splice_edges(vertex_IDs, strand,
                                                      edge_dict, run_info)
 
     # Check novelty of exons and splice jns. This will help us categorize 
     # what type of novelty the transcript has
     all_SJs_known = check_all_SJs_known(e_novelty)
     all_exons_known = check_all_exons_known(e_novelty)
-    splice_vertices_known = (sum(v_novelty[1:-1]) == 0)
+    splice_vertices_known = (sum(v_novelty) == 0)
     all_exons_novel = (reduce(operator.mul, e_novelty, 1) == 1)
 
     # Look for FSM or ISM. This includes monoexonic cases where the exon is 
     # known
-    if all_SJs_known or (n_exons == 1 and all_exons_known):
+    if all_SJs_known:
 
         # Look for FSM first
         gene_ID, transcript_ID, transcript_novelty = process_FSM_or_ISM(edge_IDs, 
@@ -923,7 +1071,7 @@ def identify_transcript(chrom, positions, strand, cursor, location_dict, edge_di
            
     # Novel in catalog transcripts have known splice donors and acceptors,
     # but new connections between them. 
-    elif splice_vertices_known and n_exons > 1 and not(all_exons_novel):
+    elif splice_vertices_known and not(all_exons_novel):
         gene_ID, transcript_ID, transcript_novelty = process_NIC(edge_IDs, 
                                                                  vertex_IDs, 
                                                                  strand, 
@@ -932,7 +1080,7 @@ def identify_transcript(chrom, positions, strand, cursor, location_dict, edge_di
                                                                  run_info)
     
     # Antisense transcript with splice junctions matching known gene
-    elif splice_vertices_known and n_exons > 1:
+    elif splice_vertices_known:
         if strand == "+":
             anti_strand = "-"
         else:
@@ -956,7 +1104,7 @@ def identify_transcript(chrom, positions, strand, cursor, location_dict, edge_di
 
     # Novel not in catalog transcripts contain new splice donors/acceptors
     # and contain at least one splice junction.
-    elif not(splice_vertices_known) and n_exons > 1 and not(all_exons_novel): 
+    elif not(splice_vertices_known) and not(all_exons_novel): 
         gene_ID = find_gene_match_on_vertex_basis(vertex_IDs, strand, vertex_2_gene)
         transcript_ID = create_transcript(gene_ID, edge_IDs, vertex_IDs,
                                          transcript_dict, run_info)["transcript_ID"]

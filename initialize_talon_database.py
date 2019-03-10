@@ -124,14 +124,18 @@ def add_transcript_table(database):
     command = """ CREATE TABLE IF NOT EXISTS transcripts (
                 transcript_ID INTEGER PRIMARY KEY,
                 gene_ID INTEGER,
-                path TEXT,
+                start_exon INTEGER,
+                jn_path TEXT,
+                end_exon INTEGER,
                 start_vertex INTEGER,
                 end_vertex INTEGER,
                 n_exons INTEGER,
                  
                 FOREIGN KEY (gene_ID) REFERENCES genes(gene_ID),
                 FOREIGN KEY (start_vertex) REFERENCES vertex(vertex_ID),
-                FOREIGN KEY (end_vertex) REFERENCES vertex(vertex_ID)
+                FOREIGN KEY (end_vertex) REFERENCES vertex(vertex_ID),
+                FOREIGN KEY (start_exon) REFERENCES edge(edge_ID),
+                FOREIGN KEY (end_exon) REFERENCES edge(edge_ID)
                 ); """
 
     c.execute(command)
@@ -298,8 +302,10 @@ def add_observed_table(database):
                      transcript_ID INTEGER,
                      read_name TEXT,
                      dataset TEXT,
-                     start_vertex_ID INTEGER,
-                     end_vertex_ID INTEGER,
+                     start_vertex INTEGER,
+                     end_vertex INTEGER,
+                     start_exon INTEGER,
+                     end_exon INTEGER,
                      start_delta INTEGER,
                      end_delta INTEGER,
                      read_length INTEGER,
@@ -307,8 +313,10 @@ def add_observed_table(database):
                      FOREIGN KEY(gene_ID) REFERENCES transcripts(gene_ID),
                      FOREIGN KEY(transcript_ID) REFERENCES transcripts(transcript_ID),
                      FOREIGN KEY(dataset) REFERENCES dataset(dataset_name),
-                     FOREIGN KEY(start_vertex_ID) REFERENCES vertex(vertex_ID),
-                     FOREIGN KEY(end_vertex_ID) REFERENCES vertex(vertex_ID)
+                     FOREIGN KEY(start_vertex) REFERENCES vertex(vertex_ID),
+                     FOREIGN KEY(end_vertex) REFERENCES vertex(vertex_ID),
+                     FOREIGN KEY(start_exon) REFERENCES edge(edge_ID),
+                     FOREIGN KEY(end_exon) REFERENCES edge(edge_ID)
               )""")
 
     conn.commit()
@@ -721,9 +729,10 @@ def bulk_update_transcripts(c, transcripts, counter):
        into the database at the provided cursor (c).
     """
     cols = " (" + ", ".join([str_wrap_double(x) for x in ["transcript_ID",
-           "gene_ID", "path", "start_vertex", "end_vertex", "n_exons"]]) + ") "
+           "gene_ID", "start_exon", "jn_path", "end_exon", "start_vertex", "end_vertex", 
+           "n_exons"]]) + ") "
     g_command = 'INSERT INTO "transcripts"' + cols + "VALUES " + \
-                '(?,?,?,?,?,?)'
+                '(?,?,?,?,?,?,?,?)'
     c.executemany(g_command,transcripts)
  
     update_counter = 'UPDATE "counters" SET "count" = ? WHERE "category" = ?'
@@ -852,10 +861,15 @@ def process_transcript(c, transcript, transcript_id, gene_id, genome_build,
             exon_index += 1
 
         prev_edge_type = edge_type
-    transcript_path = ",".join(map(str,transcript_edges))
+    if len(transcript_edges) > 1:
+        transcript_path = ",".join(map(str,transcript_edges[1:-1]))
+    else:
+        transcript_path = None
+    start_exon = transcript_edges[0]
+    end_exon = transcript_edges[-1]
 
-    transcript_tuple = (transcript_id, gene_id, transcript_path,
-                        start_vertex, end_vertex, n_exons)
+    transcript_tuple = (transcript_id, gene_id, start_exon, transcript_path,
+                        end_exon, start_vertex, end_vertex, n_exons)
     
     return transcript_tuple
 
