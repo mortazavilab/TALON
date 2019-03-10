@@ -254,6 +254,54 @@ def search_for_edge(vertex_1, vertex_2, edge_type, edge_dict):
     except:
         return None
 
+def match_monoexon_vertices(chromosome, positions, strand, location_dict,
+                                  run_info):
+    """ Given the start and end of a single-exon transcript, this function looks 
+        for a matching vertex for each position. Also returns a list where each 
+        index indicates whether that vertex is novel to the data structure 
+        (0 for known, 1 for novel) """
+
+    # Returned by function
+    vertex_matches = []
+    novelty = []
+    diff_5p = None
+    diff_3p = None
+
+    # helpers
+    start = 0
+    end = len(positions) - 1
+
+    # Iterate over positions
+    for curr_index in range(0,len(positions)):
+        position = positions[curr_index]
+
+        # Start and ends require permissive matching approach
+        if curr_index == start:
+            sj_pos = positions[curr_index + 1]
+            pos_type = "start"
+            vertex_match, diff_5p = permissive_vertex_search(chromosome, position,
+                                                        strand, sj_pos, pos_type,
+                                                         location_dict, run_info)
+        elif curr_index == end:
+            sj_pos = positions[curr_index - 1]
+            pos_type = "end"
+            vertex_match, diff_3p = permissive_vertex_search(chromosome, position,
+                                                    strand, sj_pos, pos_type,
+                                                    location_dict, run_info)
+
+        if vertex_match == None:
+            # If no vertex matches the position, one is created.
+            vertex_match = create_vertex(chromosome, position, run_info,
+                                         location_dict)
+            novelty.append(1)
+        else:
+            novelty.append(0)
+
+        # Add to running list of matches
+        vertex_matches.append(vertex_match['location_ID'])
+
+    return tuple(vertex_matches), tuple(novelty), diff_5p, diff_3p
+
 def match_all_transcript_vertices(chromosome, positions, strand, location_dict, 
                                   run_info):
     """ Given a chromosome and a list of positions from the transcript in 5' to
@@ -641,8 +689,6 @@ def process_FSM_or_ISM(edge_IDs, vertex_IDs, transcript_dict, gene_starts,
     if all_matches == None:
         return None, None, []
 
-
-    #FSM = []
     ISM = []
     suffix = []
     prefix = []
@@ -1240,7 +1286,7 @@ def identify_monoexon_transcript(chrom, positions, strand, cursor, location_dict
     # If there is no match, proceed to genomic/antisense style matching.
     else:
         # Start by performing vertex match               
-        vertex_IDs, v_novelty, diff_5p, diff_3p = match_all_transcript_vertices(
+        vertex_IDs, v_novelty, diff_5p, diff_3p = match_monoexon_vertices(
                                                                  chrom,
                                                                  positions,
                                                                  strand,
@@ -1251,45 +1297,56 @@ def identify_monoexon_transcript(chrom, positions, strand, cursor, location_dict
         edge_IDs, e_novelty = match_all_transcript_edges(vertex_IDs, strand,
                                                      edge_dict, run_info)
 
-        # Find best gene match
-        gene_ID, match_strand = search_for_overlap_with_gene(chrom, positions[0],
+        # If the exon is known, then this transcript must be ISM or NIC
+        gene_ID = None
+        if e_novelty[0] == 0:
+            gene_ID, transcript_ID, transcript_novelty = process_FSM_or_ISM(edge_IDs,
+                                                                vertex_IDs,
+                                                                transcript_dict,
+                                                                gene_starts,
+                                                                gene_ends,
+                                                                run_info)
+
+        if gene_ID == None:
+            # Find best gene match using overlap search if the ISM/NIC check didn't work
+            gene_ID, match_strand = search_for_overlap_with_gene(chrom, positions[0],
                                                              positions[1], strand,
                                                              cursor, run_info) 
-        # Add annotations
-        if gene_ID == None:
-            gene_ID = create_gene(chrom, positions[0], positions[-1],
-                              strand, cursor, run_info)
+            # Intergenic case
+            if gene_ID == None:
+                gene_ID = create_gene(chrom, positions[0], positions[-1],
+                                      strand, cursor, run_info)
 
-            gene_novelty.append((gene_ID, run_info.idprefix, "TALON",
-                         "intergenic_novel","TRUE"))
-            transcript_ID = create_transcript(gene_ID, edge_IDs, vertex_IDs,
-                                         transcript_dict, run_info)["transcript_ID"]
-            transcript_novelty.append((transcript_ID, run_info.idprefix, "TALON",
-                                  "intergenic_transcript", "TRUE"))     
-        # Antisense case
-        elif match_strand != strand:
-            anti_gene_ID = gene_ID
-            gene_ID = create_gene(chrom, positions[0], positions[-1],
-                              strand, cursor, run_info)
-            transcript_ID = create_transcript(gene_ID, edge_IDs, vertex_IDs,
+                gene_novelty.append((gene_ID, run_info.idprefix, "TALON",
+                                     "intergenic_novel","TRUE"))
+                transcript_ID = create_transcript(gene_ID, edge_IDs, vertex_IDs,
+                                     transcript_dict, run_info)["transcript_ID"]
+                transcript_novelty.append((transcript_ID, run_info.idprefix, "TALON",
+                                      "intergenic_transcript", "TRUE"))     
+            # Antisense case
+            elif match_strand != strand:
+                anti_gene_ID = gene_ID
+                gene_ID = create_gene(chrom, positions[0], positions[-1],
+                                      strand, cursor, run_info)
+                transcript_ID = create_transcript(gene_ID, edge_IDs, vertex_IDs,
                                          transcript_dict, run_info)["transcript_ID"]
 
-            gene_novelty.append((gene_ID, run_info.idprefix, "TALON",
-                         "antisense_gene","TRUE"))
-            gene_novelty.append((gene_ID, run_info.idprefix, "TALON",
-                         "gene_antisense_to_IDs",anti_gene_ID))
-            transcript_novelty.append((transcript_ID, run_info.idprefix, "TALON",
-                         "antisense_transcript", "TRUE"))
+                gene_novelty.append((gene_ID, run_info.idprefix, "TALON",
+                                     "antisense_gene","TRUE"))
+                gene_novelty.append((gene_ID, run_info.idprefix, "TALON",
+                                        "gene_antisense_to_IDs",anti_gene_ID))
+                transcript_novelty.append((transcript_ID, run_info.idprefix, "TALON",
+                                          "antisense_transcript", "TRUE"))
 
-        # Same strand
-        else:
-            transcript_ID = create_transcript(gene_ID, edge_IDs, vertex_IDs,
+            # Same strand
+            else:
+                transcript_ID = create_transcript(gene_ID, edge_IDs, vertex_IDs,
                                          transcript_dict, run_info)["transcript_ID"]
-            transcript_novelty.append((transcript_ID, run_info.idprefix, "TALON",
+                transcript_novelty.append((transcript_ID, run_info.idprefix, "TALON",
                                   "genomic_transcript", "TRUE"))
 
-        # Add all novel vertices to vertex_2_gene now that we have the gene ID
-        update_vertex_2_gene(gene_ID, vertex_IDs, strand, vertex_2_gene)
+            # Add all novel vertices to vertex_2_gene now that we have the gene ID
+            update_vertex_2_gene(gene_ID, vertex_IDs, strand, vertex_2_gene)
 
         # Add novel gene annotation attributes
         if len(gene_novelty) > 0:
