@@ -807,7 +807,7 @@ def search_for_transcript(edge_IDs, transcript_dict):
         return None, None
 
 def process_FSM(chrom, positions, strand, edge_IDs, vertex_IDs, transcript_dict,
-                edge_dict, locations, run_info):
+                gene_starts, gene_ends, edge_dict, locations, run_info):
     """ Given a transcript, try to find an FSM match for it """
     gene_ID = None
     transcript_ID = None
@@ -838,14 +838,10 @@ def process_FSM(chrom, positions, strand, edge_IDs, vertex_IDs, transcript_dict,
             diff_5p = curr_5p_diff
         else:
             # First get a permissively matched start vertex
-            start_vertex, diff_5p = permissive_match_with_gene_priority(chromosome, 
-                                                          position, strand, sj_pos,
-                                                          pos_type, gene_ID, gene_starts, 
+            start_vertex, diff_5p = permissive_match_with_gene_priority(chrom, 
+                                                          positions[0], strand, positions[1],
+                                                          "start", gene_ID, gene_starts, 
                                                           locations, run_info)
-                                                            #permissive_vertex_search(chrom, positions[0], 
-                                                            #strand, positions[1], 
-                                                            #"start",
-                                                            #locations, run_info)
             if start_vertex == None:
                 start_vertex = create_vertex(chrom, positions[0], run_info,
                                              locations)['location_ID']
@@ -862,9 +858,9 @@ def process_FSM(chrom, positions, strand, edge_IDs, vertex_IDs, transcript_dict,
             diff_3p = curr_3p_diff
         else:
             # First get a permissively matched end vertex
-            end_vertex, diff_3p = permissive_vertex_search(chrom, positions[-1],
-                                                            strand, positions[-2],
-                                                            "end",
+            end_vertex, diff_3p = permissive_match_with_gene_priority(chrom, 
+                                                            positions[-1], strand, positions[-2],
+                                                            "end", gene_ID, gene_ends,
                                                             locations, run_info)
             if end_vertex == None:
                 end_vertex = create_vertex(chrom, positions[-1], run_info,

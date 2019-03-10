@@ -17,6 +17,7 @@ class TestIdentifyFSM(object):
         location_dict = talon.make_location_dict(build, cursor)
         run_info = talon.init_run_info(cursor, build)        
         transcript_dict = talon.make_transcript_dict(cursor, build)
+        gene_starts, gene_ends = talon.make_gene_start_and_end_dict(cursor, build)
 
         chrom = "chr1"
         positions = [1, 100, 500, 600, 900, 1010]
@@ -29,6 +30,7 @@ class TestIdentifyFSM(object):
                                                             positions, strand, 
                                                             edge_IDs, vertex_IDs, 
                                                             transcript_dict, 
+                                                            gene_starts, gene_ends,
                                                             edge_dict,
                                                             location_dict, run_info)
 
@@ -53,6 +55,7 @@ class TestIdentifyFSM(object):
         run_info = talon.init_run_info(cursor, build)
         transcript_dict = talon.make_transcript_dict(cursor, build)
         orig_vertices = run_info['vertex']
+        gene_starts, gene_ends = talon.make_gene_start_and_end_dict(cursor, build)
 
         chrom = "chr2"
         positions = [1, 100, 500, 600, 900, 1301] #Last postion is > 300bp away
@@ -65,6 +68,7 @@ class TestIdentifyFSM(object):
                                                             positions, strand,
                                                             edge_IDs, vertex_IDs,
                                                             transcript_dict,
+                                                            gene_starts, gene_ends,
                                                             edge_dict,
                                                             location_dict, run_info)
 
@@ -86,6 +90,7 @@ class TestIdentifyFSM(object):
         run_info = talon.init_run_info(cursor, build)
         transcript_dict = talon.make_transcript_dict(cursor, build)
         orig_vertices = run_info['vertex']
+        gene_starts, gene_ends = talon.make_gene_start_and_end_dict(cursor, build)
 
         chrom = "chr1"
         positions = [2501, 1500, 1000, 900] #First postion is > 500bp away
@@ -98,6 +103,7 @@ class TestIdentifyFSM(object):
                                                             positions, strand,
                                                             edge_IDs, vertex_IDs,
                                                             transcript_dict,
+                                                            gene_starts, gene_ends,
                                                             edge_dict,
                                                             location_dict, run_info)
 
@@ -118,6 +124,7 @@ class TestIdentifyFSM(object):
         location_dict = talon.make_location_dict(build, cursor)
         run_info = talon.init_run_info(cursor, build)
         transcript_dict = talon.make_transcript_dict(cursor, build)
+        gene_starts, gene_ends = talon.make_gene_start_and_end_dict(cursor, build)
 
         chrom = "chr1"
         positions = [1, 100, 500, 600] 
@@ -130,6 +137,7 @@ class TestIdentifyFSM(object):
                                                             positions, strand,
                                                             edge_IDs, vertex_IDs,
                                                             transcript_dict,
+                                                            gene_starts, gene_ends,
                                                             edge_dict,
                                                             location_dict, run_info)
         assert gene_ID == transcript_ID == None 
