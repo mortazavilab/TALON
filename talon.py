@@ -419,8 +419,11 @@ def permissive_match_with_gene_priority(chromosome, position, strand, sj_pos,
     if chromosome in locations and position in locations[chromosome]:
         match = locations[chromosome][position]
         dist = 0
-        if position in gene_locs[gene_ID]:
-            return match['location_ID'], dist, 1
+        if gene_ID in gene_locs:
+            if position in gene_locs[gene_ID]:
+                return match['location_ID'], dist, 1
+            else:
+                return match['location_ID'], dist, 0
         else:
             return match['location_ID'], dist, 0   
  
@@ -1403,7 +1406,7 @@ def identify_transcript(chrom, positions, strand, cursor, location_dict, edge_di
                                                             edge_dict, location_dict,
                                                             run_info)
         # Look for NIC
-        else:
+        if gene_ID == None:
             gene_ID, transcript_ID, transcript_novelty, start_end_info = process_NIC(chrom,
                                                             positions,
                                                             strand, edge_IDs,
@@ -1818,8 +1821,8 @@ def identify_monoexon_transcript(chrom, positions, strand, cursor, location_dict
                 transcript_novelty.append((transcript_ID, run_info.idprefix, "TALON",
                                   "genomic_transcript", "TRUE"))
 
-            # Add all novel vertices to vertex_2_gene now that we have the gene ID
-            update_vertex_2_gene(gene_ID, vertex_IDs, strand, vertex_2_gene)
+        # Add all novel vertices to vertex_2_gene now that we have the gene ID
+        update_vertex_2_gene(gene_ID, vertex_IDs, strand, vertex_2_gene)
 
         # Add novel gene annotation attributes
         if len(gene_novelty) > 0:
@@ -1912,26 +1915,28 @@ def annotate_sam_transcripts(sam_file, dataset, cursor, struct_collection, QC_fi
             gene_ends = struct_collection.gene_ends
             run_info = struct_collection.run_info
 
-            try:
-                n_exons = len(positions)/2
-                if n_exons > 1:
-                    annotation_info = identify_transcript(chrom, positions, strand, 
-                                                 cursor, location_dict, 
-                                                 edge_dict, transcript_dict, 
-                                                 vertex_2_gene, 
-                                                 gene_starts, gene_ends,
-                                                 run_info)
-                else:
-                    annotation_info = identify_monoexon_transcript(chrom, positions, strand,
-                                                              cursor, location_dict,
-                                                              edge_dict, transcript_dict,
-                                                              vertex_2_gene,
-                                                              gene_starts, gene_ends,
-                                                              run_info)
-            except:
-                warnings.warn("Problem identifying transcript '%s'. Skipping.."\
-                               % read_ID)    
-                continue
+            print(read_ID)
+            #try:
+            n_exons = len(positions)/2
+            if n_exons > 1:
+                annotation_info = identify_transcript(chrom, positions, strand, 
+                                         cursor, location_dict, 
+                                         edge_dict, transcript_dict, 
+                                         vertex_2_gene, 
+                                         gene_starts, gene_ends,
+                                         run_info)
+            else:
+                annotation_info = identify_monoexon_transcript(chrom, positions, strand,
+                                                      cursor, location_dict,
+                                                      edge_dict, transcript_dict,
+                                                      vertex_2_gene,
+                                                      gene_starts, gene_ends,
+                                                      run_info)
+            #except Exception as e:
+                #warnings.warn("Problem identifying transcript '%s'. Skipping.."\
+                #               % read_ID)
+                #print(e) 
+                #continue
                             
             # Now that transcript has been annotated, unpack values and 
             # create an observed entry and abundance record
