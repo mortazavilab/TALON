@@ -53,7 +53,7 @@ class TestIdentifyNIC(object):
         conn, cursor = get_db_cursor()
         build = "toy_build"
         edge_dict = talon.make_edge_dict(cursor)
-        location_dict = talon.make_location_dict(build, cursor)
+        locations = talon.make_location_dict(build, cursor)
         run_info = talon.init_run_info(cursor, build)
         transcript_dict = talon.make_transcript_dict(cursor, build)
         vertex_2_gene = talon.make_vertex_2_gene_dict(cursor)
@@ -65,19 +65,32 @@ class TestIdentifyNIC(object):
         chrom = "chr1"
         start = 1000
         end = 1
-        edge_IDs = (500, 200, 100) # Just arbitrary novel IDs
-        vertex_IDs = (6, 5, 2, 1)
+        edge_IDs = [ run_info.edge + 1 ] 
+        positions = [ 1000, 900, 100, 1]
+        vertex_IDs = [ 5, 2 ]
         strand = "-"
         anti_strand = "+"
         v_novelty = (0, 0, 0, 0)
 
         # Find antisense match
-        anti_gene_ID = talon.find_gene_match_on_vertex_basis(vertex_IDs, 
-                                                             anti_strand,
-                                                             vertex_2_gene)
+        gene_ID, transcript_ID, gene_novelty, transcript_novelty, start_end_info = \
+                                      talon.process_spliced_antisense(chrom, positions, 
+                                                                  strand, edge_IDs, 
+                                                                  vertex_IDs, 
+                                                                  transcript_dict,
+                                                                  gene_starts, 
+                                                                  gene_ends, 
+                                                                  edge_dict, locations, 
+                                                                  vertex_2_gene, run_info,
+                                                                  cursor)
+        #anti_gene_ID = talon.find_gene_match_on_vertex_basis(vertex_IDs, 
+        #                                                     anti_strand,
+        #                                                     vertex_2_gene)
 
         correct_gene_ID = fetch_correct_ID("TG1", "gene", cursor)
+        anti_gene_ID = gene_novelty[-1][-1]
         assert anti_gene_ID == correct_gene_ID
+        assert start_end_info["vertex_IDs"] == [6, 5, 2, 1]
 
         conn.close()
 
