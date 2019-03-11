@@ -1173,7 +1173,6 @@ def process_ISM(chrom, positions, strand, edge_IDs, vertex_IDs, all_matches, tra
 #    return gene_ID, transcript_ID, novelty
     
     
-#def process_NIC(edge_IDs, vertex_IDs, strand, transcript_dict, vertex_2_gene, run_info):
 def process_NIC(chrom, positions, strand, edge_IDs, vertex_IDs, transcript_dict,
                 gene_starts, gene_ends, edge_dict, locations, vertex_2_gene, run_info):
     """ For a transcript that has been determined to be novel in catalog, find
@@ -1260,6 +1259,51 @@ def find_gene_match_on_vertex_basis(vertex_IDs, strand, vertex_2_gene):
     gene_ID = max(gene_tally, key=gene_tally.get)
 
     return gene_ID
+
+def process_NNC(chrom, positions, strand, edge_IDs, vertex_IDs, transcript_dict,
+                gene_starts, gene_ends, edge_dict, locations, vertex_2_gene, run_info):
+    """ Novel not in catalog case """
+
+    novelty = []
+    start_end_info = {}
+
+    gene_ID = find_gene_match_on_vertex_basis(vertex_IDs, strand, vertex_2_gene)
+
+    # Get matches for the ends
+    start_vertex, start_exon, start_novelty, known_start, diff_5p = process_5p(chrom,
+                                                                   positions, strand,
+                                                                   vertex_IDs,
+                                                                   gene_ID, gene_starts,
+                                                                   edge_dict,
+                                                                   locations, run_info)
+    end_vertex, end_exon, end_novelty, known_end, diff_3p = process_3p(chrom,
+                                                                   positions, strand,
+                                                                   vertex_IDs,
+                                                                   gene_ID, gene_ends,
+                                                                   edge_dict,
+                                                                   locations, run_info)
+    # Update info
+    edge_IDs = [start_exon] + edge_IDs + [end_exon]
+    vertex_IDs = [start_vertex] + vertex_IDs + [end_vertex]
+    start_end_info["start_vertex"] = start_vertex
+    start_end_info["end_vertex"] = end_vertex
+    start_end_info["start_exon"] = start_exon
+    start_end_info["end_exon"] = end_exon
+    start_end_info["start_novelty"] = start_novelty
+    start_end_info["end_novelty"] = end_novelty
+    start_end_info["diff_5p"] = diff_5p
+    start_end_info["diff_3p"] = diff_3p
+    start_end_info["edge_IDs"] = edge_IDs
+    start_end_info["vertex_IDs"] = vertex_IDs
+    
+
+    transcript_ID = create_transcript(gene_ID, edge_IDs, vertex_IDs,
+                                      transcript_dict, run_info)["transcript_ID"]
+
+    novelty.append((transcript_ID, run_info.idprefix, "TALON",
+                               "NNC_transcript", "TRUE"))
+
+    return gene_ID, transcript_ID, novelty, start_end_info
 
 def process_spliced_antisense(chrom, positions, strand, edge_IDs, vertex_IDs, transcript_dict,
                 gene_starts, gene_ends, edge_dict, locations, vertex_2_gene, run_info, cursor):
@@ -1426,26 +1470,16 @@ def identify_transcript(chrom, positions, strand, cursor, location_dict, edge_di
     
     # Antisense transcript with splice junctions matching known gene
     elif splice_vertices_known:
-        if strand == "+":
-            anti_strand = "-"
-        else:
-            anti_strand = "+"
-        anti_gene_ID = find_gene_match_on_vertex_basis(vertex_IDs, anti_strand, 
-                                                       vertex_2_gene)
-        gene_ID = create_gene(chrom, positions[0], positions[-1], 
-                              strand, cursor, run_info) 
-        transcript_ID = create_transcript(gene_ID, edge_IDs, vertex_IDs,
-                                         transcript_dict, run_info)["transcript_ID"]
-
-        # Handle gene annotations
-        gene_novelty.append((gene_ID, run_info.idprefix, "TALON",
-                             "antisense_gene","TRUE"))
-        gene_novelty.append((gene_ID, run_info.idprefix, "TALON",
-                         "gene_antisense_to_IDs",anti_gene_ID))
-
-        # Handle transcript annotations
-        transcript_novelty.append((transcript_ID, run_info.idprefix, "TALON", 
-                                   "antisense_transcript", "TRUE"))
+        gene_ID, transcript_ID, gene_novelty, transcript_novelty, start_end_info = \
+                                      talon.process_spliced_antisense(chrom, positions,
+                                                                  strand, edge_IDs,
+                                                                  vertex_IDs,
+                                                                  transcript_dict,
+                                                                  gene_starts,
+                                                                  gene_ends,
+                                                                  edge_dict, locations,
+                                                                  vertex_2_gene, run_info,
+                                                                  cursor)
 
     # Novel not in catalog transcripts contain new splice donors/acceptors
     # and contain at least one splice junction.

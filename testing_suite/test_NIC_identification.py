@@ -36,10 +36,6 @@ class TestIdentifyNIC(object):
                                                             edge_dict, location_dict, 
                                                             vertex_2_gene, run_info)
 
-                                  #process_NIC(edge_IDs, vertex_IDs,
-                                  #                    strand, transcript_dict,
-                                  #                    vertex2gene, run_info)
-
         correct_gene_ID = fetch_correct_ID("TG1", "gene", cursor)
         assert gene_ID == correct_gene_ID
         assert start_end_info["vertex_IDs"] == [1,2,5,6]
