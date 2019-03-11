@@ -29,7 +29,7 @@ class TestAssignments(object):
         assert assignment['gene_ID'] == correct_gene_ID
         assert assignment['transcript_ID'] == 8451
         assert assignment['start_delta'] == -4
-        assert assignment['end_delta'] == -40
+        assert assignment['end_delta'] == 50
 
         # Now make sure that the novel transcript was annotated correctly
         annot_dict = make_annot_dict(cursor, assignment['transcript_ID'])
@@ -40,8 +40,9 @@ class TestAssignments(object):
         conn.close()
 
     def test_prefix_ISM_of_Canx(self):
-        """ m54284_180814_002203/18677911/ccs is an ISM transcript of Canx.
-            Comes from BC017 data. """
+        """ m54284_180814_002203/18677911/ccs is an ISM transcript of Canx at 
+            first glance, but it has known 5' and 3' ends, so it should be 
+            called NIC. Comes from BC017 data. """
 
         conn = sqlite3.connect("scratch/chr11_and_Tcf3.db")
         conn.row_factory = sqlite3.Row
@@ -58,15 +59,12 @@ class TestAssignments(object):
         assert assignment['gene_ID'] == correct_gene_ID
         assert assignment['transcript_ID'] == 8452
         assert assignment['start_delta'] == 64
-        assert assignment['end_delta'] == -290 #1
+        assert assignment['end_delta'] == -290 
 
         # Now make sure that the novel transcript was annotated correctly
         annot_dict = make_annot_dict(cursor, assignment['transcript_ID'])
-        assert annot_dict["ISM_transcript"] == "TRUE"
-        assert annot_dict["ISM-prefix_transcript"] == "TRUE"
+        assert annot_dict["NIC_transcript"] == "TRUE"
         assert annot_dict["transcript_status"] == "NOVEL"
-        assert annot_dict["ISM_to_IDs"] == "1744"
-        assert annot_dict["ISM-prefix_to_IDs"] == "1744"
         conn.close()
 
     def test_genomic_of_Tcf3(self):

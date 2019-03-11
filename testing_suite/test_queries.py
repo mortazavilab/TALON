@@ -48,7 +48,7 @@ class TestQueries(object):
 
         conn.close()
 
-    def count_novel_genes_detected(self):
+    def test_count_novel_genes_detected(self):
         """ Count the number of novel genes detected per dataset """
 
         conn = sqlite3.connect("scratch/chr11_and_Tcf3.db")
@@ -157,7 +157,7 @@ class TestQueries(object):
 
         dataset = "PB65_B017"
         transcripts = qutils.fetch_all_ISM_transcripts(cursor, dataset)
-        assert len(transcripts) == 3
+        assert len(transcripts) == 2
 
         dataset = "D12"
         transcripts = qutils.fetch_all_ISM_transcripts(cursor, dataset)
@@ -172,7 +172,7 @@ class TestQueries(object):
 
         dataset = "PB65_B018"
         transcripts = qutils.fetch_prefix_ISM_transcripts(cursor, dataset)
-        assert len(transcripts) == 1
+        assert len(transcripts) == 0
         conn.close()
 
     def test_count_suffix_ISM_transcripts(self):
@@ -194,12 +194,12 @@ class TestQueries(object):
 
         dataset = "PB65_B018"
         transcripts = qutils.fetch_NIC_transcripts(cursor, dataset)
-        assert len(transcripts) == 1
+        assert len(transcripts) == 2
 
         # Now try all 3 datasets at once
         datasets = ["PB65_B017", "PB65_B018", "D12"]
         transcripts = qutils.fetch_NIC_transcripts(cursor, datasets)
-        assert len(transcripts) == 1
+        assert len(transcripts) == 3
         conn.close()
 
     def test_count_NNC_transcripts(self):

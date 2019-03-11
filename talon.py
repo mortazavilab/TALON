@@ -65,23 +65,23 @@ def make_gene_start_and_end_dict(cursor, build):
     """
     gene_starts = {}
     gene_ends = {}
-    query = """SELECT DISTINCT gene_ID, 
-                               start_vertex, 
+    query = """SELECT  gene_ID,
+                               start_vertex,
                                end_vertex,
                                loc1.position as start,
-                               loc2.position as end 
+                               loc2.position as end
                FROM transcripts
-               LEFT JOIN transcript_annotations as ta 
+               LEFT JOIN transcript_annotations as ta
                    ON ta.ID = transcripts.transcript_ID
                LEFT JOIN location as loc1
                    ON transcripts.start_vertex = loc1.location_ID
                LEFT JOIN location as loc2
                    ON transcripts.end_vertex = loc2.location_ID
-	       WHERE ta.attribute = 'transcript_status' 
+               WHERE ta.attribute = 'transcript_status'
                      AND ta.value = 'KNOWN'
                      AND loc1.genome_build = '%s'
-                     AND loc2.genome_build = '%s'"""
-
+                     AND loc2.genome_build = '%s'
+              """
     cursor.execute(query % (build, build))
     for entry in cursor.fetchall():
         gene_ID = entry['gene_ID']
@@ -448,11 +448,14 @@ def permissive_match_with_gene_priority(chromosome, position, strand, sj_pos,
         for known_location in gene_locs[gene_ID]:
             if known_location < search_window_start or known_location > search_window_end:
                 continue
-        curr_dist = compute_delta(known_location, position, strand)
-        if abs(curr_dist) < min_abs_dist:
-            best_dist = curr_dist
-            min_abs_dist = abs(curr_dist)
-            closest_vertex = gene_locs[gene_ID][known_location]
+        
+            curr_dist = compute_delta(known_location, position, strand)
+            print(curr_dist)
+            if abs(curr_dist) < min_abs_dist:
+                best_dist = curr_dist
+                min_abs_dist = abs(curr_dist)
+                closest_vertex = gene_locs[gene_ID][known_location]
+
         # If a valid match is found, return it
         if min_abs_dist <= max_dist:
             return closest_vertex, best_dist, 1
@@ -886,6 +889,9 @@ def process_5p(chrom, positions, strand, vertex_IDs, gene_ID, gene_starts, edge_
                                          positions[0], strand, positions[1],
                                          "start", gene_ID, gene_starts,
                                          locations, run_info)
+    #print("**")
+    #print(known_start)
+    #print("**")
     if start_vertex == None:
         start_vertex = create_vertex(chrom, positions[0], run_info,
                                              locations)['location_ID']
@@ -970,8 +976,9 @@ def process_ISM(chrom, positions, strand, edge_IDs, vertex_IDs, all_matches, tra
         start_end_info["vertex_IDs"] = vertex_IDs
     else:
         known_start = 0
-        known_end = 0    
-
+        known_end = 0   
+    #print(gene_starts[gene_ID])
+    #print("========")
 
     # If the 5' and 3' vertex sites are known for this gene, return NIC
     if known_start and known_end:
@@ -1765,7 +1772,9 @@ def identify_monoexon_transcript(chrom, positions, strand, cursor, location_dict
         gene_ID = None
         if e_novelty[0] == 0:
             all_matches = search_for_ISM(edge_IDs, transcript_dict)
-            gene_ID, transcript_ID, transcript_novelty, info = process_ISM(chrom, positions, 
+
+            if all_matches != None:
+                gene_ID, transcript_ID, transcript_novelty, info = process_ISM(chrom, positions, 
                                                                      strand, edge_IDs, 
                                                                      vertex_IDs, all_matches, 
                                                                      transcript_dict,
