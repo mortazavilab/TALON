@@ -126,7 +126,8 @@ def make_transcript_dict(cursor, build):
 
     cursor.execute(query, [build, build])
     for transcript in cursor.fetchall():
-        transcript_path = transcript["jn_path"].split(",")
+        transcript_path = transcript["jn_path"].split(",") + \
+                          [transcript["start_exon"], transcript["end_exon"]]
         transcript_path = frozenset([ int(x) for x in transcript_path])
         transcript_dict[transcript_path] = transcript
 
@@ -699,11 +700,7 @@ def search_for_ISM(edge_IDs, transcript_dict):
     """ Given a list of edges in a query transcript, determine whether it is an
         incomplete splice match (ISM) of any transcript in the dict."""               
 
-
-    if len(edge_IDs) > 1:
-        edges = frozenset(edge_IDs[1:-1])
-    else:
-        edges = frozenset(edge_IDs)
+    edges = frozenset(edge_IDs)
 
     ISM_matches = [ transcript_dict[x] for x in transcript_dict if edges.issubset(x)]
 
@@ -820,9 +817,22 @@ def process_FSM(chrom, positions, strand, edge_IDs, vertex_IDs, transcript_dict,
     diff_3p = None   
 
     # Check if there is a perfect match for the splice junctions
-    full_edge_set = frozenset(edge_IDs)
-    gene_ID, transcript_match = search_for_transcript(full_edge_set, transcript_dict)
-    if transcript_match != None:
+    all_matches = search_for_ISM(edge_IDs, transcript_dict)     
+    if all_matches == None:
+        return None, None, [], None
+
+    # Check if any of the matches have the same number of exons as the query.
+    # Such a match should be prioritized because it's an FSM
+    n_exons = len(positions)/2
+    FSM_matches = [ x for x in all_matches if x['n_exons'] == n_exons ]
+
+    if len(FSM_matches) == 0:
+        # Return the ISM matches so that they can be used downstream
+        return None, None, [], all_matches
+
+    else:
+        transcript_match = FSM_matches[0]
+        gene_ID = transcript_match['gene_ID']
         transcript_ID = transcript_match['transcript_ID']
  
         # Check whether the query's 5' and 3' ends are within range of those of
@@ -901,14 +911,46 @@ def process_ISM(chrom, positions, strand, edge_IDs, vertex_IDs, transcript_dict,
     if all_matches == None:
         return None, None, [], start_end_info
 
-    # If there is 
-
     ISM = []
     suffix = []
     prefix = []
-    #gene_ID = all_matches[0]['gene_ID']
+    gene_ID = all_matches[0]['gene_ID']
 
-    
+    # Iterate over matches to characterize ISMs
+    for match in all_matches:
+        transcript_ID = run_info.transcripts + 1
+
+        # Add ISM
+        ISM.append(str(match['transcript_ID']))
+
+        # Single-exon case
+        if n_exons == 1:
+            match_path = match['path']
+            exon = str(edge_IDs[0])
+            # Look for prefix
+            if match_path.startswith(exon):
+                prefix.append(str(match['transcript_ID']))
+            # Look for suffix
+            if match_path.endswith(exon):
+                suffix.append(str(match['transcript_ID']))
+                #if len(FSM) == 0:
+                gene_ID = match['gene_ID']
+            continue
+
+        # Multi-exon case
+        edge_str = ",".join([str(x) for x in edge_IDs[1:-1]])
+        match_without_start = ",".join((match['path']).split(",")[1:])
+        match_without_end = ",".join((match['path']).split(",")[:-1])
+
+        # Look for prefix
+        if match_without_start.startswith(edge_str):
+            prefix.append(str(match['transcript_ID']))
+
+        # Look for suffix
+        if match_without_end.endswith(edge_str):
+            #if len(FSM) == 0:
+            gene_ID = match['gene_ID']
+            suffix.append(str(match['transcript_ID'])) 
 
 def process_FSM_or_ISM(edge_IDs, vertex_IDs, transcript_dict, gene_starts,
                        gene_ends, run_info):
