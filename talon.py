@@ -414,6 +414,15 @@ def permissive_match_with_gene_priority(chromosome, position, strand, sj_pos,
     if strand != "+" and strand != "-":
         raise ValueError("Invalid strand specified: %s" % strand)
 
+    # Try exact match first
+    if chromosome in locations and position in locations[chromosome]:
+        match = locations[chromosome][position]
+        dist = 0
+        if position in gene_locs[gene_ID]:
+            return match['location_ID'], dist, 0
+        else:
+            return match['location_ID'], dist, 1   
+ 
     # This approach only works when there are known starts/ends for this gene
     if gene_ID in gene_locs:
 
@@ -435,23 +444,23 @@ def permissive_match_with_gene_priority(chromosome, position, strand, sj_pos,
         min_abs_dist = max_dist + 1
         best_dist = None
         closest_vertex = None
-        for known_location in gene_locs:
+        for known_location in gene_locs[gene_ID]:
             if known_location < search_window_start or known_location > search_window_end:
                 continue
         curr_dist = compute_delta(known_location, position, strand)
         if abs(curr_dist) < min_abs_dist:
             best_dist = curr_dist
             min_abs_dist = abs(curr_dist)
-            closest_vertex = gene_locs[known_location]
+            closest_vertex = gene_locs[gene_ID][known_location]
         # If a valid match is found, return it
         if min_abs_dist <= max_dist:
-            return closest_vertex, best_dist
+            return closest_vertex, best_dist, 1
 
     # Otherwise, revert to permissive match approach.
     match, dist = permissive_vertex_search(chromosome, position, strand, 
                                            sj_pos, pos_type,
                                            locations, run_info)
-    return match, dist
+    return match, dist, 0
     
 
 def permissive_vertex_search(chromosome, position, strand, sj_pos, pos_type,
@@ -806,8 +815,6 @@ def search_for_transcript(edge_IDs, transcript_dict):
     except:
         return None, None
 
-#def process_FSM(chrom, positions, strand, edge_IDs, vertex_IDs, transcript_dict,
-#                gene_starts, gene_ends, edge_dict, locations, run_info):
 def process_FSM(chrom, positions, strand, vertex_IDs, all_matches, gene_starts, gene_ends,
                 edge_dict, locations, run_info):
     """ Given a transcript, try to find an FSM match for it """
@@ -820,11 +827,6 @@ def process_FSM(chrom, positions, strand, vertex_IDs, all_matches, gene_starts, 
     end_exon = None
     diff_5p = None 
     diff_3p = None   
-
-    # Check if there is a perfect match for the splice junctions
-    #all_matches = search_for_ISM(edge_IDs, transcript_dict)     
-    #if all_matches == None:
-    #    return None, None, [], None
 
     # Check if any of the matches have the same number of exons as the query.
     # Such a match should be prioritized because it's an FSM
@@ -850,51 +852,92 @@ def process_FSM(chrom, positions, strand, vertex_IDs, all_matches, gene_starts, 
             start_vertex = transcript_match['start_vertex']
             start_exon = transcript_match['start_exon']
             diff_5p = curr_5p_diff
+            start_novelty = 0
         else:
             # First get a permissively matched start vertex
-            start_vertex, diff_5p = permissive_match_with_gene_priority(chrom, 
-                                                          positions[0], strand, positions[1],
-                                                          "start", gene_ID, gene_starts, 
-                                                          locations, run_info)
-            if start_vertex == None:
-                start_vertex = create_vertex(chrom, positions[0], run_info,
-                                             locations)['location_ID']
-              
-            # Then get the start exon
-            start_exon, start_novelty = match_or_create_edge(start_vertex,
-                                                             vertex_IDs[0], 
-                                                             "exon", strand, 
-                                                             edge_dict, run_info)
+            start_vertex, start_exon, start_novelty, known_start, diff_5p = process_5p(chrom, 
+                                                                   positions, strand,
+                                                                   vertex_IDs, 
+                                                                   gene_ID, gene_starts, 
+                                                                   edge_dict,
+                                                                   locations, run_info)
         # ---------------- 3' end ---------------------------------
         if abs(curr_3p_diff) <= run_info.cutoff_3p:
             end_vertex = transcript_match['end_vertex']
             end_exon = transcript_match['end_exon']
             diff_3p = curr_3p_diff
+            end_novelty = 0
         else:
             # First get a permissively matched end vertex
-            end_vertex, diff_3p = permissive_match_with_gene_priority(chrom, 
-                                                            positions[-1], strand, positions[-2],
-                                                            "end", gene_ID, gene_ends,
-                                                            locations, run_info)
-            if end_vertex == None:
-                end_vertex = create_vertex(chrom, positions[-1], run_info,
-                                             locations)['location_ID']
-            # Then get the end exon
-            end_exon, end_novelty = match_or_create_edge(end_vertex,
-                                                         vertex_IDs[-1],
-                                                         "exon", strand,
-                                                          edge_dict, run_info) 
+            end_vertex, end_exon, end_novelty, known_end, diff_3p = process_3p(chrom,
+                                                                   positions, strand,
+                                                                   vertex_IDs,
+                                                                   gene_ID, gene_ends,
+                                                                   edge_dict,
+                                                                   locations, run_info)
     # Package information for output
     start_end_info = {"start_vertex": start_vertex,
                       "end_vertex": end_vertex,
                       "start_exon": start_exon,
                       "end_exon": end_exon,
                       "diff_5p": diff_5p,
-                      "diff_3p": diff_3p}
+                      "diff_3p": diff_3p,
+                      "start_novelty": start_novelty,
+                      "end_novelty": end_novelty}
 
     return gene_ID, transcript_ID, novelty, start_end_info
 
-def process_ISM(chrom, positions, strand, edge_IDs, vertex_IDs, transcript_dict,
+def process_5p(chrom, positions, strand, vertex_IDs, gene_ID, gene_starts, edge_dict,
+               locations, run_info):
+    """ Conduct permissive match for 5' end and return assigned vertex,
+        edge, and distance """
+
+    # First get a permissively matched start vertex
+    start_vertex, diff_5p, known_start = permissive_match_with_gene_priority(chrom,
+                                         positions[0], strand, positions[1],
+                                         "start", gene_ID, gene_starts,
+                                         locations, run_info)
+    if start_vertex == None:
+        start_vertex = create_vertex(chrom, positions[0], run_info,
+                                             locations)['location_ID']
+
+    # Then get the start exon
+    print(start_vertex)
+    print(vertex_IDs[0])
+    start_exon, start_novelty = match_or_create_edge(start_vertex,
+                                                     vertex_IDs[0],
+                                                     "exon", strand,
+                                                     edge_dict, run_info)
+
+    # If known_start == 1, the start vertex is a known startpoint of this gene.
+    #  start novelty refers to the novelty of the first exon
+    return start_vertex, start_exon, start_novelty, known_start, diff_5p
+
+
+def process_3p(chrom, positions, strand, vertex_IDs, gene_ID, gene_ends, edge_dict,
+               locations, run_info):
+    """ Conduct permissive match for 3' end and return assigned vertex,
+        edge, and distance """
+
+    # First get a permissively matched end vertex
+    end_vertex, diff_3p, known_end = permissive_match_with_gene_priority(chrom,
+                                          positions[-1], strand, positions[-2],
+                                          "end", gene_ID, gene_ends,
+                                          locations, run_info)
+    if end_vertex == None:
+        end_vertex = create_vertex(chrom, positions[-1], run_info,
+                                   locations)['location_ID']
+    # Then get the end exon
+    end_exon, end_novelty = match_or_create_edge(end_vertex,
+                                                 vertex_IDs[-1],
+                                                 "exon", strand,
+                                                  edge_dict, run_info)
+    # If known_end == 1, the end vertex is a known endpoint of this gene.
+    # end novelty refers to the novelty of the final exon
+    return end_vertex, end_exon, end_novelty, known_end, diff_3p
+
+
+def process_ISM(chrom, positions, strand, edge_IDs, vertex_IDs, all_matches, transcript_dict,
                 gene_starts, gene_ends, edge_dict, locations, run_info):
     """ Given a transcript, try to find an ISM match for it. If the
         best match is an ISM with known ends, that will be promoted to NIC. """
@@ -902,23 +945,45 @@ def process_ISM(chrom, positions, strand, edge_IDs, vertex_IDs, transcript_dict,
     gene_ID = None
     transcript_ID = None
     novelty = []
-    start_end_info = {"start_vertex": None,
-                      "end_vertex": None,
-                      "start_exon": None,
-                      "end_exon": None,
-                      "diff_5p": None,
-                      "diff_3p": None}
-
-    # Now extract ISM matches of all kinds and then characterize them
-    all_matches = search_for_ISM(edge_IDs, transcript_dict)
-
-    if all_matches == None:
-        return None, None, [], start_end_info
+    start_end_info = {}
+    n_exons = len(positions)/2
 
     ISM = []
     suffix = []
     prefix = []
     gene_ID = all_matches[0]['gene_ID']
+
+    # Get matches for the ends
+    start_vertex, start_exon, start_novelty, known_start, diff_5p = process_5p(chrom,
+                                                                   positions, strand,
+                                                                   vertex_IDs,
+                                                                   gene_ID, gene_starts,
+                                                                   edge_dict,
+                                                                   locations, run_info) 
+    end_vertex, end_exon, end_novelty, known_end, diff_3p = process_3p(chrom,
+                                                                   positions, strand,
+                                                                   vertex_IDs,
+                                                                   gene_ID, gene_ends,
+                                                                   edge_dict,
+                                                                   locations, run_info)
+    # Update info
+    start_end_info["start_vertex"] = start_vertex
+    start_end_info["end_vertex"] = end_vertex
+    start_end_info["start_exon"] = start_exon
+    start_end_info["end_exon"] = end_exon
+    start_end_info["start_novelty"] = start_novelty
+    start_end_info["end_novelty"] = end_novelty
+    start_end_info["diff_5p"] = diff_5p
+    start_end_info["diff_3p"] = diff_3p
+    
+    # If the 5' and 3' vertex sites are known for this gene, return NIC
+    if known_start and known_end:
+        novel_transcript = create_transcript(gene_ID, edge_IDs, vertex_IDs,
+                                         transcript_dict, run_info)
+        transcript_ID = novel_transcript['transcript_ID']
+        novelty = [(transcript_ID, run_info.idprefix, "TALON",
+                        "NIC_transcript", "TRUE")]
+        return gene_ID, transcript_ID, novelty, start_end_info    
 
     # Iterate over matches to characterize ISMs
     for match in all_matches:
@@ -929,7 +994,7 @@ def process_ISM(chrom, positions, strand, edge_IDs, vertex_IDs, transcript_dict,
 
         # Single-exon case
         if n_exons == 1:
-            match_path = match['path']
+            match_path = match['jn_path']
             exon = str(edge_IDs[0])
             # Look for prefix
             if match_path.startswith(exon):
@@ -943,8 +1008,8 @@ def process_ISM(chrom, positions, strand, edge_IDs, vertex_IDs, transcript_dict,
 
         # Multi-exon case
         edge_str = ",".join([str(x) for x in edge_IDs[1:-1]])
-        match_without_start = ",".join((match['path']).split(",")[1:])
-        match_without_end = ",".join((match['path']).split(",")[:-1])
+        match_without_start = ",".join((match['jn_path']).split(",")[1:])
+        match_without_end = ",".join((match['jn_path']).split(",")[:-1])
 
         # Look for prefix
         if match_without_start.startswith(edge_str):
@@ -955,6 +1020,30 @@ def process_ISM(chrom, positions, strand, edge_IDs, vertex_IDs, transcript_dict,
             #if len(FSM) == 0:
             gene_ID = match['gene_ID']
             suffix.append(str(match['transcript_ID'])) 
+
+    novel_transcript = create_transcript(gene_ID, edge_IDs, vertex_IDs,
+                                         transcript_dict, run_info)
+    transcript_ID = novel_transcript['transcript_ID']
+
+    ISM_str = ",".join(ISM)
+    novelty.append((transcript_ID, run_info.idprefix, "TALON",
+                    "ISM_transcript", "TRUE"))
+    novelty.append((transcript_ID, run_info.idprefix, "TALON",
+                    "ISM_to_IDs", ISM_str))
+    if prefix != []:
+        prefix_str = ",".join(prefix)
+        novelty.append((transcript_ID, run_info.idprefix, "TALON",
+                        "ISM-prefix_transcript", "TRUE"))
+        novelty.append((transcript_ID, run_info.idprefix, "TALON",
+                        "ISM-prefix_to_IDs", prefix_str))
+    if suffix != []:
+        suffix_str = ",".join(suffix)
+        novelty.append((transcript_ID, run_info.idprefix, "TALON",
+                        "ISM-suffix_transcript", "TRUE"))
+        novelty.append((transcript_ID, run_info.idprefix, "TALON",
+                        "ISM-suffix_to_IDs", suffix_str))
+
+    return gene_ID, transcript_ID, novelty, start_end_info
 
 def process_FSM_or_ISM(edge_IDs, vertex_IDs, transcript_dict, gene_starts,
                        gene_ends, run_info):
@@ -1020,7 +1109,7 @@ def process_FSM_or_ISM(edge_IDs, vertex_IDs, transcript_dict, gene_starts,
 
         # Single-exon case
         if n_exons == 1:
-            match_path = match['path']
+            match_path = match['jn_path']
             exon = str(edge_IDs[0])
             # Look for prefix
             if match_path.startswith(exon):
@@ -1034,8 +1123,8 @@ def process_FSM_or_ISM(edge_IDs, vertex_IDs, transcript_dict, gene_starts,
  
         # Multi-exon case
         edge_str = ",".join([str(x) for x in edge_IDs[1:-1]])
-        match_without_start = ",".join((match['path']).split(",")[1:])
-        match_without_end = ",".join((match['path']).split(",")[:-1])
+        match_without_start = ",".join((match['jn_path']).split(",")[1:])
+        match_without_end = ",".join((match['jn_path']).split(",")[:-1])
 
         # Look for prefix
         if match_without_start.startswith(edge_str):
@@ -1193,24 +1282,25 @@ def identify_transcript(chrom, positions, strand, cursor, location_dict, edge_di
         # Get all FSM/ISM matches
         all_matches = search_for_ISM(edge_IDs, transcript_dict)
 
-        # Look for FSM first
-        gene_ID, transcript_ID, novelty, start_end_info = process_FSM(chrom,
+        if len(all_matches) > 0:
+            # Look for FSM first
+            gene_ID, transcript_ID, novelty, start_end_info = process_FSM(chrom,
                                                             positions, strand,
                                                             all_matches,
                                                             edge_dict,
                                                             location_dict, run_info)
-        # Now look for ISM
-        if gene_ID == None:
-            pass
+            if gene_ID == None:
+                # Now look for ISM
+                pass
             # ISM    
         # Look for NIC
-        #if gene_ID == None:
-        #    gene_ID, transcript_ID, transcript_novelty = process_NIC(edge_IDs,
-        #                                                         vertex_IDs,
-        #                                                         strand,
-        #                                                         transcript_dict,
-        #                                                         vertex_2_gene,
-        #                                                         run_info)
+        else:
+            gene_ID, transcript_ID, transcript_novelty = process_NIC(edge_IDs,
+                                                                 vertex_IDs,
+                                                                 strand,
+                                                                 transcript_dict,
+                                                                 vertex_2_gene,
+                                                                 run_info)
            
     # Novel in catalog transcripts have known splice donors and acceptors,
     # but new connections between them. 
