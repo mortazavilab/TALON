@@ -52,6 +52,7 @@ class TestIdentifyISM(object):
         run_info = talon.init_run_info(cursor, build)
         transcript_dict = talon.make_transcript_dict(cursor, build)
         gene_starts, gene_ends = talon.make_gene_start_and_end_dict(cursor, build)
+        orig_exons = run_info["edge"]
 
         chrom = "chr1"
         strand = "+"
@@ -73,7 +74,9 @@ class TestIdentifyISM(object):
 
         correct_gene_ID = fetch_correct_ID("TG1", "gene", cursor)
         assert gene_ID == correct_gene_ID
-   
+        assert start_end_info["vertex_IDs"] == [1, 2, 3, 4]
+        assert start_end_info["edge_IDs"] == [1, 2, 3]
+ 
         conn.close()
 
 
