@@ -29,7 +29,7 @@ class TestIdentifyFSM(object):
         all_matches = talon.search_for_ISM(edge_IDs, transcript_dict)
 
         gene_ID, transcript_ID, novelty, start_end_info = talon.process_FSM(chrom, 
-                                                            positions, strand, 
+                                                            positions, strand, edge_IDs,
                                                             vertex_IDs, all_matches,
                                                             gene_starts, gene_ends,
                                                             edge_dict,
@@ -68,7 +68,7 @@ class TestIdentifyFSM(object):
         all_matches = talon.search_for_ISM(edge_IDs, transcript_dict)
 
         gene_ID, transcript_ID, novelty, start_end_info = talon.process_FSM(chrom,
-                                                            positions, strand,
+                                                            positions, strand, edge_IDs,
                                                             vertex_IDs, all_matches,
                                                             gene_starts, gene_ends,
                                                             edge_dict,
@@ -104,7 +104,7 @@ class TestIdentifyFSM(object):
         all_matches = talon.search_for_ISM(edge_IDs, transcript_dict)
 
         gene_ID, transcript_ID, novelty, start_end_info = talon.process_FSM(chrom,
-                                                            positions, strand,
+                                                            positions, strand, edge_IDs,
                                                             vertex_IDs, all_matches,
                                                             gene_starts, gene_ends,
                                                             edge_dict,
@@ -139,7 +139,7 @@ class TestIdentifyFSM(object):
         all_matches = talon.search_for_ISM(edge_IDs, transcript_dict)
 
         gene_ID, transcript_ID, novelty, start_end_info = talon.process_FSM(chrom,
-                                                            positions, strand,
+                                                            positions, strand, edge_IDs,
                                                             vertex_IDs, all_matches,
                                                             gene_starts, gene_ends,
                                                             edge_dict,

@@ -9,7 +9,7 @@ from helper_fns import *
 class TestIdentifyNNC(object):
 
     def test_NNC_match(self):
-        """ Example where the transcript is an NIC match to an existing one by
+        """ Example where the transcript is an NNC match to an existing one by
             virtue of a new splice donor.
         """
         conn, cursor = get_db_cursor()

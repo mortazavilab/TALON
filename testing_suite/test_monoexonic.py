@@ -20,7 +20,7 @@ class TestIdentifyMonoexonic(object):
         run_info = talon.init_run_info(cursor, build)
         transcript_dict = talon.make_transcript_dict(cursor, build)
         vertex_2_gene = talon.make_vertex_2_gene_dict(cursor)
-        gene_starts, gene_ends = talon.make_gene_start_and_end_dict(cursor)
+        gene_starts, gene_ends = talon.make_gene_start_and_end_dict(cursor, build)
 
         chrom = "chr4"
         strand = "-"
@@ -55,7 +55,7 @@ class TestIdentifyMonoexonic(object):
         run_info = talon.init_run_info(cursor, build)
         transcript_dict = talon.make_transcript_dict(cursor, build)
         vertex_2_gene = talon.make_vertex_2_gene_dict(cursor)
-        gene_starts, gene_ends = talon.make_gene_start_and_end_dict(cursor)
+        gene_starts, gene_ends = talon.make_gene_start_and_end_dict(cursor, build)
 
         chrom = "chr4"
         strand = "-"
@@ -89,7 +89,7 @@ class TestIdentifyMonoexonic(object):
         run_info = talon.init_run_info(cursor, build)
         transcript_dict = talon.make_transcript_dict(cursor, build)
         vertex_2_gene = talon.make_vertex_2_gene_dict(cursor)
-        gene_starts, gene_ends = talon.make_gene_start_and_end_dict(cursor)
+        gene_starts, gene_ends = talon.make_gene_start_and_end_dict(cursor, build)
 
         chrom = "chr4"
         strand = "-"
@@ -123,7 +123,7 @@ class TestIdentifyMonoexonic(object):
         run_info = talon.init_run_info(cursor, build)
         transcript_dict = talon.make_transcript_dict(cursor, build)
         vertex_2_gene = talon.make_vertex_2_gene_dict(cursor)
-        gene_starts, gene_ends = talon.make_gene_start_and_end_dict(cursor)
+        gene_starts, gene_ends = talon.make_gene_start_and_end_dict(cursor, build)
         tot_vertices = len(vertex_2_gene)
         query = """ SELECT COUNT(*) FROM temp_monoexon """
         tot_monoexonic = cursor.execute(query).fetchone()[0]
@@ -163,7 +163,7 @@ class TestIdentifyMonoexonic(object):
         run_info = talon.init_run_info(cursor, build)
         transcript_dict = talon.make_transcript_dict(cursor, build)
         vertex_2_gene = talon.make_vertex_2_gene_dict(cursor)
-        gene_starts, gene_ends = talon.make_gene_start_and_end_dict(cursor)
+        gene_starts, gene_ends = talon.make_gene_start_and_end_dict(cursor, build)
 
         chrom = "chr4"
         strand = "+"

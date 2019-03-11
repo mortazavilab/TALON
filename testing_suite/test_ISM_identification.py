@@ -40,6 +40,11 @@ class TestIdentifyISM(object):
         correct_gene_ID = fetch_correct_ID("TG1", "gene", cursor) 
 
         assert gene_ID == correct_gene_ID
+        assert start_end_info["vertex_IDs"] == [3, 4, 5, 6]
+        assert start_end_info["edge_IDs"] == [3, 4, 5]
+        assert start_end_info["start_novelty"] == 0 # because the exon is known
+        assert start_end_info["end_novelty"] == 0
+        assert transcript_dict[frozenset(start_end_info["edge_IDs"])] != None
         conn.close()
 
     def test_ISM_prefix(self):
@@ -75,8 +80,7 @@ class TestIdentifyISM(object):
         correct_gene_ID = fetch_correct_ID("TG1", "gene", cursor)
         assert gene_ID == correct_gene_ID
         assert start_end_info["vertex_IDs"] == [1, 2, 3, 4]
-        assert start_end_info["edge_IDs"] == [1, 2, 3]
- 
+        assert start_end_info["edge_IDs"] == [1, 2, 3] 
         conn.close()
 
 
