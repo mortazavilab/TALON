@@ -19,11 +19,11 @@ class TestIdentifyFSM(object):
         run_info = talon.init_run_info(cursor, build)        
         transcript_dict = talon.make_transcript_dict(cursor, build)
         vertex_2_gene = talon.make_vertex_2_gene_dict(cursor)
-        gene_starts, gene_ends = talon.make_gene_start_and_end_dict(cursor)
+        gene_starts, gene_ends = talon.make_gene_start_and_end_dict(cursor, build)
 
         chrom = "chr1"
         strand = "+"
-        positions = ( 1, 100, 500, 600, 900, 1000 )
+        positions = [ 1, 100, 500, 600, 900, 1000 ]
 
 
         annotation = talon.identify_transcript(chrom, positions, strand, cursor, 
@@ -50,11 +50,11 @@ class TestIdentifyFSM(object):
         run_info = talon.init_run_info(cursor, build)
         transcript_dict = talon.make_transcript_dict(cursor, build)
         vertex_2_gene = talon.make_vertex_2_gene_dict(cursor)
-        gene_starts, gene_ends = talon.make_gene_start_and_end_dict(cursor)
+        gene_starts, gene_ends = talon.make_gene_start_and_end_dict(cursor, build)
 
         chrom = "chr2"
         strand = "+"
-        positions = ( 1, 100, 500, 600, 900, 1500 )
+        positions = [ 1, 100, 500, 600, 900, 1500 ]
 
 
         annotation = talon.identify_transcript(chrom, positions, strand, cursor,
@@ -79,7 +79,7 @@ class TestIdentifyFSM(object):
         run_info = talon.init_run_info(cursor, build)
         transcript_dict = talon.make_transcript_dict(cursor, build)
         vertex_2_gene = talon.make_vertex_2_gene_dict(cursor)
-        gene_starts, gene_ends = talon.make_gene_start_and_end_dict(cursor)
+        gene_starts, gene_ends = talon.make_gene_start_and_end_dict(cursor, build)
 
         chrom = "chr3"
         strand = "+"
@@ -107,11 +107,11 @@ class TestIdentifyFSM(object):
         run_info = talon.init_run_info(cursor, build)
         transcript_dict = talon.make_transcript_dict(cursor, build)
         vertex_2_gene = talon.make_vertex_2_gene_dict(cursor)
-        gene_starts, gene_ends = talon.make_gene_start_and_end_dict(cursor)
+        gene_starts, gene_ends = talon.make_gene_start_and_end_dict(cursor, build)
 
         chrom = "chr1"
         strand = "+"
-        positions = ( 550, 600, 900, 1500 )
+        positions = [ 550, 600, 900, 1200 ]
 
         annotation = talon.identify_transcript(chrom, positions, strand, cursor,
                                                location_dict, edge_dict,
@@ -137,11 +137,11 @@ class TestIdentifyFSM(object):
         run_info = talon.init_run_info(cursor, build)
         transcript_dict = talon.make_transcript_dict(cursor, build)
         vertex_2_gene = talon.make_vertex_2_gene_dict(cursor)
-        gene_starts, gene_ends = talon.make_gene_start_and_end_dict(cursor)
+        gene_starts, gene_ends = talon.make_gene_start_and_end_dict(cursor, build)
 
         chrom = "chr1"
         strand = "+"
-        positions = ( 1, 100, 500, 600 )
+        positions = ( 1, 100, 500, 620 )
 
         annotation = talon.identify_transcript(chrom, positions, strand, cursor,
                                                location_dict, edge_dict,
@@ -151,9 +151,9 @@ class TestIdentifyFSM(object):
         correct_gene_ID = fetch_correct_ID("TG1", "gene", cursor)
         novelty_types = [ x[-2] for x in annotation['transcript_novelty']]
         assert annotation['gene_ID'] == correct_gene_ID
-        assert "ISM_transcript" in novelty_types
         assert "ISM-prefix_transcript" in novelty_types
-        assert annotation['start_delta'] == annotation['end_delta'] == 0
+        assert annotation['start_delta'] == 0
+        assert annotation['end_delta'] == 20
         conn.close()
 
     def test_ISM_internal(self):
@@ -162,18 +162,19 @@ class TestIdentifyFSM(object):
         conn, cursor = get_db_cursor()
         build = "toy_build"
         talon.make_temp_novel_gene_table(cursor, build)
+        talon.make_temp_monoexonic_transcript_table(cursor, build)
         edge_dict = talon.make_edge_dict(cursor)
         location_dict = talon.make_location_dict(build, cursor)
         run_info = talon.init_run_info(cursor, build)
         transcript_dict = talon.make_transcript_dict(cursor, build)
         vertex_2_gene = talon.make_vertex_2_gene_dict(cursor)
-        gene_starts, gene_ends = talon.make_gene_start_and_end_dict(cursor)
+        gene_starts, gene_ends = talon.make_gene_start_and_end_dict(cursor,build)
 
         chrom = "chr1"
         strand = "+"
         positions = ( 500, 600 )
 
-        annotation = talon.identify_transcript(chrom, positions, strand, cursor,
+        annotation = talon.identify_monoexon_transcript(chrom, positions, strand, cursor,
                                                location_dict, edge_dict,
                                                transcript_dict, vertex_2_gene,
                                                gene_starts, gene_ends, run_info)
@@ -196,7 +197,7 @@ class TestIdentifyFSM(object):
         run_info = talon.init_run_info(cursor, build)
         transcript_dict = talon.make_transcript_dict(cursor, build)
         vertex_2_gene = talon.make_vertex_2_gene_dict(cursor)
-        gene_starts, gene_ends = talon.make_gene_start_and_end_dict(cursor)
+        gene_starts, gene_ends = talon.make_gene_start_and_end_dict(cursor, build)
 
         chrom = "chr1"
         strand = "+"
@@ -226,11 +227,11 @@ class TestIdentifyFSM(object):
         run_info = talon.init_run_info(cursor, build)
         transcript_dict = talon.make_transcript_dict(cursor, build)
         vertex_2_gene = talon.make_vertex_2_gene_dict(cursor)
-        gene_starts, gene_ends = talon.make_gene_start_and_end_dict(cursor)
+        gene_starts, gene_ends = talon.make_gene_start_and_end_dict(cursor, build)
 
         chrom = "chr1"
         strand = "+"
-        positions = ( 1, 50, 900, 1000 )
+        positions = [ 1, 50, 900, 1000 ]
 
         annotation = talon.identify_transcript(chrom, positions, strand, cursor,
                                                location_dict, edge_dict,
@@ -255,11 +256,11 @@ class TestIdentifyFSM(object):
         run_info = talon.init_run_info(cursor, build)
         transcript_dict = talon.make_transcript_dict(cursor, build)
         vertex_2_gene = talon.make_vertex_2_gene_dict(cursor)
-        gene_starts, gene_ends = talon.make_gene_start_and_end_dict(cursor)
+        gene_starts, gene_ends = talon.make_gene_start_and_end_dict(cursor, build)
 
         chrom = "chr2"
         strand = "-"
-        positions = ( 1000, 900, 600, 500, 100, 1 )
+        positions = [ 1000, 900, 600, 500, 100, 1 ]
 
         annotation = talon.identify_transcript(chrom, positions, strand, cursor,
                                                location_dict, edge_dict,
@@ -280,18 +281,19 @@ class TestIdentifyFSM(object):
         conn, cursor = get_db_cursor()
         build = "toy_build"
         talon.make_temp_novel_gene_table(cursor, build)
+        talon.make_temp_monoexonic_transcript_table(cursor, build)
         edge_dict = talon.make_edge_dict(cursor)
         location_dict = talon.make_location_dict(build, cursor)
         run_info = talon.init_run_info(cursor, build)
         transcript_dict = talon.make_transcript_dict(cursor, build)
         vertex_2_gene = talon.make_vertex_2_gene_dict(cursor)
-        gene_starts, gene_ends = talon.make_gene_start_and_end_dict(cursor)
+        gene_starts, gene_ends = talon.make_gene_start_and_end_dict(cursor, build)
 
         chrom = "chr1"
         strand = "+"
         positions = (1, 990)
 
-        annotation = talon.identify_transcript(chrom, positions, strand, cursor,
+        annotation = talon.identify_monoexon_transcript(chrom, positions, strand, cursor,
                                                location_dict, edge_dict,
                                                transcript_dict, vertex_2_gene,
                                                gene_starts, gene_ends, run_info)
@@ -317,11 +319,11 @@ class TestIdentifyFSM(object):
         run_info = talon.init_run_info(cursor, build)
         transcript_dict = talon.make_transcript_dict(cursor, build)
         vertex_2_gene = talon.make_vertex_2_gene_dict(cursor)
-        gene_starts, gene_ends = talon.make_gene_start_and_end_dict(cursor)
+        gene_starts, gene_ends = talon.make_gene_start_and_end_dict(cursor, build)
 
         chrom = "chr11"
         strand = "-"
-        positions = (65788254, 65788136, 65775765, 65775733, 65756371, 65756269, 65735366, 65735192, 65719603, 65719484, 65712297, 65712178, 65709983, 65709932, 65707111, 65706984, 65696365, 65696288, 65693570, 65693422, 65691773, 65691728, 65690804, 65689322)
+        positions = [65788254, 65788136, 65775765, 65775733, 65756371, 65756269, 65735366, 65735192, 65719603, 65719484, 65712297, 65712178, 65709983, 65709932, 65707111, 65706984, 65696365, 65696288, 65693570, 65693422, 65691773, 65691728, 65690804, 65689322]
       
         annotation = talon.identify_transcript(chrom, positions, strand, cursor,
                                                location_dict, edge_dict,

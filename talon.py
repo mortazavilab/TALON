@@ -606,10 +606,11 @@ def check_all_SJs_known(novelty):
     """ Given a list in which each element represents the novelty (1) or 
         known-ness of a transcript edge (0), determine whether all of the
         introns are known or not. Return True if all are known, and False 
-        otherwise. Input should not include first or last exon. """
+        otherwise. Input should not include first or last exon. If there is
+        only one entry, then that means there is one splice junction (two exons)"""
 
     if len(novelty) == 1:
-        return None
+        return novelty[0] == 0
 
     introns = novelty[::2]
         
@@ -885,7 +886,6 @@ def process_5p(chrom, positions, strand, vertex_IDs, gene_ID, gene_starts, edge_
                                          positions[0], strand, positions[1],
                                          "start", gene_ID, gene_starts,
                                          locations, run_info)
-    print("-")
     if start_vertex == None:
         start_vertex = create_vertex(chrom, positions[0], run_info,
                                              locations)['location_ID']
@@ -968,13 +968,11 @@ def process_ISM(chrom, positions, strand, edge_IDs, vertex_IDs, all_matches, tra
         start_end_info["diff_3p"] = diff_3p
         start_end_info["edge_IDs"] = edge_IDs
         start_end_info["vertex_IDs"] = vertex_IDs
-        print(known_start)
-        print(known_end)
-        print(start_vertex)
-        print(end_vertex)
     else:
         known_start = 0
         known_end = 0    
+
+
     # If the 5' and 3' vertex sites are known for this gene, return NIC
     if known_start and known_end:
         novel_transcript = create_transcript(chrom, positions[0], positions[-1],
@@ -1007,16 +1005,13 @@ def process_ISM(chrom, positions, strand, edge_IDs, vertex_IDs, all_matches, tra
 
         # Multi-exon case
         edge_str = ",".join([str(x) for x in edge_IDs[1:-1]])
-        match_without_start = ",".join((match['jn_path']).split(",")[1:])
-        match_without_end = ",".join((match['jn_path']).split(",")[:-1])
 
         # Look for prefix
-        if match_without_start.startswith(edge_str):
+        if match['jn_path'].startswith(edge_str):
             prefix.append(str(match['transcript_ID']))
 
         # Look for suffix
-        if match_without_end.endswith(edge_str):
-            #if len(FSM) == 0:
+        if match['jn_path'].endswith(edge_str):
             gene_ID = match['gene_ID']
             suffix.append(str(match['transcript_ID'])) 
 
@@ -1364,6 +1359,7 @@ def identify_transcript(chrom, positions, strand, cursor, location_dict, edge_di
     gene_novelty = []
     transcript_novelty = []
     n_exons = len(positions)/2.0
+    gene_ID = None
  
     # Get vertex matches for the transcript positions
     vertex_IDs, v_novelty = match_splice_vertices(chrom, positions, strand,
@@ -1384,7 +1380,6 @@ def identify_transcript(chrom, positions, strand, cursor, location_dict, edge_di
     if all_SJs_known:
         # Get all FSM/ISM matches
         all_matches = search_for_ISM(edge_IDs, transcript_dict)
-         
         if all_matches != None:
             # Look for FSM first
             gene_ID, transcript_ID, transcript_novelty, start_end_info = process_FSM(chrom,
@@ -1416,7 +1411,7 @@ def identify_transcript(chrom, positions, strand, cursor, location_dict, edge_di
             
     # Novel in catalog transcripts have known splice donors and acceptors,
     # but new connections between them. 
-    elif splice_vertices_known:
+    elif splice_vertices_known and gene_ID == None:
         gene_ID, transcript_ID, transcript_novelty, start_end_info = process_NIC(chrom,
                                                             positions,
                                                             strand, edge_IDs,
@@ -1426,7 +1421,7 @@ def identify_transcript(chrom, positions, strand, cursor, location_dict, edge_di
                                                             vertex_2_gene, run_info)
     
     # Antisense transcript with splice junctions matching known gene
-    elif splice_vertices_known and gene_ID == None:
+    if splice_vertices_known and gene_ID == None:
         gene_ID, transcript_ID, gene_novelty, transcript_novelty, start_end_info = \
                                       process_spliced_antisense(chrom, positions,
                                                                   strand, edge_IDs,
