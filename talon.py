@@ -1366,6 +1366,79 @@ def process_spliced_antisense(chrom, positions, strand, edge_IDs, vertex_IDs, tr
 
     return gene_ID, transcript_ID, gene_novelty, transcript_novelty, start_end_info
 
+def process_remaining_mult_cases(chrom, positions, strand, edge_IDs, vertex_IDs, transcript_dict,
+                gene_starts, gene_ends, edge_dict, locations, vertex_2_gene, run_info, cursor):
+    """ This function is a catch-all for multiexonic transcripts that were not
+        FSM, ISM, NIC, NNC, or spliced antisense.
+    """
+    gene_novelty = []
+    transcript_novelty = []
+    start_end_info = {}
+
+    gene_ID, match_strand = search_for_overlap_with_gene(chrom, positions[0],
+                                                         positions[1], strand,
+                                                         cursor, run_info)
+
+    # We don't care about the gene when making these assignments
+    start_vertex, start_exon, start_novelty, known_start, diff_5p = process_5p(chrom,
+                                                                   positions, strand,
+                                                                   vertex_IDs,
+                                                                   gene_ID, gene_starts,
+                                                                   edge_dict,
+                                                                   locations, run_info)
+    end_vertex, end_exon, end_novelty, known_end, diff_3p = process_3p(chrom,
+                                                                   positions, strand,
+                                                                   vertex_IDs,
+                                                                   gene_ID, gene_ends,
+                                                                   edge_dict,
+                                                                   locations, run_info)
+    # Update info
+    edge_IDs = [start_exon] + edge_IDs + [end_exon]
+    vertex_IDs = [start_vertex] + vertex_IDs + [end_vertex]
+    start_end_info["start_vertex"] = start_vertex
+    start_end_info["end_vertex"] = end_vertex
+    start_end_info["start_exon"] = start_exon
+    start_end_info["end_exon"] = end_exon
+    start_end_info["start_novelty"] = start_novelty
+    start_end_info["end_novelty"] = end_novelty
+    start_end_info["diff_5p"] = diff_5p
+    start_end_info["diff_3p"] = diff_3p
+    start_end_info["edge_IDs"] = edge_IDs
+    start_end_info["vertex_IDs"] = vertex_IDs
+
+    if gene_ID == None:
+        gene_ID = create_gene(chrom, positions[0], positions[-1],
+                          strand, cursor, run_info)
+
+        gene_novelty.append((gene_ID, run_info.idprefix, "TALON",
+                     "intergenic_novel","TRUE"))
+
+        transcript_ID = create_transcript(gene_ID, edge_IDs, vertex_IDs,
+                                     transcript_dict, run_info)["transcript_ID"]
+        transcript_novelty.append((transcript_ID, run_info.idprefix, "TALON",
+                              "intergenic_transcript", "TRUE"))
+
+    elif match_strand != strand:
+        anti_gene_ID = gene_ID
+        gene_ID = create_gene(chrom, positions[0], positions[-1],
+                          strand, cursor, run_info)
+        transcript_ID = create_transcript(gene_ID, edge_IDs, vertex_IDs,
+                                     transcript_dict, run_info)["transcript_ID"]
+
+        gene_novelty.append((gene_ID, run_info.idprefix, "TALON",
+                     "antisense_gene","TRUE"))
+        gene_novelty.append((gene_ID, run_info.idprefix, "TALON",
+                     "gene_antisense_to_IDs",anti_gene_ID))
+        transcript_novelty.append((transcript_ID, run_info.idprefix, "TALON",
+                              "antisense_transcript", "TRUE"))
+    else:
+        transcript_ID = create_transcript(gene_ID, edge_IDs, vertex_IDs,
+                                     transcript_dict, run_info)["transcript_ID"]
+        transcript_novelty.append((transcript_ID, run_info.idprefix, "TALON",
+                              "genomic_transcript", "TRUE"))
+    
+    return gene_ID, transcript_ID, gene_novelty, transcript_novelty, start_end_info
+
 def update_vertex_2_gene(gene_ID, vertex_IDs, strand, vertex_2_gene):
     """ Add all vertices with gene pairings to vertex_2_gene dict """
 
@@ -1484,12 +1557,13 @@ def identify_transcript(chrom, positions, strand, cursor, location_dict, edge_di
     # Novel not in catalog transcripts contain new splice donors/acceptors
     # and contain at least one splice junction.
     elif not(splice_vertices_known) and not(all_exons_novel): 
-        gene_ID = find_gene_match_on_vertex_basis(vertex_IDs, strand, vertex_2_gene)
-        transcript_ID = create_transcript(gene_ID, edge_IDs, vertex_IDs,
-                                         transcript_dict, run_info)["transcript_ID"]
-
-        transcript_novelty.append((transcript_ID, run_info.idprefix, "TALON",
-                               "NNC_transcript", "TRUE"))
+        gene_ID, transcript_ID, transcript_novelty, start_end_info = talon.process_NNC(chrom,
+                                                            positions,
+                                                            strand, edge_IDs,
+                                                            vertex_IDs, transcript_dict,
+                                                            gene_starts, gene_ends,
+                                                            edge_dict, location_dict,
+                                                            vertex_2_gene, run_info)
 
     # Transcripts that don't match the previous categories end up here
     else:
@@ -1527,7 +1601,11 @@ def identify_transcript(chrom, positions, strand, cursor, location_dict, edge_di
                                   "genomic_transcript", "TRUE"))
 
     # Add all novel vertices to vertex_2_gene now that we have the gene ID
-    # TODO: we might be able to run this operation fewer times by screening novelty
+    vertex_IDs = start_end_info["vertex_IDs"]
+    edge_IDs = start_end_info["edge_IDs"]
+    e_novelty = [start_end_info["start_novelty"]] + e_novelty + \
+                [start_end_info["end_novelty"]]
+
     update_vertex_2_gene(gene_ID, vertex_IDs, strand, vertex_2_gene)
  
     # For novel genes and transcripts, add names to novelty entries
