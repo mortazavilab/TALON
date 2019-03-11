@@ -112,7 +112,6 @@ def make_transcript_dict(cursor, build):
         be handled by a different data structure
     """
     transcript_dict = {}
-    #query = """SELECT * FROM transcripts """
     query = """SELECT t.*,
     	         loc1.chromosome as chromosome,
                  loc1.position as start_pos,
@@ -120,15 +119,18 @@ def make_transcript_dict(cursor, build):
     	       FROM transcripts AS t
     	       LEFT JOIN location as loc1 ON t.start_vertex = loc1.location_ID 
     	       LEFT JOIN location as loc2 ON t.end_vertex = loc2.location_ID
-    	       WHERE loc1.genome_build = ? AND loc2.genome_build = ?
-               AND t.n_exons > 1;
+    	       WHERE loc1.genome_build = ? AND loc2.genome_build = ?;
            """
 
     cursor.execute(query, [build, build])
     for transcript in cursor.fetchall():
-        transcript_path = transcript["jn_path"].split(",") + \
-                          [transcript["start_exon"], transcript["end_exon"]]
-        transcript_path = frozenset([ int(x) for x in transcript_path])
+        transcript_path = transcript["jn_path"]
+        if transcript_path != None:
+            transcript_path = transcript_path.split(",") + \
+                              [transcript["start_exon"], transcript["end_exon"]]
+            transcript_path = frozenset([ int(x) for x in transcript_path])
+        else:
+            transcript_path = frozenset([transcript["start_exon"]])
         transcript_dict[transcript_path] = transcript
 
     return transcript_dict
@@ -698,7 +700,8 @@ def search_without_transcript_ends(edge_IDs, transcript_dict):
 
 def search_for_ISM(edge_IDs, transcript_dict):
     """ Given a list of edges in a query transcript, determine whether it is an
-        incomplete splice match (ISM) of any transcript in the dict."""               
+        incomplete splice match (ISM) of any transcript in the dict. Will also
+        return FSM matches if they're there"""               
 
     edges = frozenset(edge_IDs)
 
@@ -803,8 +806,10 @@ def search_for_transcript(edge_IDs, transcript_dict):
     except:
         return None, None
 
-def process_FSM(chrom, positions, strand, edge_IDs, vertex_IDs, transcript_dict,
-                gene_starts, gene_ends, edge_dict, locations, run_info):
+#def process_FSM(chrom, positions, strand, edge_IDs, vertex_IDs, transcript_dict,
+#                gene_starts, gene_ends, edge_dict, locations, run_info):
+def process_FSM(chrom, positions, strand, vertex_IDs, all_matches, gene_starts, gene_ends,
+                edge_dict, locations, run_info):
     """ Given a transcript, try to find an FSM match for it """
     gene_ID = None
     transcript_ID = None
@@ -817,9 +822,9 @@ def process_FSM(chrom, positions, strand, edge_IDs, vertex_IDs, transcript_dict,
     diff_3p = None   
 
     # Check if there is a perfect match for the splice junctions
-    all_matches = search_for_ISM(edge_IDs, transcript_dict)     
-    if all_matches == None:
-        return None, None, [], None
+    #all_matches = search_for_ISM(edge_IDs, transcript_dict)     
+    #if all_matches == None:
+    #    return None, None, [], None
 
     # Check if any of the matches have the same number of exons as the query.
     # Such a match should be prioritized because it's an FSM
@@ -827,8 +832,7 @@ def process_FSM(chrom, positions, strand, edge_IDs, vertex_IDs, transcript_dict,
     FSM_matches = [ x for x in all_matches if x['n_exons'] == n_exons ]
 
     if len(FSM_matches) == 0:
-        # Return the ISM matches so that they can be used downstream
-        return None, None, [], all_matches
+        return None, None, [], None
 
     else:
         transcript_match = FSM_matches[0]
@@ -1186,12 +1190,13 @@ def identify_transcript(chrom, positions, strand, cursor, location_dict, edge_di
     # Look for FSM or ISM. This includes monoexonic cases where the exon is 
     # known
     if all_SJs_known:
+        # Get all FSM/ISM matches
+        all_matches = search_for_ISM(edge_IDs, transcript_dict)
 
         # Look for FSM first
         gene_ID, transcript_ID, novelty, start_end_info = process_FSM(chrom,
                                                             positions, strand,
-                                                            edge_IDs, vertex_IDs,
-                                                            transcript_dict,
+                                                            all_matches,
                                                             edge_dict,
                                                             location_dict, run_info)
         # Now look for ISM

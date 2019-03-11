@@ -26,10 +26,11 @@ class TestIdentifyFSM(object):
         vertex_IDs = [2, 3, 4, 5]
         v_novelty = [0, 0, 0, 0]
 
+        all_matches = talon.search_for_ISM(edge_IDs, transcript_dict)
+
         gene_ID, transcript_ID, novelty, start_end_info = talon.process_FSM(chrom, 
                                                             positions, strand, 
-                                                            edge_IDs, vertex_IDs, 
-                                                            transcript_dict, 
+                                                            vertex_IDs, all_matches,
                                                             gene_starts, gene_ends,
                                                             edge_dict,
                                                             location_dict, run_info)
@@ -63,14 +64,15 @@ class TestIdentifyFSM(object):
         edge_IDs = [13, 14, 15]
         vertex_IDs = [14, 15, 16, 17] 
         v_novelty = [0, 0, 0, 0]
-   
+  
+        all_matches = talon.search_for_ISM(edge_IDs, transcript_dict)
+
         gene_ID, transcript_ID, novelty, start_end_info = talon.process_FSM(chrom,
                                                             positions, strand,
-                                                            edge_IDs, vertex_IDs,
-                                                            transcript_dict,
+                                                            vertex_IDs, all_matches,
                                                             gene_starts, gene_ends,
                                                             edge_dict,
-                                                            location_dict, run_info)
+                                                            location_dict, run_info) 
 
         correct_gene_ID = fetch_correct_ID("TG2", "gene", cursor)
         correct_transcript_ID = fetch_correct_ID("TG2-001", "transcript", cursor)
@@ -99,10 +101,11 @@ class TestIdentifyFSM(object):
         vertex_IDs = [7, 6]
         v_novelty = [0, 0]
 
+        all_matches = talon.search_for_ISM(edge_IDs, transcript_dict)
+
         gene_ID, transcript_ID, novelty, start_end_info = talon.process_FSM(chrom,
                                                             positions, strand,
-                                                            edge_IDs, vertex_IDs,
-                                                            transcript_dict,
+                                                            vertex_IDs, all_matches,
                                                             gene_starts, gene_ends,
                                                             edge_dict,
                                                             location_dict, run_info)
@@ -133,13 +136,15 @@ class TestIdentifyFSM(object):
         vertex_IDs = [2,3,4,5]
         v_novelty = [0, 0, 0, 0]
 
+        all_matches = talon.search_for_ISM(edge_IDs, transcript_dict)
+
         gene_ID, transcript_ID, novelty, start_end_info = talon.process_FSM(chrom,
                                                             positions, strand,
-                                                            edge_IDs, vertex_IDs,
-                                                            transcript_dict,
+                                                            vertex_IDs, all_matches,
                                                             gene_starts, gene_ends,
                                                             edge_dict,
                                                             location_dict, run_info)
+
         assert gene_ID == transcript_ID == None 
         conn.close()       
 
