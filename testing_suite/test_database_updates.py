@@ -53,9 +53,9 @@ class TestDatabaseUpdates(object):
         edge_dict = talon.make_edge_dict(cursor)
         run_info = talon.init_run_info(cursor, build)
 
-        observed = [ ( 1, 1, 1, "read1", "test", 1, 2, 0, 0, 100),
-                     ( 2, 1, 1, "read2", "test", 1, 2, 0, 0, 100),
-                     ( 3, 1, 1, "read3", "test", 1, 2, 0, 0, 100) ]
+        observed = [ ( 1, 1, 1, "read1", "test", 1, 2, 1, 1, 0, 0, 100),
+                     ( 2, 1, 1, "read2", "test", 1, 2, 1, 1, 0, 0, 100),
+                     ( 3, 1, 1, "read3", "test", 1, 2, 1, 1, 0, 0, 100) ]
         batch_size = 1
         talon.batch_add_observed(cursor, observed, batch_size)
 
@@ -151,7 +151,7 @@ class TestDatabaseUpdates(object):
         edge_dict = talon.make_edge_dict(cursor)
         run_info = talon.init_run_info(cursor, build)
         transcript_dict = talon.make_transcript_dict(cursor, build)
-        talon.create_transcript( 1, (1,2,3), (1,2,3,4), transcript_dict, run_info)
+        talon.create_transcript( "chr1", 1, 1000, 1, (1,2,3), (1,2,3,4), transcript_dict, run_info)
 
         batch_size = 5
         talon.batch_add_transcripts(cursor, transcript_dict, batch_size)
