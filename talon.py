@@ -211,7 +211,8 @@ def make_temp_monoexonic_transcript_table(cursor, build):
                          loc2.position as end,
 			 genes.strand,
                          t.start_vertex,
-                         t.end_vertex
+                         t.end_vertex,
+                         t.start_exon as exon_ID
                   FROM transcripts as t
 	          LEFT JOIN location as loc1 ON loc1.location_ID = t.start_vertex
 	          LEFT JOIN location as loc2 ON loc2.location_ID = t.end_vertex
@@ -419,9 +420,9 @@ def permissive_match_with_gene_priority(chromosome, position, strand, sj_pos,
         match = locations[chromosome][position]
         dist = 0
         if position in gene_locs[gene_ID]:
-            return match['location_ID'], dist, 0
+            return match['location_ID'], dist, 1
         else:
-            return match['location_ID'], dist, 1   
+            return match['location_ID'], dist, 0   
  
     # This approach only works when there are known starts/ends for this gene
     if gene_ID in gene_locs:
@@ -489,7 +490,7 @@ def permissive_vertex_search(chromosome, position, strand, sj_pos, pos_type,
         max_dist = run_info.cutoff_5p
     else:
         max_dist = run_info.cutoff_3p
-
+    
     # For + strand start and - strand end, look for a vertex with a smaller
     # position first (since degradtion is more biologically likely).
     # For the + strand, this would be a negative delta, and for the - strand,
@@ -546,8 +547,6 @@ def create_edge(vertex_1, vertex_2, edge_type, strand, edge_dict, run_info):
                 'v2': vertex_2,
                 'edge_type': edge_type,
                 'strand': strand }
-    print(vertex_1)
-    print(vertex_2) 
     edge_dict[(vertex_1, vertex_2, edge_type)] = new_edge
 
     return new_edge
@@ -564,17 +563,23 @@ def create_gene(chromosome, start, end, strand, memory_cursor, run_info):
     memory_cursor.execute(command, new_gene)
     return new_ID
 
-def create_transcript(gene_ID, edge_IDs, vertex_IDs, transcript_dict, run_info):
+def create_transcript(chromosome, start_pos, end_pos, gene_ID, edge_IDs, vertex_IDs, 
+                      transcript_dict, run_info):
     """Creates a novel transcript and adds it to the transcript data structure.
     """
     run_info.transcripts += 1
     new_ID = run_info.transcripts
     new_transcript = {'transcript_ID': new_ID,
                       'gene_ID': gene_ID,
-                      'path': ",".join(map(str, edge_IDs)),
+                      'jn_path': ",".join(map(str, edge_IDs)),
+                      'start_exon': edge_IDs[0],
+                      'end_exon': edge_IDs[-1],
                       'start_vertex': vertex_IDs[0],
                       'end_vertex': vertex_IDs[-1],
-                      'n_exons': (len(edge_IDs) + 1)/2 }
+                      'n_exons': (len(edge_IDs) + 1)/2,
+                      'chromosome': chromosome,
+                      'start_pos': start_pos,
+                      'end_pos': end_pos }
 
     path_key = frozenset(edge_IDs)
     transcript_dict[path_key] = new_transcript
@@ -682,22 +687,6 @@ def match_all_transcript_edges(vertices, strand, edge_dict, run_info):
                                                 
     return tuple(edge_matches), tuple(novelty)
 
-
-#def search_without_transcript_ends(edge_IDs, transcript_dict):
-#    """ Search for the body of the query transcript (i.e. leave out the 3' and 
-#        5' exons). Number of edges in the query and match must be the same. 
-#    """
-#    edge_IDs = frozenset(edge_IDs[1:-1])  
-#
-#    try:
-#        matches = [ transcript_dict[x] for x in transcript_dict if edge_IDs.issubset(x)]
-#
-#        gene_ID = transcripts[0]["gene_ID"]
-#        return gene_ID, transcripts
-#
-#    except:
-#        return None,None
-    
 
 def search_for_ISM(edge_IDs, transcript_dict):
     """ Given a list of edges in a query transcript, determine whether it is an
@@ -896,6 +885,7 @@ def process_5p(chrom, positions, strand, vertex_IDs, gene_ID, gene_starts, edge_
                                          positions[0], strand, positions[1],
                                          "start", gene_ID, gene_starts,
                                          locations, run_info)
+    print("-")
     if start_vertex == None:
         start_vertex = create_vertex(chrom, positions[0], run_info,
                                              locations)['location_ID']
@@ -921,7 +911,6 @@ def process_3p(chrom, positions, strand, vertex_IDs, gene_ID, gene_ends, edge_di
                                           positions[-1], strand, positions[-2],
                                           "end", gene_ID, gene_ends,
                                           locations, run_info)
-    print(end_vertex)
     if end_vertex == None:
         end_vertex = create_vertex(chrom, positions[-1], run_info,
                                    locations)['location_ID']
@@ -952,36 +941,45 @@ def process_ISM(chrom, positions, strand, edge_IDs, vertex_IDs, all_matches, tra
     gene_ID = all_matches[0]['gene_ID']
 
     # Get matches for the ends
-    start_vertex, start_exon, start_novelty, known_start, diff_5p = process_5p(chrom,
+    if n_exons > 1:
+        start_vertex, start_exon, start_novelty, known_start, diff_5p = process_5p(chrom,
                                                                    positions, strand,
                                                                    vertex_IDs,
                                                                    gene_ID, gene_starts,
                                                                    edge_dict,
                                                                    locations, run_info) 
-    end_vertex, end_exon, end_novelty, known_end, diff_3p = process_3p(chrom,
+        end_vertex, end_exon, end_novelty, known_end, diff_3p = process_3p(chrom,
                                                                    positions, strand,
                                                                    vertex_IDs,
                                                                    gene_ID, gene_ends,
                                                                    edge_dict,
                                                                    locations, run_info)
-    # Update info
-    edge_IDs = [start_exon] + edge_IDs + [end_exon]
-    vertex_IDs = [start_vertex] + vertex_IDs + [end_vertex]
-    start_end_info["start_vertex"] = start_vertex
-    start_end_info["end_vertex"] = end_vertex
-    start_end_info["start_exon"] = start_exon
-    start_end_info["end_exon"] = end_exon
-    start_end_info["start_novelty"] = start_novelty
-    start_end_info["end_novelty"] = end_novelty
-    start_end_info["diff_5p"] = diff_5p
-    start_end_info["diff_3p"] = diff_3p
-    start_end_info["edge_IDs"] = edge_IDs
-    start_end_info["vertex_IDs"] = vertex_IDs
-    
+        # Update info
+        edge_IDs = [start_exon] + edge_IDs + [end_exon]
+        vertex_IDs = [start_vertex] + vertex_IDs + [end_vertex]
+        
+        start_end_info["start_vertex"] = start_vertex
+        start_end_info["end_vertex"] = end_vertex
+        start_end_info["start_exon"] = start_exon
+        start_end_info["end_exon"] = end_exon
+        start_end_info["start_novelty"] = start_novelty
+        start_end_info["end_novelty"] = end_novelty
+        start_end_info["diff_5p"] = diff_5p
+        start_end_info["diff_3p"] = diff_3p
+        start_end_info["edge_IDs"] = edge_IDs
+        start_end_info["vertex_IDs"] = vertex_IDs
+        print(known_start)
+        print(known_end)
+        print(start_vertex)
+        print(end_vertex)
+    else:
+        known_start = 0
+        known_end = 0    
     # If the 5' and 3' vertex sites are known for this gene, return NIC
     if known_start and known_end:
-        novel_transcript = create_transcript(gene_ID, edge_IDs, vertex_IDs,
-                                         transcript_dict, run_info)
+        novel_transcript = create_transcript(chrom, positions[0], positions[-1],
+                                              gene_ID, edge_IDs, vertex_IDs,
+                                              transcript_dict, run_info)
         transcript_ID = novel_transcript['transcript_ID']
         novelty = [(transcript_ID, run_info.idprefix, "TALON",
                         "NIC_transcript", "TRUE")]
@@ -1004,7 +1002,6 @@ def process_ISM(chrom, positions, strand, edge_IDs, vertex_IDs, all_matches, tra
             # Look for suffix
             if match_path.endswith(exon):
                 suffix.append(str(match['transcript_ID']))
-                #if len(FSM) == 0:
                 gene_ID = match['gene_ID']
             continue
 
@@ -1023,8 +1020,10 @@ def process_ISM(chrom, positions, strand, edge_IDs, vertex_IDs, all_matches, tra
             gene_ID = match['gene_ID']
             suffix.append(str(match['transcript_ID'])) 
 
-    novel_transcript = create_transcript(gene_ID, edge_IDs, vertex_IDs,
-                                         transcript_dict, run_info)
+    novel_transcript = create_transcript(chrom, positions[0], positions[-1],
+                                              gene_ID, edge_IDs, vertex_IDs,
+                                              transcript_dict, run_info)
+
     transcript_ID = novel_transcript['transcript_ID']
 
     ISM_str = ",".join(ISM)
@@ -1065,12 +1064,16 @@ def process_NIC(chrom, positions, strand, edge_IDs, vertex_IDs, transcript_dict,
             # Make sure the gene is on the correct strand
             gene_matches += [ x[0] for x in list(curr_matches) if x[1] == strand ]
 
+  
     # Now count up how often we see each gene
     gene_tally = dict((x,gene_matches.count(x)) for x in set(gene_matches))
 
     # TODO: deal with fusions
 
     # For the main assignment, pick the gene that is observed the most
+    if len(gene_tally) == 0:
+        return None, None, [], None
+
     gene_ID = max(gene_tally, key=gene_tally.get)
 
     # Get matches for the ends
@@ -1101,8 +1104,9 @@ def process_NIC(chrom, positions, strand, edge_IDs, vertex_IDs, transcript_dict,
     start_end_info["vertex_IDs"] = vertex_IDs
 
     # Create a new transcript of that gene
-    novel_transcript = create_transcript(gene_ID, edge_IDs, vertex_IDs,
-                                         transcript_dict, run_info)
+    novel_transcript = create_transcript(chrom, positions[0], positions[-1],
+                                              gene_ID, edge_IDs, vertex_IDs,
+                                              transcript_dict, run_info)
     transcript_ID = novel_transcript["transcript_ID"]
     novelty = [(transcript_ID, run_info.idprefix, "TALON",
                          "NIC_transcript","TRUE")]
@@ -1143,6 +1147,8 @@ def process_NNC(chrom, positions, strand, edge_IDs, vertex_IDs, transcript_dict,
     start_end_info = {}
 
     gene_ID = find_gene_match_on_vertex_basis(vertex_IDs, strand, vertex_2_gene)
+    if gene_ID == None:
+        return None, None, [], None
 
     # Get matches for the ends
     start_vertex, start_exon, start_novelty, known_start, diff_5p = process_5p(chrom,
@@ -1171,9 +1177,9 @@ def process_NNC(chrom, positions, strand, edge_IDs, vertex_IDs, transcript_dict,
     start_end_info["edge_IDs"] = edge_IDs
     start_end_info["vertex_IDs"] = vertex_IDs
     
-
-    transcript_ID = create_transcript(gene_ID, edge_IDs, vertex_IDs,
-                                      transcript_dict, run_info)["transcript_ID"]
+    transcript_ID = create_transcript(chrom, positions[0], positions[-1],
+                                              gene_ID, edge_IDs, vertex_IDs,
+                                              transcript_dict, run_info)["transcript_ID"]
 
     novelty.append((transcript_ID, run_info.idprefix, "TALON",
                                "NNC_transcript", "TRUE"))
@@ -1226,8 +1232,9 @@ def process_spliced_antisense(chrom, positions, strand, edge_IDs, vertex_IDs, tr
 
     gene_ID = create_gene(chrom, positions[0], positions[-1],
                               strand, cursor, run_info)
-    transcript_ID = create_transcript(gene_ID, edge_IDs, vertex_IDs,
-                                         transcript_dict, run_info)["transcript_ID"]
+    transcript_ID = create_transcript(chrom, positions[0], positions[-1],
+                                              gene_ID, edge_IDs, vertex_IDs,
+                                              transcript_dict, run_info)["transcript_ID"]
 
     # Handle gene annotations
     gene_novelty.append((gene_ID, run_info.idprefix, "TALON",
@@ -1288,8 +1295,9 @@ def process_remaining_mult_cases(chrom, positions, strand, edge_IDs, vertex_IDs,
         gene_novelty.append((gene_ID, run_info.idprefix, "TALON",
                      "intergenic_novel","TRUE"))
 
-        transcript_ID = create_transcript(gene_ID, edge_IDs, vertex_IDs,
-                                     transcript_dict, run_info)["transcript_ID"]
+        transcript_ID = create_transcript(chrom, positions[0], positions[-1],
+                                              gene_ID, edge_IDs, vertex_IDs,
+                                              transcript_dict, run_info)["transcript_ID"]
         transcript_novelty.append((transcript_ID, run_info.idprefix, "TALON",
                               "intergenic_transcript", "TRUE"))
 
@@ -1297,8 +1305,9 @@ def process_remaining_mult_cases(chrom, positions, strand, edge_IDs, vertex_IDs,
         anti_gene_ID = gene_ID
         gene_ID = create_gene(chrom, positions[0], positions[-1],
                           strand, cursor, run_info)
-        transcript_ID = create_transcript(gene_ID, edge_IDs, vertex_IDs,
-                                     transcript_dict, run_info)["transcript_ID"]
+        transcript_ID = create_transcript(chrom, positions[0], positions[-1],
+                                              gene_ID, edge_IDs, vertex_IDs,
+                                              transcript_dict, run_info)["transcript_ID"]
 
         gene_novelty.append((gene_ID, run_info.idprefix, "TALON",
                      "antisense_gene","TRUE"))
@@ -1307,8 +1316,9 @@ def process_remaining_mult_cases(chrom, positions, strand, edge_IDs, vertex_IDs,
         transcript_novelty.append((transcript_ID, run_info.idprefix, "TALON",
                               "antisense_transcript", "TRUE"))
     else:
-        transcript_ID = create_transcript(gene_ID, edge_IDs, vertex_IDs,
-                                     transcript_dict, run_info)["transcript_ID"]
+        transcript_ID = create_transcript(chrom, positions[0], positions[-1],
+                                              gene_ID, edge_IDs, vertex_IDs,
+                                              transcript_dict, run_info)["transcript_ID"]
         transcript_novelty.append((transcript_ID, run_info.idprefix, "TALON",
                               "genomic_transcript", "TRUE"))
     
@@ -1374,18 +1384,18 @@ def identify_transcript(chrom, positions, strand, cursor, location_dict, edge_di
     if all_SJs_known:
         # Get all FSM/ISM matches
         all_matches = search_for_ISM(edge_IDs, transcript_dict)
-
-        if len(all_matches) > 0:
+         
+        if all_matches != None:
             # Look for FSM first
-            gene_ID, transcript_ID, novelty, start_end_info = process_FSM(chrom,
-                                                            positions, strand,
+            gene_ID, transcript_ID, transcript_novelty, start_end_info = process_FSM(chrom,
+                                                            positions, strand, edge_IDs,
                                                             vertex_IDs, all_matches,
                                                             gene_starts, gene_ends,
                                                             edge_dict,
                                                             location_dict, run_info)
             if gene_ID == None:
                 # Now look for ISM
-                gene_ID, transcript_ID, novelty, start_end_info = process_ISM(chrom,
+                gene_ID, transcript_ID, transcript_novelty, start_end_info = process_ISM(chrom,
                                                             positions,
                                                             strand, edge_IDs,
                                                             vertex_IDs,
@@ -1396,18 +1406,18 @@ def identify_transcript(chrom, positions, strand, cursor, location_dict, edge_di
                                                             run_info)
         # Look for NIC
         else:
-            gene_ID, transcript_ID, novelty, start_end_info = talon.process_NIC(chrom,
+            gene_ID, transcript_ID, transcript_novelty, start_end_info = process_NIC(chrom,
                                                             positions,
                                                             strand, edge_IDs,
                                                             vertex_IDs, transcript_dict,
                                                             gene_starts, gene_ends,
                                                             edge_dict, location_dict,
                                                             vertex_2_gene, run_info)
-           
+            
     # Novel in catalog transcripts have known splice donors and acceptors,
     # but new connections between them. 
-    elif splice_vertices_known and not(all_exons_novel):
-        gene_ID, transcript_ID, novelty, start_end_info = talon.process_NIC(chrom,
+    elif splice_vertices_known:
+        gene_ID, transcript_ID, transcript_novelty, start_end_info = process_NIC(chrom,
                                                             positions,
                                                             strand, edge_IDs,
                                                             vertex_IDs, transcript_dict,
@@ -1416,22 +1426,22 @@ def identify_transcript(chrom, positions, strand, cursor, location_dict, edge_di
                                                             vertex_2_gene, run_info)
     
     # Antisense transcript with splice junctions matching known gene
-    elif splice_vertices_known:
+    elif splice_vertices_known and gene_ID == None:
         gene_ID, transcript_ID, gene_novelty, transcript_novelty, start_end_info = \
-                                      talon.process_spliced_antisense(chrom, positions,
+                                      process_spliced_antisense(chrom, positions,
                                                                   strand, edge_IDs,
                                                                   vertex_IDs,
                                                                   transcript_dict,
                                                                   gene_starts,
                                                                   gene_ends,
-                                                                  edge_dict, locations,
+                                                                  edge_dict, location_dict,
                                                                   vertex_2_gene, run_info,
                                                                   cursor)
 
     # Novel not in catalog transcripts contain new splice donors/acceptors
     # and contain at least one splice junction.
-    elif not(splice_vertices_known) and not(all_exons_novel): 
-        gene_ID, transcript_ID, transcript_novelty, start_end_info = talon.process_NNC(chrom,
+    elif not(splice_vertices_known): 
+        gene_ID, transcript_ID, transcript_novelty, start_end_info = process_NNC(chrom,
                                                             positions,
                                                             strand, edge_IDs,
                                                             vertex_IDs, transcript_dict,
@@ -1440,10 +1450,9 @@ def identify_transcript(chrom, positions, strand, cursor, location_dict, edge_di
                                                             vertex_2_gene, run_info)
 
     # Transcripts that don't match the previous categories end up here
-    else:
-
+    if gene_ID == None:
         gene_ID, transcript_ID, gene_novelty, transcript_novelty, start_end_info = \
-                             talon.process_remaining_mult_cases(chrom, positions,
+                             process_remaining_mult_cases(chrom, positions,
                                                                 strand, edge_IDs,
                                                                 vertex_IDs,
                                                                 transcript_dict,
@@ -1492,10 +1501,12 @@ def identify_transcript(chrom, positions, strand, cursor, location_dict, edge_di
                    'gene_novelty': gene_novelty,
                    'transcript_novelty': transcript_novelty,
                    'exon_novelty': exon_novelty,
-                   'start_vertex': vertex_IDs[0],
-                   'end_vertex': vertex_IDs[-1],
-                   'start_delta': diff_5p,
-                   'end_delta': diff_3p}
+                   'start_vertex': start_end_info["start_vertex"],
+                   'end_vertex': start_end_info["end_vertex"],
+                   'start_exon': start_end_info["start_exon"],
+                   'end_exon': start_end_info["end_exon"],
+                   'start_delta': start_end_info["diff_5p"],
+                   'end_delta': start_end_info["diff_3p"]}
     
     return annotations
 
@@ -1737,6 +1748,7 @@ def identify_monoexon_transcript(chrom, positions, strand, cursor, location_dict
         gene_ID = best_match['gene_ID']
         transcript_ID = best_match['transcript_ID']
         vertex_IDs = (best_match['start_vertex'], best_match['end_vertex'])
+        edge_IDs = [best_match['exon_ID']]
         diff_5p = compute_delta(best_match['start'], start, strand)
         diff_3p = compute_delta(best_match['end'], end, strand)
 
@@ -1757,13 +1769,14 @@ def identify_monoexon_transcript(chrom, positions, strand, cursor, location_dict
         # If the exon is known, then this transcript must be ISM or NIC
         gene_ID = None
         if e_novelty[0] == 0:
-            gene_ID, transcript_ID, transcript_novelty = process_FSM_or_ISM(edge_IDs,
-                                                                vertex_IDs,
-                                                                transcript_dict,
-                                                                gene_starts,
-                                                                gene_ends,
-                                                                run_info)
-
+            all_matches = search_for_ISM(edge_IDs, transcript_dict)
+            gene_ID, transcript_ID, transcript_novelty, info = process_ISM(chrom, positions, 
+                                                                     strand, edge_IDs, 
+                                                                     vertex_IDs, all_matches, 
+                                                                     transcript_dict,
+                                                                     gene_starts, gene_ends, 
+                                                                     edge_dict, location_dict, 
+                                                                     run_info)
         if gene_ID == None:
             # Find best gene match using overlap search if the ISM/NIC check didn't work
             gene_ID, match_strand = search_for_overlap_with_gene(chrom, positions[0],
@@ -1776,8 +1789,9 @@ def identify_monoexon_transcript(chrom, positions, strand, cursor, location_dict
 
                 gene_novelty.append((gene_ID, run_info.idprefix, "TALON",
                                      "intergenic_novel","TRUE"))
-                transcript_ID = create_transcript(gene_ID, edge_IDs, vertex_IDs,
-                                     transcript_dict, run_info)["transcript_ID"]
+                transcript_ID = create_transcript(chrom, positions[0], positions[-1],
+                                              gene_ID, edge_IDs, vertex_IDs,
+                                              transcript_dict, run_info)["transcript_ID"]
                 transcript_novelty.append((transcript_ID, run_info.idprefix, "TALON",
                                       "intergenic_transcript", "TRUE"))     
             # Antisense case
@@ -1785,8 +1799,9 @@ def identify_monoexon_transcript(chrom, positions, strand, cursor, location_dict
                 anti_gene_ID = gene_ID
                 gene_ID = create_gene(chrom, positions[0], positions[-1],
                                       strand, cursor, run_info)
-                transcript_ID = create_transcript(gene_ID, edge_IDs, vertex_IDs,
-                                         transcript_dict, run_info)["transcript_ID"]
+                transcript_ID = create_transcript(chrom, positions[0], positions[-1],
+                                              gene_ID, edge_IDs, vertex_IDs,
+                                              transcript_dict, run_info)["transcript_ID"]
 
                 gene_novelty.append((gene_ID, run_info.idprefix, "TALON",
                                      "antisense_gene","TRUE"))
@@ -1797,8 +1812,9 @@ def identify_monoexon_transcript(chrom, positions, strand, cursor, location_dict
 
             # Same strand
             else:
-                transcript_ID = create_transcript(gene_ID, edge_IDs, vertex_IDs,
-                                         transcript_dict, run_info)["transcript_ID"]
+                transcript_ID = create_transcript(chrom, positions[0], positions[-1],
+                                              gene_ID, edge_IDs, vertex_IDs,
+                                              transcript_dict, run_info)["transcript_ID"]
                 transcript_novelty.append((transcript_ID, run_info.idprefix, "TALON",
                                   "genomic_transcript", "TRUE"))
 
@@ -1831,10 +1847,10 @@ def identify_monoexon_transcript(chrom, positions, strand, cursor, location_dict
         
         # Add the novel transcript to the temporary monoexon table
         new_mono = ( gene_ID, transcript_ID, chrom, start, end, strand, 
-                     vertex_IDs[0], vertex_IDs[-1] )
+                     vertex_IDs[0], vertex_IDs[-1], edge_IDs[0] )
         cols = '("gene_ID", "transcript_ID", "chromosome", "start", "end",' + \
-                 '"strand", "start_vertex", "end_vertex")'
-        command = 'INSERT INTO temp_monoexon ' + cols + ' VALUES ' + '(?,?,?,?,?,?,?,?)'
+                 '"strand", "start_vertex", "end_vertex", "exon_ID")'
+        command = 'INSERT INTO temp_monoexon ' + cols + ' VALUES ' + '(?,?,?,?,?,?,?,?,?)'
         cursor.execute(command, new_mono)
 
     # Package annotation information
@@ -1845,6 +1861,8 @@ def identify_monoexon_transcript(chrom, positions, strand, cursor, location_dict
                    'exon_novelty': exon_novelty,
                    'start_vertex': vertex_IDs[0],
                    'end_vertex': vertex_IDs[-1],
+                   'start_exon': edge_IDs[0],
+                   'end_exon': edge_IDs[-1],
                    'start_delta': diff_5p,
                    'end_delta': diff_3p}
     return annotations
@@ -1894,26 +1912,26 @@ def annotate_sam_transcripts(sam_file, dataset, cursor, struct_collection, QC_fi
             gene_ends = struct_collection.gene_ends
             run_info = struct_collection.run_info
 
-            try:
-                n_exons = len(positions)/2
-                if n_exons > 1:
-                    annotation_info = identify_transcript(chrom, positions, strand, 
-                                                      cursor, location_dict, 
-                                                      edge_dict, transcript_dict, 
-                                                      vertex_2_gene, 
-                                                      gene_starts, gene_ends,
-                                                      run_info)
-                else:
-                    annotation_info = identify_monoexon_transcript(chrom, positions, strand,
-                                                                   cursor, location_dict,
-                                                                   edge_dict, transcript_dict,
-                                                                   vertex_2_gene,
-                                                                   gene_starts, gene_ends,
-                                                                   run_info)
-            except:
-                warnings.warn("Problem identifying transcript '%s'. Skipping.."\
-                               % read_ID)    
-                continue
+            #try:
+            n_exons = len(positions)/2
+            if n_exons > 1:
+                annotation_info = identify_transcript(chrom, positions, strand, 
+                                                 cursor, location_dict, 
+                                                 edge_dict, transcript_dict, 
+                                                 vertex_2_gene, 
+                                                 gene_starts, gene_ends,
+                                                 run_info)
+            else:
+                annotation_info = identify_monoexon_transcript(chrom, positions, strand,
+                                                              cursor, location_dict,
+                                                              edge_dict, transcript_dict,
+                                                              vertex_2_gene,
+                                                              gene_starts, gene_ends,
+                                                              run_info)
+            #except:
+            #    warnings.warn("Problem identifying transcript '%s'. Skipping.."\
+            #                   % read_ID)    
+            #    continue
                             
             # Now that transcript has been annotated, unpack values and 
             # create an observed entry and abundance record
@@ -1926,12 +1944,14 @@ def annotate_sam_transcripts(sam_file, dataset, cursor, struct_collection, QC_fi
             end_vertex = annotation_info['end_vertex']
             start_delta = annotation_info['start_delta']
             end_delta = annotation_info['end_delta']
+            start_exon = annotation_info['start_exon']
+            end_exon = annotation_info['end_exon']
 
             struct_collection.run_info['observed'] += 1
             obs_ID = struct_collection.run_info['observed'] 
             observed = (obs_ID, gene_ID, transcript_ID, read_ID, dataset, 
-                        start_vertex, end_vertex, start_delta, 
-                        end_delta, read_length)
+                        start_vertex, end_vertex, start_exon, end_exon,
+                        start_delta, end_delta, read_length)
             observed_transcripts.append(observed)
 
             # Also add transcript to abundance dict
@@ -2187,7 +2207,9 @@ def batch_add_transcripts(cursor, transcript_dict, batch_size):
         if type(transcript) is dict:
             transcript_entries.append((transcript['transcript_ID'],
                                        transcript['gene_ID'],
-                                       transcript['path'],
+                                       transcript['start_exon'],
+                                       transcript['jn_path'],
+                                       transcript['end_exon'],
                                        transcript['start_vertex'],
                                        transcript['end_vertex'],
                                        transcript['n_exons']))
@@ -2202,9 +2224,9 @@ def batch_add_transcripts(cursor, transcript_dict, batch_size):
 
         try:
             cols = " (" + ", ".join([str_wrap_double(x) for x in
-                   ["transcript_id", "gene_id", "path", "start_vertex",
-                     "end_vertex", "n_exons"]]) + ") "
-            command = 'INSERT INTO "transcripts"' + cols + "VALUES " + '(?,?,?,?,?,?)'
+                   ["transcript_id", "gene_id", "start_exon", "jn_path", 
+                     "end_exon", "start_vertex", "end_vertex", "n_exons"]]) + ") "
+            command = 'INSERT INTO "transcripts"' + cols + "VALUES " + '(?,?,?,?,?,?,?,?)'
             cursor.executemany(command, transcript_batch)
         except Exception as e:
             print(e)
@@ -2264,8 +2286,8 @@ def batch_add_annotations(cursor, annotations, annot_type, batch_size):
 
 def batch_add_observed(cursor, observed, batch_size):
     """ Adds observed tuples (obs_ID, gene_ID, transcript_ID, read_name,
-        dataset, start_vertex_ID, end_vertex_ID, start_delta, end_delta, 
-        read_length) to observed table of database. """
+        dataset, start_vertex_ID, end_vertex_ID, start_exon, end_exon, 
+        start_delta, end_delta, read_length) to observed table of database. """
 
     index = 0
     while index < len(observed):
@@ -2279,10 +2301,11 @@ def batch_add_observed(cursor, observed, batch_size):
         try:
             cols = " (" + ", ".join([str_wrap_double(x) for x in
                    ["obs_ID", "gene_ID", "transcript_ID", "read_name",
-                    "dataset", "start_vertex_ID", "end_vertex_ID",
+                    "dataset", "start_vertex", "end_vertex",
+                    "start_exon", "end_exon",
                     "start_delta", "end_delta", "read_length"]]) + ") "
             command = 'INSERT INTO "observed"' + cols + \
-                      "VALUES " + '(?,?,?,?,?,?,?,?,?,?)'
+                      "VALUES " + '(?,?,?,?,?,?,?,?,?,?,?,?)'
             cursor.executemany(command, batch)
 
         except Exception as e:
