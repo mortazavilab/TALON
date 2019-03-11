@@ -18,19 +18,32 @@ class TestIdentifyNIC(object):
         location_dict = talon.make_location_dict(build, cursor)
         run_info = talon.init_run_info(cursor, build)
         transcript_dict = talon.make_transcript_dict(cursor, build)
-        vertex2gene = talon.make_vertex_2_gene_dict(cursor)
+        vertex_2_gene = talon.make_vertex_2_gene_dict(cursor)
+        gene_starts, gene_ends = talon.make_gene_start_and_end_dict(cursor, build)
 
-        edge_IDs = (1, 200, 5)
-        vertex_IDs = (1, 2, 5, 6)
+        chrom = "chr1"
+        positions = [ 1, 100, 900, 1000]
+        edge_IDs = [ run_info.edge + 1 ]
+        vertex_IDs = [ 2, 5 ]
         strand = "+"
-        v_novelty = (0, 0, 0, 0)
+        v_novelty = [0, 0]
 
-        gene_ID, transcript_ID, novelty = talon.process_NIC(edge_IDs, vertex_IDs,
-                                                      strand, transcript_dict,
-                                                      vertex2gene, run_info)
+        gene_ID, transcript_ID, novelty, start_end_info = talon.process_NIC(chrom, 
+                                                            positions, 
+                                                            strand, edge_IDs, 
+                                                            vertex_IDs, transcript_dict,
+                                                            gene_starts, gene_ends, 
+                                                            edge_dict, location_dict, 
+                                                            vertex_2_gene, run_info)
+
+                                  #process_NIC(edge_IDs, vertex_IDs,
+                                  #                    strand, transcript_dict,
+                                  #                    vertex2gene, run_info)
 
         correct_gene_ID = fetch_correct_ID("TG1", "gene", cursor)
         assert gene_ID == correct_gene_ID
+        assert start_end_info["vertex_IDs"] == [1,2,5,6]
+        assert transcript_dict[frozenset(start_end_info["edge_IDs"])] != None
         conn.close()
 
     def test_antisense(self):
@@ -43,7 +56,8 @@ class TestIdentifyNIC(object):
         location_dict = talon.make_location_dict(build, cursor)
         run_info = talon.init_run_info(cursor, build)
         transcript_dict = talon.make_transcript_dict(cursor, build)
-        vertex2gene = talon.make_vertex_2_gene_dict(cursor)
+        vertex_2_gene = talon.make_vertex_2_gene_dict(cursor)
+        gene_starts, gene_ends = talon.make_gene_start_and_end_dict(cursor, build)
 
         # Construct temp novel gene db
         talon.make_temp_novel_gene_table(cursor, "toy_build")
@@ -60,7 +74,7 @@ class TestIdentifyNIC(object):
         # Find antisense match
         anti_gene_ID = talon.find_gene_match_on_vertex_basis(vertex_IDs, 
                                                              anti_strand,
-                                                             vertex2gene)
+                                                             vertex_2_gene)
 
         correct_gene_ID = fetch_correct_ID("TG1", "gene", cursor)
         assert anti_gene_ID == correct_gene_ID

@@ -974,16 +974,18 @@ def process_ISM(chrom, positions, strand, edge_IDs, vertex_IDs, all_matches, tra
                                                                    edge_dict,
                                                                    locations, run_info)
     # Update info
+    edge_IDs = [start_exon] + edge_IDs + [end_exon]
+    vertex_IDs = [start_vertex] + vertex_IDs + [end_vertex]
     start_end_info["start_vertex"] = start_vertex
     start_end_info["end_vertex"] = end_vertex
     start_end_info["start_exon"] = start_exon
     start_end_info["end_exon"] = end_exon
-    start_end_info["exon_novelty"] = start_novelty
+    start_end_info["start_novelty"] = start_novelty
     start_end_info["end_novelty"] = end_novelty
     start_end_info["diff_5p"] = diff_5p
     start_end_info["diff_3p"] = diff_3p
-    start_end_info["edge_IDs"] = [start_exon] + edge_IDs + [end_exon]
-    start_end_info["vertex_IDs"] = [start_vertex] + vertex_IDs + [end_vertex]
+    start_end_info["edge_IDs"] = edge_IDs
+    start_end_info["vertex_IDs"] = vertex_IDs
     
     # If the 5' and 3' vertex sites are known for this gene, return NIC
     if known_start and known_end:
@@ -1171,13 +1173,16 @@ def process_ISM(chrom, positions, strand, edge_IDs, vertex_IDs, all_matches, tra
 #    return gene_ID, transcript_ID, novelty
     
     
-def process_NIC(edge_IDs, vertex_IDs, strand, transcript_dict, vertex_2_gene, run_info):
+#def process_NIC(edge_IDs, vertex_IDs, strand, transcript_dict, vertex_2_gene, run_info):
+def process_NIC(chrom, positions, strand, edge_IDs, vertex_IDs, transcript_dict,
+                gene_starts, gene_ends, edge_dict, locations, vertex_2_gene, run_info):
     """ For a transcript that has been determined to be novel in catalog, find
         the proper gene match (documenting fusion event if applicable). To do 
         this, look up each vertex in the vertex_2_gene dict, and keep track of all
         same-strand genes. """
 
     gene_matches = []
+    start_end_info = {}
     
     for vertex in vertex_IDs:
         if vertex in vertex_2_gene:
@@ -1194,6 +1199,33 @@ def process_NIC(edge_IDs, vertex_IDs, strand, transcript_dict, vertex_2_gene, ru
     # For the main assignment, pick the gene that is observed the most
     gene_ID = max(gene_tally, key=gene_tally.get)
 
+    # Get matches for the ends
+    start_vertex, start_exon, start_novelty, known_start, diff_5p = process_5p(chrom,
+                                                                   positions, strand,
+                                                                   vertex_IDs,
+                                                                   gene_ID, gene_starts,
+                                                                   edge_dict,
+                                                                   locations, run_info)
+    end_vertex, end_exon, end_novelty, known_end, diff_3p = process_3p(chrom,
+                                                                   positions, strand,
+                                                                   vertex_IDs,
+                                                                   gene_ID, gene_ends,
+                                                                   edge_dict,
+                                                                   locations, run_info)
+    # Update info
+    edge_IDs = [start_exon] + edge_IDs + [end_exon]
+    vertex_IDs = [start_vertex] + vertex_IDs + [end_vertex]
+    start_end_info["start_vertex"] = start_vertex
+    start_end_info["end_vertex"] = end_vertex
+    start_end_info["start_exon"] = start_exon
+    start_end_info["end_exon"] = end_exon
+    start_end_info["start_novelty"] = start_novelty
+    start_end_info["end_novelty"] = end_novelty
+    start_end_info["diff_5p"] = diff_5p
+    start_end_info["diff_3p"] = diff_3p
+    start_end_info["edge_IDs"] = edge_IDs
+    start_end_info["vertex_IDs"] = vertex_IDs
+
     # Create a new transcript of that gene
     novel_transcript = create_transcript(gene_ID, edge_IDs, vertex_IDs,
                                          transcript_dict, run_info)
@@ -1201,7 +1233,7 @@ def process_NIC(edge_IDs, vertex_IDs, strand, transcript_dict, vertex_2_gene, ru
     novelty = [(transcript_ID, run_info.idprefix, "TALON",
                          "NIC_transcript","TRUE")]
 
-    return gene_ID, transcript_ID, novelty    
+    return gene_ID, transcript_ID, novelty, start_end_info    
 
 
 def find_gene_match_on_vertex_basis(vertex_IDs, strand, vertex_2_gene):
