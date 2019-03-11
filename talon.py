@@ -450,7 +450,6 @@ def permissive_match_with_gene_priority(chromosome, position, strand, sj_pos,
                 continue
         
             curr_dist = compute_delta(known_location, position, strand)
-            print(curr_dist)
             if abs(curr_dist) < min_abs_dist:
                 best_dist = curr_dist
                 min_abs_dist = abs(curr_dist)
@@ -889,9 +888,6 @@ def process_5p(chrom, positions, strand, vertex_IDs, gene_ID, gene_starts, edge_
                                          positions[0], strand, positions[1],
                                          "start", gene_ID, gene_starts,
                                          locations, run_info)
-    #print("**")
-    #print(known_start)
-    #print("**")
     if start_vertex == None:
         start_vertex = create_vertex(chrom, positions[0], run_info,
                                              locations)['location_ID']
