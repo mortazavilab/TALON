@@ -186,9 +186,11 @@ def get_gene_2_transcripts(database, genome_build, whitelist):
             4: end position (max of 5' and 3')
             5: strand
             6: edge path
+            7. n_exons
  """
 
     conn = sqlite3.connect(database)
+    conn.row_factory = sqlite3.Row
     cursor = conn.cursor()
     whitelist_string = "(" + ','.join([str(x) for x in whitelist]) + ")"
     query = """
@@ -196,10 +198,13 @@ def get_gene_2_transcripts(database, genome_build, whitelist):
                t.gene_ID,
                t.transcript_ID,
                loc1.chromosome,
-               MIN(loc1.position,loc2.position),
-               MAX(loc1.position,loc2.position),
+               MIN(loc1.position,loc2.position) AS min_pos,
+               MAX(loc1.position,loc2.position) AS max_pos,
                genes.strand,
-               t.path
+               t.jn_path,
+               t.start_exon,
+               t.end_exon,
+               t.n_exons
            FROM transcripts t
            LEFT JOIN location loc1 ON t.start_vertex = loc1.location_ID
            LEFT JOIN location loc2 ON t.end_vertex = loc2.location_ID
@@ -212,12 +217,12 @@ def get_gene_2_transcripts(database, genome_build, whitelist):
     transcript_tuples = cursor.fetchall()
 
     # Sort based on gene ID
-    sorted_transcript_tuples = sorted(transcript_tuples, key=lambda x: x[0])
-    
+    sorted_transcript_tuples = sorted(transcript_tuples, key=lambda x: x["gene_ID"])    
+
     gene_groups = {}
     for key,group in itertools.groupby(sorted_transcript_tuples,operator.itemgetter(0)):
         # Sort by transcript start position
-        gene_groups[key] = sorted(list(group), key=lambda x: x[3])
+        gene_groups[key] = sorted(list(group), key=lambda x: x["min_pos"])
     conn.close()
 
     return gene_groups 
@@ -299,7 +304,7 @@ def create_gtf(database, annot, genome_build, whitelist, outfile):
     
         # Create a GTF entry for every transcript of this gene
         for transcript_entry in transcript_tuples:
-            transcript_ID = transcript_entry[1]
+            transcript_ID = transcript_entry["transcript_ID"]
             curr_transcript_annot = transcript_annotations[transcript_ID]
             
             transcript_annotation_dict = {}
@@ -311,8 +316,12 @@ def create_gtf(database, annot, genome_build, whitelist, outfile):
                                             copy.copy(gene_annotation_dict),
                                        copy.copy(transcript_annotation_dict))
             o.write(transcript_GTF_line + "\n")
-            transcript_edges = str(transcript_entry[6]).split(",")
-            
+            if transcript_entry["n_exons"] != None:
+                transcript_edges = [str(transcript_entry["start_exon"])] + \
+                                   str(transcript_entry["jn_path"]).split(",")+ \
+                                   [str(transcript_entry["end_exon"])]
+            else:
+                transcript_edges = [transcript_entry["start_exon"]]
 
             # Create a GTF entry for every exon of this transcript (skip introns)
             exon_num = 1
@@ -547,12 +556,12 @@ def get_gene_GTF_entry(gene_ID, associated_transcript_tuples, annotation_dict):
         source = "TALON"
 
     # GTF fields
-    chromosome = associated_transcript_tuples[0][2]
+    chromosome = associated_transcript_tuples[0]["chromosome"]
     feature = "gene"
-    start = str(associated_transcript_tuples[0][3])
-    end = str(associated_transcript_tuples[-1][4])
+    start = str(associated_transcript_tuples[0]["min_pos"])
+    end = str(associated_transcript_tuples[-1]["max_pos"])
     score = "."
-    strand = associated_transcript_tuples[0][5]
+    strand = associated_transcript_tuples[0]["strand"]
     frame = "."
     attributes = " ".join(format_GTF_tag_values_for_gene(gene_ID, annotation_dict))
 
@@ -569,16 +578,16 @@ def get_transcript_GTF_entry(transcript_entry, curr_gene_annot_dict, curr_transc
     else:
         source = "TALON"
 
-    gene_ID = transcript_entry[0]
-    transcript_ID = transcript_entry[1]
+    gene_ID = transcript_entry["gene_ID"]
+    transcript_ID = transcript_entry["transcript_ID"]
 
     # GTF fields for transcript
-    chromosome = str(transcript_entry[2])
+    chromosome = str(transcript_entry["chromosome"])
     feature = "transcript"
-    start = str(transcript_entry[3])
-    end = str(transcript_entry[4])
+    start = str(transcript_entry["min_pos"])
+    end = str(transcript_entry["max_pos"])
     score = "."
-    strand = transcript_entry[5]
+    strand = transcript_entry["strand"]
     frame = "."
     attributes = " ".join(format_GTF_tag_values_for_transcript(gene_ID, 
                                                                transcript_ID, 
