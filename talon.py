@@ -578,6 +578,7 @@ def create_transcript(chromosome, start_pos, end_pos, gene_ID, edge_IDs, vertex_
         jn_path = ",".join(map(str, edge_IDs[1:-1]))
     else:
         jn_path = None
+        
     new_transcript = {'transcript_ID': new_ID,
                       'gene_ID': gene_ID,
                       'jn_path': jn_path,
@@ -948,7 +949,6 @@ def process_ISM(chrom, positions, strand, edge_IDs, vertex_IDs, all_matches, tra
     suffix = []
     prefix = []
     gene_ID = all_matches[0]['gene_ID']
-
     # Get matches for the ends
     if n_exons > 1:
         start_vertex, start_exon, start_novelty, known_start, diff_5p = process_5p(chrom,
@@ -1000,6 +1000,13 @@ def process_ISM(chrom, positions, strand, edge_IDs, vertex_IDs, all_matches, tra
 
         # Single-exon case
         if n_exons == 1:
+            if match["n_exons"] == 1:
+                # Return FSM
+                gene_ID = match["gene_ID"]
+                transcript_ID = match["transcript_ID"]
+                novelty = []
+                return gene_ID, transcript_ID, novelty, start_end_info
+
             match_path = match['jn_path']
             exon = str(edge_IDs[0])
             # Look for prefix
@@ -1920,27 +1927,27 @@ def annotate_sam_transcripts(sam_file, dataset, cursor, struct_collection, QC_fi
             gene_ends = struct_collection.gene_ends
             run_info = struct_collection.run_info
 
-            try:
-                n_exons = len(positions)/2
-                if n_exons > 1:
-                    annotation_info = identify_transcript(chrom, positions, strand, 
-                                         cursor, location_dict, 
-                                         edge_dict, transcript_dict, 
-                                         vertex_2_gene, 
-                                         gene_starts, gene_ends,
-                                         run_info)
-                else:
-                    annotation_info = identify_monoexon_transcript(chrom, positions, strand,
-                                                      cursor, location_dict,
-                                                      edge_dict, transcript_dict,
-                                                      vertex_2_gene,
-                                                      gene_starts, gene_ends,
-                                                      run_info)
-            except Exception as e:
-                print(e)
-                warnings.warn("Problem identifying transcript '%s'. Skipping.."\
-                               % read_ID) 
-                sys.exit(1)
+            #try:
+            n_exons = len(positions)/2
+            if n_exons > 1:
+                annotation_info = identify_transcript(chrom, positions, strand, 
+                                     cursor, location_dict, 
+                                     edge_dict, transcript_dict, 
+                                     vertex_2_gene, 
+                                     gene_starts, gene_ends,
+                                     run_info)
+            else:
+                annotation_info = identify_monoexon_transcript(chrom, positions, strand,
+                                                  cursor, location_dict,
+                                                  edge_dict, transcript_dict,
+                                                  vertex_2_gene,
+                                                  gene_starts, gene_ends,
+                                                  run_info)
+            #except Exception as e:
+            #    print(e)
+            #    warnings.warn("Problem identifying transcript '%s'. Skipping.."\
+            #                   % read_ID) 
+            #    sys.exit(1)
                 #continue
                             
             # Now that transcript has been annotated, unpack values and 
