@@ -108,8 +108,6 @@ def make_transcript_dict(cursor, build):
     """ Format of dict:
             Key: tuple consisting of edges in transcript path
             Value: SQLite3 row from transcript table
-        Ignore database transcripts that have only one exon since these will
-        be handled by a different data structure
     """
     transcript_dict = {}
     query = """SELECT t.*,

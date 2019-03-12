@@ -619,10 +619,11 @@ def add_genes(c, genes, annot_name):
         gene_id_map[native_gene_id] = db_gene_id
         source = attributes["source"]
 
+        if "gene_status" not in attributes:
+            attributes["gene_status"] = "KNOWN"
         for att in attributes.keys():
             value = attributes[att]
             bulk_annotations.append((db_gene_id, annot_name, source, att, value))
-
 
     print("bulk update genes...")
     bulk_update_genes(c, bulk_genes, gene_counter)
@@ -706,12 +707,14 @@ def add_transcripts(c, transcripts, annot_name, gene_id_map, genome_build):
 
         # Create annotation entries
         ignore = ["gene_id", "gene_name"]
+        if "transcript_status" not in attributes:
+            attributes["transcript_status"] = "KNOWN"
         for att in attributes.keys():
             if att in ignore or "gene" in att:
                 continue
             value = attributes[att]
             bulk_annotations.append((db_transcript_id, annot_name, source, att, value))
-           
+ 
     print("bulk update transcripts...")
     bulk_update_transcripts(c, bulk_transcripts, counter)
     print("bulk update annotations...")
@@ -880,6 +883,8 @@ def add_exon_annotations_to_db(c, exon, exon_id, annot_name):
     ignore = ["gene_id", "gene_name"]
     attributes = exon.annotations
     source = attributes['source']
+    if "exon_status" not in attributes:
+            attributes["exon_status"] = "KNOWN"
 
     for att in attributes.keys():
         if (att in ignore) or ("gene" in att) or ("transcript" in att):

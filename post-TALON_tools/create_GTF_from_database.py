@@ -292,7 +292,6 @@ def create_gtf(database, annot, genome_build, whitelist, outfile):
     # Create a GTF entry for every gene
     for gene_ID, transcript_tuples in gene_2_transcripts.items():
         curr_annot = gene_annotations[gene_ID]
-
         gene_annotation_dict = {}
         for annot in curr_annot:
             attribute = annot[3]
