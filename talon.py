@@ -980,8 +980,6 @@ def process_ISM(chrom, positions, strand, edge_IDs, vertex_IDs, all_matches, tra
     else:
         known_start = 0
         known_end = 0   
-    #print(gene_starts[gene_ID])
-    #print("========")
 
     # If the 5' and 3' vertex sites are known for this gene, return NIC
     if known_start and known_end:
@@ -1497,16 +1495,12 @@ def identify_transcript(chrom, positions, strand, cursor, location_dict, edge_di
     exons = edge_IDs[::2]
     e_novelty = e_novelty[::2]
 
-    print(transcript_ID)
-    print(exons)
-    print(e_novelty)
-    if not all_exons_known:
+    if sum(e_novelty) > 0:
         for exon,is_novel in zip(exons, e_novelty):
             if is_novel:
-                print(exon)
                 exon_novelty.append((exon, run_info.idprefix, "TALON", 
                                      "exon_status", "NOVEL"))
-    print("________________")
+
     # Package up information for output
     annotations = {'gene_ID': gene_ID,
                    'transcript_ID': transcript_ID,
