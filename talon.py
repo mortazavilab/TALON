@@ -574,9 +574,13 @@ def create_transcript(chromosome, start_pos, end_pos, gene_ID, edge_IDs, vertex_
     """
     run_info.transcripts += 1
     new_ID = run_info.transcripts
+    if len(edge_IDs) > 1:
+        jn_path = ",".join(map(str, edge_IDs[1:-1]))
+    else:
+        jn_path = None
     new_transcript = {'transcript_ID': new_ID,
                       'gene_ID': gene_ID,
-                      'jn_path': ",".join(map(str, edge_IDs)),
+                      'jn_path': jn_path,
                       'start_exon': edge_IDs[0],
                       'end_exon': edge_IDs[-1],
                       'start_vertex': vertex_IDs[0],
@@ -668,7 +672,7 @@ def match_or_create_edge(vertex_1, vertex_2, edge_type, strand, edge_dict, run_i
 def match_all_transcript_edges(vertices, strand, edge_dict, run_info):
     """ Given a list of vertex IDs from the transcript in 5' to
         3' end order, this function looks for a matching edge ID for each
-        position. If none exists, it creates one. """
+        position. If none exists, it creates one. Only used for monoexon case"""
 
     edge_matches = []
     novelty = []
@@ -902,7 +906,7 @@ def process_5p(chrom, positions, strand, vertex_IDs, gene_ID, gene_starts, edge_
                                                      edge_dict, run_info)
 
     # If known_start == 1, the start vertex is a known startpoint of this gene.
-    #  start novelty refers to the novelty of the first exon
+    #  start novelty refers to the novelty of the first exon (1 if yes, 0 if no)
     return start_vertex, start_exon, start_novelty, known_start, diff_5p
 
 
@@ -925,7 +929,7 @@ def process_3p(chrom, positions, strand, vertex_IDs, gene_ID, gene_ends, edge_di
                                                  "exon", strand,
                                                   edge_dict, run_info)
     # If known_end == 1, the end vertex is a known endpoint of this gene.
-    # end novelty refers to the novelty of the final exon
+    # end novelty refers to the novelty of the final exon (1 if yes, 0 if no)
     return end_vertex, end_exon, end_novelty, known_end, diff_3p
 
 
@@ -1490,12 +1494,19 @@ def identify_transcript(chrom, positions, strand, cursor, location_dict, edge_di
 
     # Add annotation entries for any novel exons
     exon_novelty = []
+    exons = edge_IDs[::2]
+    e_novelty = e_novelty[::2]
+
+    print(transcript_ID)
+    print(exons)
+    print(e_novelty)
     if not all_exons_known:
-        for exon,is_novel in zip(edge_IDs, e_novelty):
+        for exon,is_novel in zip(exons, e_novelty):
             if is_novel:
+                print(exon)
                 exon_novelty.append((exon, run_info.idprefix, "TALON", 
                                      "exon_status", "NOVEL"))
-
+    print("________________")
     # Package up information for output
     annotations = {'gene_ID': gene_ID,
                    'transcript_ID': transcript_ID,
@@ -1915,27 +1926,27 @@ def annotate_sam_transcripts(sam_file, dataset, cursor, struct_collection, QC_fi
             gene_ends = struct_collection.gene_ends
             run_info = struct_collection.run_info
 
-            print(read_ID)
-            #try:
-            n_exons = len(positions)/2
-            if n_exons > 1:
-                annotation_info = identify_transcript(chrom, positions, strand, 
+            try:
+                n_exons = len(positions)/2
+                if n_exons > 1:
+                    annotation_info = identify_transcript(chrom, positions, strand, 
                                          cursor, location_dict, 
                                          edge_dict, transcript_dict, 
                                          vertex_2_gene, 
                                          gene_starts, gene_ends,
                                          run_info)
-            else:
-                annotation_info = identify_monoexon_transcript(chrom, positions, strand,
+                else:
+                    annotation_info = identify_monoexon_transcript(chrom, positions, strand,
                                                       cursor, location_dict,
                                                       edge_dict, transcript_dict,
                                                       vertex_2_gene,
                                                       gene_starts, gene_ends,
                                                       run_info)
-            #except Exception as e:
-                #warnings.warn("Problem identifying transcript '%s'. Skipping.."\
-                #               % read_ID)
-                #print(e) 
+            except Exception as e:
+                print(e)
+                warnings.warn("Problem identifying transcript '%s'. Skipping.."\
+                               % read_ID) 
+                sys.exit(1)
                 #continue
                             
             # Now that transcript has been annotated, unpack values and 
