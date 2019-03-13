@@ -62,9 +62,6 @@ def getOptions():
     (options, args) = parser.parse_args()
     return options
 
-        conn.close()
-
-
 def create_outname(options):
     """ Creates filename for the output GTF that reflects the input options that
         were used. """
