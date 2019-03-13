@@ -37,7 +37,7 @@ def handle_filtering(database, annot, observed, whitelist_file, dataset_file):
 
     if datasets != None:
         # Limit the whitelist to transcripts detected in the datasets
-        transcripts = [ x["transcript_ID"] in whitelist ]
+        transcripts = [ x[1] for x in whitelist ]
         transcript_str = qutils.format_for_IN(transcripts)
         dataset_str = qutils.format_for_IN(datasets)
 

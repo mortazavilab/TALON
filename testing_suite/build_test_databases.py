@@ -101,7 +101,7 @@ except Exception as e:
     print(e)
     sys.exit("Post-TALON filtering failed on chr11_and_Tcf3")
 
-# Run GTF script on chr11_and_Tcf3 TALON results
+# Run GTF script on chr11_and_Tcf3 TALON results with whitelist
 try:
     subprocess.check_output(
        ["python", "../post-TALON_tools/create_GTF_from_database.py",

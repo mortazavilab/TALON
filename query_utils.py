@@ -446,6 +446,6 @@ def format_for_IN(l):
     """ Converts input to string that can be used for IN database query """
     
     if type(l) is not list:
-        l = [str(l)]
+        l = list(l)
 
     return "(" + ','.join(['"' + str(x) + '"' for x in l]) + ")" 

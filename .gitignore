@@ -1,6 +1,7 @@
 test_files/GM12878_chr1_clean.sam
 testing_suite/scratch/*
 *.db
+timing_tests/*
 
 # Byte-compiled / optimized / DLL files
 __pycache__/
