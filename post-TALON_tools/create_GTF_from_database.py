@@ -619,7 +619,7 @@ def main():
     # Sort on gene ID
     sorted_whitelist = sorted(whitelist, key=lambda x: x[0])
 
-    create_gtf(database, annot, build, gene_whitelist, transcript_whitelist, outfile)    
+    create_gtf(database, annot, build, whitelist, outfile)    
     
 
 if __name__ == '__main__':
