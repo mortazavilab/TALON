@@ -380,6 +380,52 @@ def fetch_genomic_transcripts(cursor, datasets):
     transcripts = [x[0] for x in cursor.fetchall()]
     return transcripts
 
+def fetch_all_transcript_gene_pairs(cursor):
+    """ Return gene_ID - transcript_ID tuples from database """
+
+    query = """ SELECT gene_ID, transcript_ID FROM transcripts """
+    cursor.execute(query)
+    
+    pairs = cursor.fetchall()
+    return pairs
+    
+def fetch_all_datasets(cursor):
+    """ Return a list of all datasets in database """
+    cursor.execute("SELECT dataset_name FROM dataset")
+    datasets = [str(x[0]) for x in cursor.fetchall()]
+    return datasets
+
+def parse_whitelist(whitelist_file):
+    """ From the whitelist file, obtain a list of acccepted gene and 
+        transcript IDs tuples"""
+    whitelist = set()
+    with open(whitelist_file, 'r') as f:
+        for line in f:
+            line = line.strip()
+            fields = line.split(",")
+            gene_ID = fields[0]
+            transcript_ID = fields[1]
+            try:
+                whitelist.add((int(gene_ID), int(transcript_ID)))
+            except:
+                raise ValueError("Gene/Transcript IDs in whitelist must be integer TALON IDs")
+    return whitelist
+
+def parse_datasets(dataset_file, cursor):
+    """ From the dataset file, obtain a list of acccepted dataset names"""
+    # Get datasets in this database
+    db_datasets = qutils.fetch_all_datasets(cursor)
+
+    dataset_list = set()
+    with open(dataset_file, 'r') as f:
+        for line in f:
+            line = line.strip()
+            fields = line.split()
+            dataset = fields[0]
+            if dataset not in db_datasets:
+                raise ValueError("Dataset name '%s' not found in database" % dataset)
+            dataset_list.add(dataset)
+    return dataset_list
 
 #-------------------------------------------------------------------------------
 def format_for_IN(l):

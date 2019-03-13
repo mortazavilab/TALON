@@ -88,3 +88,16 @@ try:
 except Exception as e:
     print(e)
     sys.exit("TALON run failed on chr11_and_Tcf3")
+
+# Run the whitelist filtering script on the chr11_and_Tcf3 TALON results
+try:
+    subprocess.check_output(
+       ["python", "../post-TALON_tools/filter_talon_transcripts.py",
+        "--db", "scratch/chr11_and_Tcf3.db",
+        "-a", "gencode_vM7",
+        "-p", "input_files/chr11_and_Tcf3/pairings.csv",
+        "--o", "scratch/chr11_and_Tcf3_whitelist.csv" ])
+except Exception as e:
+    print(e)
+    sys.exit("Post-TALON filtering failed on chr11_and_Tcf3")
+
