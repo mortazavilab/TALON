@@ -101,3 +101,16 @@ except Exception as e:
     print(e)
     sys.exit("Post-TALON filtering failed on chr11_and_Tcf3")
 
+# Run GTF script on chr11_and_Tcf3 TALON results
+try:
+    subprocess.check_output(
+       ["python", "../post-TALON_tools/create_GTF_from_database.py",
+        "--db", "scratch/chr11_and_Tcf3.db",
+        "-a", "gencode_vM7",
+        "--build", "mm10",
+        "--w", "scratch/chr11_and_Tcf3_whitelist.csv",
+        "--o", "scratch/chr11_and_Tcf3"])
+except Exception as e:
+    print(e)
+    sys.exit("Post-TALON GTF script failed on chr11_and_Tcf3")
+

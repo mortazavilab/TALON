@@ -1,4 +1,5 @@
 import pytest
+import subprocess
 import sys
 sys.path.append("../")
 sys.path.append("../post-TALON_tools")
@@ -19,4 +20,18 @@ class TestPostTalonUtils(object):
 
         # Gene IDs
         assert set([x[0] for x in whitelist]) == set([5, 723, 2987]) 
-        assert set([x[1] for x in whitelist]) == set([28, 1744, 8455, 8437])          
+        assert set([x[1] for x in whitelist]) == set([28, 1744, 8455, 8437])
+
+    def test_GTF_integrity(self):
+        """ Try running a Bedtools command on the GTF """
+        pass
+
+    def test_validate_GTF(self):
+        """ Check whether Bedtools sort runs on the GTF without crashing """
+
+        try:
+            subprocess.check_output(
+                ["bedtools", "sort", "-i", "scratch/chr11_and_Tcf3_talon.gtf"])
+        except:
+            pytest.fail("Bedtools crashed on chr11_and_Tcf3_talon.gtf")
+
