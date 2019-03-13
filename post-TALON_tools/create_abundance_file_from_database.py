@@ -13,6 +13,10 @@ import filter_talon_transcripts as filt
 from pathlib import Path
 script_dir = os.path.dirname(os.path.realpath(__file__))
 sys.path.append(os.path.abspath(os.path.join(script_dir, os.pardir)))
+main_path = "/".join(script_dir.split("/")[0:-1])
+sys.path.append(main_path)
+import dstruct as dstruct
+import query_utils as qutils
 
 def getOptions():
     parser = OptionParser()
@@ -211,23 +215,42 @@ def fetch_abundances(database, datasets, annot, whitelist):
     conn.close() 
     return abundance_tuples
 
-def write_abundance_file(abundances, datasets, outfile):
+def write_abundance_file(abundances, datasets, novelty_types, outfile):
     """ Writes abundances to an output file """
 
     o = open(outfile, 'w')
+    
     col_names = abundances[0].keys()
-    o.write("\t".join(col_names) + "\n")
+    novelty_type_cols = ["antisense_gene", "intergenic_gene", "ISM_transcript",
+                         "ISM-prefix_transcript", "ISM-suffix_transcript",
+                         "NIC_transcript", "NNC_transcript", "antisense_transcript",
+                         "intergenic_transcript", "genomic_transcript"]
+    first_dataset_index = len(col_names) - len(datasets)
+    first_colnames = col_names[0:first_dataset_index]
+    dataset_colnames = col_names[first_dataset_index:]
+    all_colnames = first_colnames + novelty_type_cols + dataset_colnames
+    o.write("\t".join(all_colnames) + "\n")
 
     abundance_list = [list(elem) for elem in abundances]
+    
+    # Split dataset columns into their own list
 
     # Find indices of columns that may need 'None' replaced
-    annot_indices = [i for i, s in enumerate(col_names) if 'annot' in s]
-    status_indices = [i for i, s in enumerate(col_names) if 'status' in s]
-    dataset_indices = [i for i,s in enumerate(col_names) if s in set(datasets)]
+    annot_indices = [i for i, s in enumerate(all_colnames) if 'annot' in s]
+    status_indices = [i for i, s in enumerate(all_colnames) if 'status' in s]
+    dataset_indices = [i for i,s in enumerate(all_colnames) if s in set(datasets)]
 
     # Iterate over abundances, fixing Nones, and write to file
     for transcript in abundances:
+        #transcript = list(transcript)
+        curr_novelty = get_gene_and_transcript_novelty_types(transcript["gene_ID"], 
+                                                             transcript["transcript_ID"], 
+                                                             novelty_types)
         transcript = list(transcript)
+        transcript = transcript[0:first_dataset_index] + \
+                     [ curr_novelty[x] for x in novelty_type_cols] + \
+                     transcript[first_dataset_index:]
+
         for index in annot_indices:
             if transcript[index] == None:
                 transcript[index] = "NA"
@@ -241,6 +264,34 @@ def write_abundance_file(abundances, datasets, outfile):
         
     o.close()
     return
+
+def get_gene_and_transcript_novelty_types(gene_ID, transcript_ID, novelty_type):
+    """ Look up gene and transcript IDs in data structure to determine which types
+        of novelty are present """
+
+    curr_novel = {}
+    curr_novel["antisense_gene"] = "antisense_gene" \
+               if gene_ID in novelty_type.antisense_genes else "NA"
+    curr_novel["intergenic_gene"] = "intergenic_gene" \
+               if gene_ID in novelty_type.intergenic_genes else "NA"
+    curr_novel["ISM_transcript"] = "ISM_transcript" \
+               if transcript_ID in novelty_type.ISM_transcripts else "NA"
+    curr_novel["ISM-prefix_transcript"] = "ISM-prefix_transcript" \
+               if transcript_ID in novelty_type.ISM_prefix else "NA"
+    curr_novel["ISM-suffix_transcript"] = "ISM-suffix_transcript" \
+               if transcript_ID in novelty_type.ISM_suffix else "NA"
+    curr_novel["NIC_transcript"] = "NIC_transcript" \
+               if transcript_ID in novelty_type.NIC_transcripts else "NA"
+    curr_novel["NNC_transcript"] = "NNC_transcript" \
+               if transcript_ID in novelty_type.NNC_transcripts else "NA"
+    curr_novel["antisense_transcript"] = "antisense_transcript" \
+               if transcript_ID in novelty_type.antisense_transcripts else "NA"
+    curr_novel["intergenic_transcript"] = "intergenic_transcript" \
+               if transcript_ID in novelty_type.intergenic_transcripts else "NA"
+    curr_novel["genomic_transcript"] = "genomic_transcript" \
+               if transcript_ID in novelty_type.genomic_transcripts else "NA"
+
+    return curr_novel
 
 def check_annot_validity(annot, database):
     """ Make sure that the user has entered a correct annotation name """
@@ -269,6 +320,31 @@ def check_annot_validity(annot, database):
 
     return
 
+def make_novelty_type_struct(database, datasets):
+    """ Create a data structure where it is possible to look up whether a gene
+        or transcript belongs to a particular category of novelty"""
+
+    conn = sqlite3.connect(database)
+    conn.row_factory = sqlite3.Row 
+    cursor = conn.cursor() 
+
+    novelty_type = dstruct.Struct()
+    novelty_type.known_genes = set(qutils.fetch_all_known_genes_detected(cursor, datasets))
+    novelty_type.antisense_genes = set(qutils.fetch_antisense_genes(cursor, datasets))
+    novelty_type.intergenic_genes = set(qutils.fetch_intergenic_novel_genes(cursor, datasets))
+    novelty_type.known_transcripts = set(qutils.fetch_all_known_transcripts_detected(cursor, datasets))
+    novelty_type.ISM_transcripts = set(qutils.fetch_all_ISM_transcripts(cursor, datasets))
+    novelty_type.ISM_prefix = set(qutils.fetch_prefix_ISM_transcripts(cursor, datasets))
+    novelty_type.ISM_suffix = set(qutils.fetch_suffix_ISM_transcripts(cursor, datasets))
+    novelty_type.NIC_transcripts = set(qutils.fetch_NIC_transcripts(cursor, datasets))
+    novelty_type.NNC_transcripts = set(qutils.fetch_NNC_transcripts(cursor, datasets))
+    novelty_type.antisense_transcripts = set(qutils.fetch_antisense_transcripts(cursor, datasets))
+    novelty_type.intergenic_transcripts = set(qutils.fetch_intergenic_transcripts(cursor, datasets))
+    novelty_type.genomic_transcripts = set(qutils.fetch_genomic_transcripts(cursor, datasets))
+
+    conn.close()
+    return novelty_type
+
 def main():
     options = getOptions()
     database = options.database
@@ -286,8 +362,9 @@ def main():
 
     # Create the abundance file
     datasets = datasets = fetch_dataset_list(database)
+    novelty_type = make_novelty_type_struct(database, datasets)
     abundances = fetch_abundances(database, datasets, annot, transcript_whitelist)
-    write_abundance_file(abundances, datasets, outfile)
+    write_abundance_file(abundances, datasets, novelty_type, outfile)
 
 if __name__ == '__main__':
     main()
