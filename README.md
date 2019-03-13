@@ -92,7 +92,7 @@ The columns in the abundance file are as follows:
 7. Number of exons in the transcript
 8. Gene status (KNOWN or NOVEL)	
 9. Transcript status (KNOWN or NOVEL)  
-**Fields describing types of novelty present in gene/transcript:**
+**------- Fields describing types of novelty present in gene/transcript ------**
 10. antisense_gene  
 11. intergenic_gene  
 12. ISM_transcript  
@@ -103,8 +103,8 @@ The columns in the abundance file are as follows:
 17. antisense_transcript  
 18. intergenic_transcript
 19. genomic_transcript  
-**Remaining columns:** 
-One column per dataset, with a count indicating how many times the current transcript was observed in that dataset.  
+**---------------------------- Remaining columns -----------------------------**  
+One column per dataset, with a count indicating how many times the current transcript was observed in that dataset. 
 
 # License
 MIT, see LICENSE
