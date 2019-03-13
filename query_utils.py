@@ -367,6 +367,20 @@ def fetch_antisense_transcripts(cursor, datasets):
     transcripts = [x[0] for x in cursor.fetchall()]
     return transcripts
 
+def fetch_intergenic_transcripts(cursor, datasets):
+    """ Fetch IDs of all intergenic transcripts """
+
+    datasets = format_for_IN(datasets)
+    query = """SELECT DISTINCT(transcript_ID) FROM observed
+                   LEFT JOIN transcript_annotations
+                       AS ta ON ta.ID = observed.transcript_ID
+                   WHERE (ta.attribute = 'intergenic_transcript')
+                   AND observed.dataset IN """ + datasets
+    cursor.execute(query)
+    transcripts = [x[0] for x in cursor.fetchall()]
+    return transcripts
+
+
 def fetch_genomic_transcripts(cursor, datasets):
     """ Fetch IDs of all genomic transcripts """
 
@@ -414,7 +428,7 @@ def parse_whitelist(whitelist_file):
 def parse_datasets(dataset_file, cursor):
     """ From the dataset file, obtain a list of acccepted dataset names"""
     # Get datasets in this database
-    db_datasets = qutils.fetch_all_datasets(cursor)
+    db_datasets = fetch_all_datasets(cursor)
 
     dataset_list = set()
     with open(dataset_file, 'r') as f:
@@ -434,4 +448,4 @@ def format_for_IN(l):
     if type(l) is not list:
         l = [str(l)]
 
-    return "(" + ','.join(['"' + x + '"' for x in l]) + ")" 
+    return "(" + ','.join(['"' + str(x) + '"' for x in l]) + ")" 
