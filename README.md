@@ -4,9 +4,9 @@ works from mapped SAM files, allowing data from different sequencing platforms
 (i.e. PacBio and Oxford Nanopore) to be analyzed side by side. 
 
 # Installation
-TALON is designed to be run with Python 3.7 (tested on version 3.7.2).
+Newer version of TALON (v4.0+) are designed to be run with Python 3.7 (tested specifically with Python 3.7.2). Older versions of TALON use Python 2.7.
 
-To install TALON, simply download the files using Github's "Download ZIP" button, then unzip them in the directory where you would like to install the program. Alternately, you can download a specific version of the program from the Releases tab. The TALON scripts can now be run directly from the command line- just include the path.
+To install TALON, simply download the files using Github's "Download ZIP" button, then unzip them in the directory where you would like to store the program. Alternately, you can download a specific version of the program from the Releases tab. The TALON scripts can now be run directly from the command line- just include the path.
 
 # How to run
 
@@ -102,9 +102,9 @@ Fields describing types of novelty present in gene/transcript:
 16. NNC_transcript
 17. antisense_transcript  
 18. intergenic_transcript
-19. genomic_transcript
-Remaining columns:
-One column per dataset, with a count indicating how many times the current transcript was observed in that dataset.
+19. genomic_transcript  
+Remaining columns:  
+One column per dataset, with a count indicating how many times the current transcript was observed in that dataset.  
 
 # License
 MIT, see LICENSE
