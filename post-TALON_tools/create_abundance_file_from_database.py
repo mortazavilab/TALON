@@ -222,9 +222,10 @@ def write_abundance_file(abundances, datasets, novelty_types, outfile):
     
     col_names = abundances[0].keys()
     novelty_type_cols = ["antisense_gene", "intergenic_gene", "ISM_transcript",
-                         "ISM-prefix_transcript", "ISM-suffix_transcript",
+                         "ISM_prefix_transcript", "ISM_suffix_transcript",
                          "NIC_transcript", "NNC_transcript", "antisense_transcript",
                          "intergenic_transcript", "genomic_transcript"]
+
     first_dataset_index = len(col_names) - len(datasets)
     first_colnames = col_names[0:first_dataset_index]
     dataset_colnames = col_names[first_dataset_index:]
@@ -233,8 +234,6 @@ def write_abundance_file(abundances, datasets, novelty_types, outfile):
 
     abundance_list = [list(elem) for elem in abundances]
     
-    # Split dataset columns into their own list
-
     # Find indices of columns that may need 'None' replaced
     annot_indices = [i for i, s in enumerate(all_colnames) if 'annot' in s]
     status_indices = [i for i, s in enumerate(all_colnames) if 'status' in s]
@@ -271,25 +270,25 @@ def get_gene_and_transcript_novelty_types(gene_ID, transcript_ID, novelty_type):
 
     curr_novel = {}
     curr_novel["antisense_gene"] = "antisense_gene" \
-               if gene_ID in novelty_type.antisense_genes else "NA"
+               if gene_ID in novelty_type.antisense_genes else "No"
     curr_novel["intergenic_gene"] = "intergenic_gene" \
-               if gene_ID in novelty_type.intergenic_genes else "NA"
+               if gene_ID in novelty_type.intergenic_genes else "No"
     curr_novel["ISM_transcript"] = "ISM_transcript" \
-               if transcript_ID in novelty_type.ISM_transcripts else "NA"
-    curr_novel["ISM-prefix_transcript"] = "ISM-prefix_transcript" \
-               if transcript_ID in novelty_type.ISM_prefix else "NA"
-    curr_novel["ISM-suffix_transcript"] = "ISM-suffix_transcript" \
-               if transcript_ID in novelty_type.ISM_suffix else "NA"
+               if transcript_ID in novelty_type.ISM_transcripts else "No"
+    curr_novel["ISM_prefix_transcript"] = "ISM_prefix_transcript" \
+               if transcript_ID in novelty_type.ISM_prefix else "No"
+    curr_novel["ISM_suffix_transcript"] = "ISM_suffix_transcript" \
+               if transcript_ID in novelty_type.ISM_suffix else "No"
     curr_novel["NIC_transcript"] = "NIC_transcript" \
-               if transcript_ID in novelty_type.NIC_transcripts else "NA"
+               if transcript_ID in novelty_type.NIC_transcripts else "No"
     curr_novel["NNC_transcript"] = "NNC_transcript" \
-               if transcript_ID in novelty_type.NNC_transcripts else "NA"
+               if transcript_ID in novelty_type.NNC_transcripts else "No"
     curr_novel["antisense_transcript"] = "antisense_transcript" \
-               if transcript_ID in novelty_type.antisense_transcripts else "NA"
+               if transcript_ID in novelty_type.antisense_transcripts else "No"
     curr_novel["intergenic_transcript"] = "intergenic_transcript" \
-               if transcript_ID in novelty_type.intergenic_transcripts else "NA"
+               if transcript_ID in novelty_type.intergenic_transcripts else "No"
     curr_novel["genomic_transcript"] = "genomic_transcript" \
-               if transcript_ID in novelty_type.genomic_transcripts else "NA"
+               if transcript_ID in novelty_type.genomic_transcripts else "No"
 
     return curr_novel
 
