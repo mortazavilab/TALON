@@ -121,6 +121,34 @@ def fetch_dataset_list(database):
     conn.close()
     return datasets
 
+def create_abundance_dict(database, datasets):
+    """Process the abundance table by dataset in order to create a dictionary
+       data structure organized like this:
+           transcript_ID -> dataset -> abundance in that dataset
+    """
+    abundance = {}    
+
+    conn = sqlite3.connect(database)
+    conn.row_factory = sqlite3.Row
+    cursor = conn.cursor()
+
+    for dataset in datasets:
+        query = """ SELECT transcript_ID, count FROM abundance 
+                    WHERE dataset = '%s' """ % dataset
+        cursor.execute(query)
+
+        for transcript in cursor.fetchall():
+            transcript_ID = transcript["transcript_ID"]
+            count = transcript["count"]  
+
+            if transcript_ID in abundance:
+                abundance[transcript_ID][dataset] = count
+            else:
+                abundance[transcript_ID] = {}
+                abundance[transcript_ID][dataset] = count 
+
+    conn.close()
+    return abundance
 
 def fetch_abundances(database, datasets, annot, whitelist):
     """Constructs a query to get the following information for every 
@@ -140,6 +168,7 @@ def fetch_abundances(database, datasets, annot, whitelist):
     """
 
     datasets = fetch_dataset_list(database)
+    abundance = create_abundance_dict(database, datasets)
 
     col_query = """SELECT
 	               t.gene_ID,
@@ -152,25 +181,10 @@ def fetch_abundances(database, datasets, annot, whitelist):
 	               ga_status.value AS gene_status,
 	               ta_status.value AS transcript_status"""
 
-    if len(datasets) > 0:
-        col_query = col_query + ","
-
     conn = sqlite3.connect(database)
     conn.row_factory = sqlite3.Row
     cursor = conn.cursor()
 
-    # Create a mapping to allow us to escape possible special characters in
-    # dataset names
-    dataset_id_mapper = {}
-    new_dataset_names = []
-    count = 1
-    for dataset in datasets:
-        name = "abd_" + str(count)
-        dataset_id_mapper[name] = dataset
-        new_dataset_names.append(name)
-        count += 1
-
-    dataset_cols = ",\n".join([ name + ".count AS '" + dataset_id_mapper[name] + "'" for name in new_dataset_names ])
     whitelist_string = "WHERE t.transcript_ID IN (" + ','.join(whitelist) + ");"
 
     name_status_query = """        
@@ -195,32 +209,43 @@ def fetch_abundances(database, datasets, annot, whitelist):
                     AND ta_status.attribute = 'transcript_status'
                 """ % (annot, annot, annot, annot, annot, annot)
 
-    # Create an abundance query for every dataset  
-    abundance_queries = "\n".join(["LEFT JOIN abundance AS " + x + \
-                                   " ON t.transcript_ID = " + x + \
-                                   ".transcript_ID AND " + x + \
-                                   ".dataset = '" + dataset_id_mapper[x] \
-                                   + "'" for x in new_dataset_names])
-
-    # Combine the subparts of the query into one and run it
-    full_query = "\n".join([col_query, dataset_cols, name_status_query, 
-                            abundance_queries, whitelist_string])
+    full_query = "\n".join([col_query, name_status_query, whitelist_string])
 
     try:
         abundance_tuples = (cursor.execute(full_query)).fetchall()
+        colnames = list(abundance_tuples[0].keys()) + datasets
     except Exception as e:
         print(e)
         raise RuntimeError("Something went wrong with the database query")
 
-    conn.close() 
-    return abundance_tuples
+    conn.close()
 
-def write_abundance_file(abundances, datasets, novelty_types, outfile):
+    # Now iterate over the query results to incorporate the abundance information
+    final_abundance = []
+    for entry in abundance_tuples:
+        transcript_ID = entry["transcript_ID"]
+        if transcript_ID not in abundance:
+            continue
+
+        # Get abundance of this transcript in each dataset
+        dataset_counts = []
+        for dataset in datasets:
+            if dataset in abundance[transcript_ID]:
+                dataset_counts.append(str(abundance[transcript_ID][dataset]))
+            else: 
+                dataset_counts.append("0")
+
+        # Combine abundance info with rest of transcript information        
+        combined_entry = list(entry) + dataset_counts
+        final_abundance.append(combined_entry)
+
+    return final_abundance, colnames
+
+def write_abundance_file(abundances, col_names, datasets, novelty_types, outfile):
     """ Writes abundances to an output file """
 
     o = open(outfile, 'w')
     
-    col_names = abundances[0].keys()
     novelty_type_cols = ["antisense_gene", "intergenic_gene", "ISM_transcript",
                          "ISM_prefix_transcript", "ISM_suffix_transcript",
                          "NIC_transcript", "NNC_transcript", "antisense_transcript",
@@ -241,9 +266,10 @@ def write_abundance_file(abundances, datasets, novelty_types, outfile):
 
     # Iterate over abundances, fixing Nones, and write to file
     for transcript in abundances:
-        #transcript = list(transcript)
-        curr_novelty = get_gene_and_transcript_novelty_types(transcript["gene_ID"], 
-                                                             transcript["transcript_ID"], 
+        gene_ID_index = all_colnames.index("gene_ID")
+        transcript_ID_index = all_colnames.index("transcript_ID")
+        curr_novelty = get_gene_and_transcript_novelty_types(transcript[gene_ID_index], 
+                                                             transcript[transcript_ID_index], 
                                                              novelty_types)
         transcript = list(transcript)
         transcript = transcript[0:first_dataset_index] + \
@@ -362,8 +388,8 @@ def main():
     # Create the abundance file
     datasets = datasets = fetch_dataset_list(database)
     novelty_type = make_novelty_type_struct(database, datasets)
-    abundances = fetch_abundances(database, datasets, annot, transcript_whitelist)
-    write_abundance_file(abundances, datasets, novelty_type, outfile)
+    abundances, colnames = fetch_abundances(database, datasets, annot, transcript_whitelist)
+    write_abundance_file(abundances, colnames, datasets, novelty_type, outfile)
 
 if __name__ == '__main__':
     main()
