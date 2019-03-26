@@ -241,7 +241,7 @@ def fetch_abundances(database, datasets, annot, whitelist):
 
     return final_abundance, colnames
 
-def write_abundance_file(abundances, col_names, datasets, novelty_types, outfile):
+def write_abundance_file(abundances, col_names, prefix, datasets, novelty_types, outfile):
     """ Writes abundances to an output file """
 
     o = open(outfile, 'w')
@@ -260,14 +260,15 @@ def write_abundance_file(abundances, col_names, datasets, novelty_types, outfile
     abundance_list = [list(elem) for elem in abundances]
     
     # Find indices of columns that may need 'None' replaced
-    annot_indices = [i for i, s in enumerate(all_colnames) if 'annot' in s]
+    gene_ID_index = all_colnames.index("gene_ID")
+    transcript_ID_index = all_colnames.index("transcript_ID")
+    gene_name_index = all_colnames.index("annot_gene_name")
+    transcript_name_index = all_colnames.index("annot_transcript_name")
     status_indices = [i for i, s in enumerate(all_colnames) if 'status' in s]
     dataset_indices = [i for i,s in enumerate(all_colnames) if s in set(datasets)]
 
     # Iterate over abundances, fixing Nones, and write to file
     for transcript in abundances:
-        gene_ID_index = all_colnames.index("gene_ID")
-        transcript_ID_index = all_colnames.index("transcript_ID")
         curr_novelty = get_gene_and_transcript_novelty_types(transcript[gene_ID_index], 
                                                              transcript[transcript_ID_index], 
                                                              novelty_types)
@@ -276,9 +277,12 @@ def write_abundance_file(abundances, col_names, datasets, novelty_types, outfile
                      [ curr_novelty[x] for x in novelty_type_cols] + \
                      transcript[first_dataset_index:]
 
-        for index in annot_indices:
-            if transcript[index] == None:
-                transcript[index] = "NA"
+        if transcript[gene_name_index] == None:
+            transcript[gene_name_index] = prefix + "-gene_" + \
+                                          str(transcript[gene_ID_index])
+        if transcript[transcript_name_index] == None:
+            transcript[transcript_name_index] = prefix + "-transcript_" + \
+                                            str(transcript[transcript_ID_index])
         for index in status_indices:
             if transcript[index] == None:
                 transcript[index] = "NOVEL"
@@ -370,6 +374,17 @@ def make_novelty_type_struct(database, datasets):
     conn.close()
     return novelty_type
 
+def fetch_naming_prefix(database):
+    """ Get naming prefix from the database run_info table """
+    conn = sqlite3.connect(database)
+    conn.row_factory = sqlite3.Row
+    cursor = conn.cursor()
+    cursor.execute("SELECT value FROM run_info WHERE item = 'idprefix'")
+    prefix = cursor.fetchone()[0]
+
+    conn.close()
+    return prefix
+
 def main():
     options = getOptions()
     database = options.database
@@ -389,7 +404,8 @@ def main():
     datasets = datasets = fetch_dataset_list(database)
     novelty_type = make_novelty_type_struct(database, datasets)
     abundances, colnames = fetch_abundances(database, datasets, annot, transcript_whitelist)
-    write_abundance_file(abundances, colnames, datasets, novelty_type, outfile)
+    prefix = fetch_naming_prefix(database)
+    write_abundance_file(abundances, colnames, prefix, datasets, novelty_type, outfile)
 
 if __name__ == '__main__':
     main()
