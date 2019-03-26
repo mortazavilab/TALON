@@ -262,6 +262,8 @@ def write_abundance_file(abundances, col_names, prefix, datasets, novelty_types,
     # Find indices of columns that may need 'None' replaced
     gene_ID_index = all_colnames.index("gene_ID")
     transcript_ID_index = all_colnames.index("transcript_ID")
+    annot_gene_ID_index = all_colnames.index("annot_gene_id")
+    annot_transcript_ID_index = all_colnames.index("annot_transcript_id")
     gene_name_index = all_colnames.index("annot_gene_name")
     transcript_name_index = all_colnames.index("annot_transcript_name")
     status_indices = [i for i, s in enumerate(all_colnames) if 'status' in s]
@@ -277,12 +279,22 @@ def write_abundance_file(abundances, col_names, prefix, datasets, novelty_types,
                      [ curr_novelty[x] for x in novelty_type_cols] + \
                      transcript[first_dataset_index:]
 
+        alt_gene_name = prefix + "-gene_" + str(transcript[gene_ID_index])
+        alt_transcript_name = prefix + "-transcript_" + \
+                              str(transcript[transcript_ID_index])
+
+        if transcript[annot_gene_ID_index] == None:
+            transcript[annot_gene_ID_index] = alt_gene_name
+
         if transcript[gene_name_index] == None:
-            transcript[gene_name_index] = prefix + "-gene_" + \
-                                          str(transcript[gene_ID_index])
+            transcript[gene_name_index] = alt_gene_name
+
+        if transcript[annot_transcript_ID_index] == None:
+            transcript[annot_transcript_ID_index] = alt_transcript_name
+
         if transcript[transcript_name_index] == None:
-            transcript[transcript_name_index] = prefix + "-transcript_" + \
-                                            str(transcript[transcript_ID_index])
+            transcript[transcript_name_index] = alt_transcript_name
+
         for index in status_indices:
             if transcript[index] == None:
                 transcript[index] = "NOVEL"
