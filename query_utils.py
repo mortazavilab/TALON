@@ -182,12 +182,13 @@ def fetch_NIC_transcripts_with_gene_label(cursor, datasets):
     known_transcripts = [(x[0], x[1], "NIC_transcript") for x in cursor.fetchall()]
     return known_transcripts
 
-def count_observed_reads(cursor, dataset):
-    """ Count the number of observed reads for the provided dataset """
+def count_observed_reads(cursor, datasets):
+    """ Count the number of observed reads for the provided datasets """
 
+    datasets = format_for_IN(datasets)
     reads = cursor.execute(""" SELECT COUNT(obs_ID)
-                                   FROM observed WHERE dataset = ? """,
-                               [dataset]).fetchone()[0]
+                                   FROM observed WHERE dataset IN """ + \
+                           datasets).fetchone()[0]
     return reads
 
 def fetch_all_known_genes_detected(cursor, datasets):
@@ -254,14 +255,15 @@ def fetch_FSM_novel_transcripts(cursor, dataset):
     FSM_transcripts = [x[0] for x in cursor.fetchall()]
     return FSM_transcripts
 
-def fetch_novel_transcripts(cursor, dataset):
+def fetch_novel_transcripts(cursor, datasets):
     """ Fetch IDs of novel transcripts observed in the current dataset """
+    datasets = format_for_IN(datasets)
 
     query = """SELECT DISTINCT(transcript_ID) FROM observed
                    LEFT JOIN transcript_annotations AS ta ON ta.ID = observed.transcript_ID
                    WHERE (ta.attribute = 'transcript_status' AND ta.value = 'NOVEL')
-                   AND observed.dataset = ?;"""
-    cursor.execute(query, [dataset])
+                   AND observed.dataset IN """ + datasets
+    cursor.execute(query)
     transcripts = [x[0] for x in cursor.fetchall()]
     return transcripts
 

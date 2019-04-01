@@ -17,6 +17,8 @@ def get_args():
     parser = argparse.ArgumentParser(description=program_desc)
     parser.add_argument('--db', dest = 'database', metavar='FILE,', type = str,
         help='TALON database')
+    parser.add_argument('--groups', dest = 'groups', metavar='FILE,', type = str,
+        help='Optional: file of comma-delimited dataset groups to process together', default = None)
     parser.add_argument("--verbose", 
                         help = "Verbose mode: print out the counts in terminal",
                         action="store_true")
@@ -26,7 +28,7 @@ def get_args():
     args = parser.parse_args()
     return args
 
-def write_counts_file(cursor, outprefix, verbose = False):
+def write_counts_file(cursor, outprefix, datasets, verbose = False):
     """ Create a log file with the following columns:
             - dataset name
             - Number of reads annotated
@@ -52,8 +54,10 @@ def write_counts_file(cursor, outprefix, verbose = False):
     o.write("\t".join(columns) + "\n")
 
     # Get dataset names
-    cursor.execute(""" SELECT dataset_name FROM dataset """)
-    datasets = [ str(x[0]) for x in cursor.fetchall() ]
+    if datasets == None:
+        cursor.execute(""" SELECT dataset_name FROM dataset """)
+        datasets = [ str(x[0]) for x in cursor.fetchall() ]
+    
     for dataset in datasets:
         # Get number of reads in the dataset
         reads = qutils.count_observed_reads(cursor, dataset)
@@ -119,11 +123,24 @@ def write_counts_file(cursor, outprefix, verbose = False):
 
     o.close()
 
+def process_groups(group_file):
+    """ Read in a comma-delimited file of dataset groups and format them
+        as a list of lists """
+
+    datasets = []
+    with open(group_file, 'r') as f:
+        for line in f:
+            line = line.strip()
+            datasets.append(line.split(","))
+         
+    return datasets
+
 def main():
     options = get_args()
 
     # Make sure that the input database exists!
     database = options.database
+    groups = options.groups
     if not Path(database).exists():
         raise ValueError("Database file '%s' does not exist!" % database)
 
@@ -131,7 +148,12 @@ def main():
     conn.row_factory = sqlite3.Row
     cursor = conn.cursor()
 
-    write_counts_file(cursor, options.outprefix, options.verbose) 
+    if groups != None:
+        datasets = process_groups(groups)
+        write_counts_file(cursor, options.outprefix, datasets, options.verbose)
+
+    else:
+        write_counts_file(cursor, options.outprefix, None, options.verbose) 
     conn.close()
     
 
