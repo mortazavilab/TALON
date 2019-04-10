@@ -33,7 +33,7 @@ def handle_filtering(database, annot, observed, whitelist_file, dataset_file):
     if whitelist_file != None:
         whitelist = qutils.parse_whitelist(whitelist_file)
     else:
-        whitelist = qutils.fetch_all_transcript_gene_pairs(cursor, datasets)
+        whitelist = qutils.fetch_all_transcript_gene_pairs(cursor)
 
     if datasets != None:
         # Limit the whitelist to transcripts detected in the datasets
