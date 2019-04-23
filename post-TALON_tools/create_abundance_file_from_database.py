@@ -17,6 +17,7 @@ main_path = "/".join(script_dir.split("/")[0:-1])
 sys.path.append(main_path)
 import dstruct as dstruct
 import query_utils as qutils
+import talon as talon
 
 def getOptions():
     parser = OptionParser()
@@ -265,7 +266,7 @@ def write_abundance_file(abundances, col_names, prefix, n_places, datasets,
                      [ curr_novelty[x] for x in novelty_type_cols] + \
                      transcript[first_dataset_index:]
 
-        alt_gene_name, alt_transcript_name = construct_names(transcript[gene_ID_index], \
+        alt_gene_name, alt_transcript_name = talon.construct_names(transcript[gene_ID_index], \
                                                              transcript[transcript_ID_index], \
                                                              prefix, n_places)
 
@@ -289,18 +290,18 @@ def write_abundance_file(abundances, col_names, prefix, n_places, datasets,
     o.close()
     return
 
-def construct_names(gene_ID, transcript_ID, prefix, n_places):
-    """ Create a gene and transcript name using the TALON IDs.
-        The n_places variable indicates how many characters long the numeric
-        part of the name should be. """
+#def construct_names(gene_ID, transcript_ID, prefix, n_places):
+#    """ Create a gene and transcript name using the TALON IDs.
+#        The n_places variable indicates how many characters long the numeric
+#        part of the name should be. """
 
-    gene_ID_str = str(gene_ID).zfill(n_places)
-    gene_name = prefix + "-G" + gene_ID_str
+#    gene_ID_str = str(gene_ID).zfill(n_places)
+#    gene_name = prefix + "-G" + gene_ID_str
 
-    transcript_ID_str = str(transcript_ID).zfill(n_places)
-    transcript_name = prefix + "-T" + transcript_ID_str
+#    transcript_ID_str = str(transcript_ID).zfill(n_places)
+#    transcript_name = prefix + "-T" + transcript_ID_str
 
-    return gene_name, transcript_name
+#    return gene_name, transcript_name
 
 def get_gene_and_transcript_novelty_types(gene_ID, transcript_ID, novelty_type):
     """ Look up gene and transcript IDs in data structure to determine which types
