@@ -1478,22 +1478,24 @@ def identify_transcript(chrom, positions, strand, cursor, location_dict, edge_di
     update_vertex_2_gene(gene_ID, vertex_IDs, strand, vertex_2_gene)
  
     # For novel genes and transcripts, add names to novelty entries
+    talon_gene_name, talon_transcript_name = construct_names(gene_ID, 
+                                                             transcript_ID,
+                                                             run_info.idprefix,
+                                                             run_info.n_places)
     if len(gene_novelty) > 0:
         gene_novelty.append((gene_ID, run_info.idprefix, "TALON",
                                    "gene_status", "NOVEL"))
-        gene_name = run_info.idprefix + "-gene_%d" % gene_ID
         gene_novelty.append((gene_ID, run_info.idprefix, "TALON",
-                         "gene_name", gene_name))
+                         "gene_name", talon_gene_name))
         gene_novelty.append((gene_ID, run_info.idprefix, "TALON",
-                         "gene_id", gene_name))
+                         "gene_id", talon_gene_name))
     if len(transcript_novelty) > 0:
         transcript_novelty.append((transcript_ID, run_info.idprefix, "TALON",
                                    "transcript_status", "NOVEL"))
-        transcript_name = run_info.idprefix + "-transcript_%d" % transcript_ID
         transcript_novelty.append((transcript_ID, run_info.idprefix, "TALON",
-                         "transcript_name", transcript_name))
+                         "transcript_name", talon_transcript_name))
         transcript_novelty.append((transcript_ID, run_info.idprefix, "TALON",
-                         "transcript_id", transcript_name))
+                         "transcript_id", talon_transcript_name))
 
     # Add annotation entries for any novel exons
     exon_novelty = []
@@ -1520,6 +1522,19 @@ def identify_transcript(chrom, positions, strand, cursor, location_dict, edge_di
                    'end_delta': start_end_info["diff_3p"]}
     
     return annotations
+
+def construct_names(gene_ID, transcript_ID, prefix, n_places):
+    """ Create a gene and transcript name using the TALON IDs.
+        The n_places variable indicates how many characters long the numeric
+        part of the name should be. """
+
+    gene_ID_str = str(gene_ID).zfill(n_places)
+    gene_name = prefix + "-G" + gene_ID_str
+
+    transcript_ID_str = str(transcript_ID).zfill(n_places)
+    transcript_name = prefix + "-T" + transcript_ID_str
+
+    return gene_name, transcript_name
 
 def check_inputs(options):
     """ Checks the input options provided by the user and makes sure that
@@ -1594,6 +1609,7 @@ def init_run_info(cursor, genome_build, min_coverage = 0.9, min_identity = 0):
     run_info.build = genome_build
     run_info.min_coverage = min_coverage
     run_info.min_identity = min_identity
+    run_info.n_places = 11    
 
     # Fetch information from run_info table
     cursor.execute("""SELECT * FROM run_info""")
@@ -1834,24 +1850,27 @@ def identify_monoexon_transcript(chrom, positions, strand, cursor, location_dict
         # Add all novel vertices to vertex_2_gene now that we have the gene ID
         update_vertex_2_gene(gene_ID, vertex_IDs, strand, vertex_2_gene)
 
+        talon_gene_name, talon_transcript_name = construct_names(gene_ID,
+                                                             transcript_ID,
+                                                             run_info.idprefix,
+                                                             run_info.n_places)
+
         # Add novel gene annotation attributes
         if len(gene_novelty) > 0:
             gene_novelty.append((gene_ID, run_info.idprefix, "TALON",
                          "gene_status", "NOVEL"))
-            gene_name = run_info.idprefix + "-gene_%d" % gene_ID
             gene_novelty.append((gene_ID, run_info.idprefix, "TALON",
-                         "gene_name", gene_name))
+                         "gene_name", talon_gene_name))
             gene_novelty.append((gene_ID, run_info.idprefix, "TALON",
-                         "gene_id", gene_name))
+                         "gene_id", talon_gene_name))
 
         # Add novel transcript annotation attributes
         transcript_novelty.append((transcript_ID, run_info.idprefix, "TALON",
                                    "transcript_status", "NOVEL"))
-        transcript_name = run_info.idprefix + "-transcript_%d" % transcript_ID
         transcript_novelty.append((transcript_ID, run_info.idprefix, "TALON",
-                         "transcript_name", transcript_name))
+                         "transcript_name", talon_transcript_name))
         transcript_novelty.append((transcript_ID, run_info.idprefix, "TALON",
-                         "transcript_id", transcript_name))
+                         "transcript_id", talon_transcript_name))
 
         # Add annotation entries for any novel exons
         if e_novelty[0] == 1:
