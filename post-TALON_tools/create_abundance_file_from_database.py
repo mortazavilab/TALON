@@ -159,10 +159,7 @@ def fetch_abundances(database, datasets, annot, whitelist):
            4) Transcript ID (from annotation specified in 'annot', None otherwise)
            5) Gene name (from annotation specified in 'annot', None otherwise)
            6) Transcript name (from annotation specified in 'annot', None otherwise)
-           7) Gene annotation status (KNOWN/NOVEL)
-           8) Transcript annotation status (KNOWN/NOVEL)
-           9) number of exons in transcript
-           10+) Count of this transcript in each dataset in the database
+           7) number of exons in transcript
 
         Returns a list of tuples (one tuple per transcript)
     """
@@ -177,9 +174,7 @@ def fetch_abundances(database, datasets, annot, whitelist):
                        ta_id.value AS annot_transcript_id,
 	               ga_name.value AS annot_gene_name,
 	               ta_name.value AS annot_transcript_name,
-                       t.n_exons,
-	               ga_status.value AS gene_status,
-	               ta_status.value AS transcript_status"""
+                       t.n_exons"""
 
     conn = sqlite3.connect(database)
     conn.row_factory = sqlite3.Row
@@ -201,13 +196,7 @@ def fetch_abundances(database, datasets, annot, whitelist):
                 LEFT JOIN transcript_annotations ta_name ON t.transcript_ID = ta_name.ID 
 	            AND ta_name.annot_name = '%s' 
                     AND ta_name.attribute = 'transcript_name' 
-                LEFT JOIN gene_annotations ga_status ON t.gene_ID = ga_status.ID 
-	            AND ga_status.annot_name = '%s' 
-                    AND ga_status.attribute = 'gene_status' 
-                LEFT JOIN transcript_annotations ta_status ON t.transcript_ID = ta_status.ID 
-	            AND ta_status.annot_name = '%s' 
-                    AND ta_status.attribute = 'transcript_status'
-                """ % (annot, annot, annot, annot, annot, annot)
+                """ % (annot, annot, annot, annot)
 
     full_query = "\n".join([col_query, name_status_query, whitelist_string])
 
@@ -241,15 +230,13 @@ def fetch_abundances(database, datasets, annot, whitelist):
 
     return final_abundance, colnames
 
-def write_abundance_file(abundances, col_names, prefix, datasets, novelty_types, outfile):
-    """ Writes abundances to an output file """
+def write_abundance_file(abundances, col_names, prefix, n_places, datasets, 
+                         novelty_types, outfile):
+    """ Writes abundances and metadata to an output file """
 
     o = open(outfile, 'w')
     
-    novelty_type_cols = ["antisense_gene", "intergenic_gene", "ISM_transcript",
-                         "ISM_prefix_transcript", "ISM_suffix_transcript",
-                         "NIC_transcript", "NNC_transcript", "antisense_transcript",
-                         "intergenic_transcript", "genomic_transcript"]
+    novelty_type_cols = ["gene_novelty", "transcript_novelty", "ISM_subtype"]
 
     first_dataset_index = len(col_names) - len(datasets)
     first_colnames = col_names[0:first_dataset_index]
@@ -266,7 +253,6 @@ def write_abundance_file(abundances, col_names, prefix, datasets, novelty_types,
     annot_transcript_ID_index = all_colnames.index("annot_transcript_id")
     gene_name_index = all_colnames.index("annot_gene_name")
     transcript_name_index = all_colnames.index("annot_transcript_name")
-    status_indices = [i for i, s in enumerate(all_colnames) if 'status' in s]
     dataset_indices = [i for i,s in enumerate(all_colnames) if s in set(datasets)]
 
     # Iterate over abundances, fixing Nones, and write to file
@@ -279,9 +265,9 @@ def write_abundance_file(abundances, col_names, prefix, datasets, novelty_types,
                      [ curr_novelty[x] for x in novelty_type_cols] + \
                      transcript[first_dataset_index:]
 
-        alt_gene_name = prefix + "-gene_" + str(transcript[gene_ID_index])
-        alt_transcript_name = prefix + "-transcript_" + \
-                              str(transcript[transcript_ID_index])
+        alt_gene_name, alt_transcript_name = construct_names(transcript[gene_ID_index], \
+                                                             transcript[transcript_ID_index], \
+                                                             prefix, n_places)
 
         if transcript[annot_gene_ID_index] == None:
             transcript[annot_gene_ID_index] = alt_gene_name
@@ -295,9 +281,6 @@ def write_abundance_file(abundances, col_names, prefix, datasets, novelty_types,
         if transcript[transcript_name_index] == None:
             transcript[transcript_name_index] = alt_transcript_name
 
-        for index in status_indices:
-            if transcript[index] == None:
-                transcript[index] = "NOVEL"
         for index in dataset_indices:
             if transcript[index] == None:
                 transcript[index] = 0
@@ -306,32 +289,64 @@ def write_abundance_file(abundances, col_names, prefix, datasets, novelty_types,
     o.close()
     return
 
+def construct_names(gene_ID, transcript_ID, prefix, n_places):
+    """ Create a gene and transcript name using the TALON IDs.
+        The n_places variable indicates how many characters long the numeric
+        part of the name should be. """
+
+    gene_ID_str = str(gene_ID).zfill(n_places)
+    gene_name = prefix + "-G" + gene_ID_str
+
+    transcript_ID_str = str(transcript_ID).zfill(n_places)
+    transcript_name = prefix + "-T" + transcript_ID_str
+
+    return gene_name, transcript_name
+
 def get_gene_and_transcript_novelty_types(gene_ID, transcript_ID, novelty_type):
     """ Look up gene and transcript IDs in data structure to determine which types
         of novelty are present """
 
     curr_novel = {}
-    curr_novel["antisense_gene"] = "antisense_gene" \
-               if gene_ID in novelty_type.antisense_genes else "No"
-    curr_novel["intergenic_gene"] = "intergenic_gene" \
-               if gene_ID in novelty_type.intergenic_genes else "No"
-    curr_novel["ISM_transcript"] = "ISM_transcript" \
-               if transcript_ID in novelty_type.ISM_transcripts else "No"
-    curr_novel["ISM_prefix_transcript"] = "ISM_prefix_transcript" \
-               if transcript_ID in novelty_type.ISM_prefix else "No"
-    curr_novel["ISM_suffix_transcript"] = "ISM_suffix_transcript" \
-               if transcript_ID in novelty_type.ISM_suffix else "No"
-    curr_novel["NIC_transcript"] = "NIC_transcript" \
-               if transcript_ID in novelty_type.NIC_transcripts else "No"
-    curr_novel["NNC_transcript"] = "NNC_transcript" \
-               if transcript_ID in novelty_type.NNC_transcripts else "No"
-    curr_novel["antisense_transcript"] = "antisense_transcript" \
-               if transcript_ID in novelty_type.antisense_transcripts else "No"
-    curr_novel["intergenic_transcript"] = "intergenic_transcript" \
-               if transcript_ID in novelty_type.intergenic_transcripts else "No"
-    curr_novel["genomic_transcript"] = "genomic_transcript" \
-               if transcript_ID in novelty_type.genomic_transcripts else "No"
 
+    # Look for gene type
+    if gene_ID in novelty_type.antisense_genes:
+        curr_novel["gene_novelty"] = "Antisense"
+    elif gene_ID in novelty_type.intergenic_genes:
+        curr_novel["gene_novelty"] = "Intergenic"
+    elif gene_ID in novelty_type.known_genes:
+        curr_novel["gene_novelty"] = "Known"
+    else:
+        print("Warning: Could not locate novelty type for gene %s" % gene_ID)
+
+    # Look for transcript type
+    if transcript_ID in novelty_type.ISM_transcripts:
+        curr_novel["transcript_novelty"] = "ISM"
+    elif transcript_ID in novelty_type.NIC_transcripts:
+        curr_novel["transcript_novelty"] = "NIC"
+    elif transcript_ID in novelty_type.NNC_transcripts:
+        curr_novel["transcript_novelty"] = "NNC"
+    elif transcript_ID in novelty_type.antisense_transcripts:
+        curr_novel["transcript_novelty"] = "Antisense"
+    elif transcript_ID in novelty_type.intergenic_transcripts:
+        curr_novel["transcript_novelty"] = "Intergenic"
+    elif transcript_ID in novelty_type.genomic_transcripts:
+        curr_novel["transcript_novelty"] = "Genomic"
+    elif transcript_ID in novelty_type.known_transcripts:
+        curr_novel["transcript_novelty"] = "Known" 
+    else:
+        print("Warning: Could not locate novelty type for transcript %s" % transcript_ID)
+
+    # Look for ISM subtype
+    if transcript_ID in novelty_type.ISM_prefix and \
+       transcript_ID in novelty_type.ISM_suffix:
+        curr_novel["ISM_subtype"] = "Both"
+    elif transcript_ID in novelty_type.ISM_prefix:
+        curr_novel["ISM_subtype"] = "Prefix"
+    elif transcript_ID in novelty_type.ISM_suffix:
+        curr_novel["ISM_subtype"] = "Suffix"
+    else:
+        curr_novel["ISM_subtype"] = "None"
+               
     return curr_novel
 
 def check_annot_validity(annot, database):
@@ -417,7 +432,8 @@ def main():
     novelty_type = make_novelty_type_struct(database, datasets)
     abundances, colnames = fetch_abundances(database, datasets, annot, transcript_whitelist)
     prefix = fetch_naming_prefix(database)
-    write_abundance_file(abundances, colnames, prefix, datasets, novelty_type, outfile)
+    n_places = 11
+    write_abundance_file(abundances, colnames, prefix, n_places, datasets, novelty_type, outfile)
 
 if __name__ == '__main__':
     main()
