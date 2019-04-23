@@ -1609,7 +1609,6 @@ def init_run_info(cursor, genome_build, min_coverage = 0.9, min_identity = 0):
     run_info.build = genome_build
     run_info.min_coverage = min_coverage
     run_info.min_identity = min_identity
-    run_info.n_places = 11    
 
     # Fetch information from run_info table
     cursor.execute("""SELECT * FROM run_info""")
