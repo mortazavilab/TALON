@@ -412,6 +412,17 @@ def fetch_naming_prefix(database):
     conn.close()
     return prefix
 
+def fetch_n_places(database):
+    """ Get length of name field from the database run_info table """
+    conn = sqlite3.connect(database)
+    conn.row_factory = sqlite3.Row
+    cursor = conn.cursor()
+    cursor.execute("SELECT value FROM run_info WHERE item = 'n_places'")
+    n_places = cursor.fetchone()[0]
+
+    conn.close()
+    return int(n_places)
+
 def main():
     options = getOptions()
     database = options.database
@@ -432,7 +443,7 @@ def main():
     novelty_type = make_novelty_type_struct(database, datasets)
     abundances, colnames = fetch_abundances(database, datasets, annot, transcript_whitelist)
     prefix = fetch_naming_prefix(database)
-    n_places = 11
+    n_places = fetch_n_places(database)
     write_abundance_file(abundances, colnames, prefix, n_places, datasets, novelty_type, outfile)
 
 if __name__ == '__main__':
