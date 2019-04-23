@@ -186,9 +186,9 @@ def count_observed_reads(cursor, datasets):
     """ Count the number of observed reads for the provided datasets """
 
     datasets = format_for_IN(datasets)
-    reads = cursor.execute(""" SELECT COUNT(obs_ID)
-                                   FROM observed WHERE dataset IN """ + \
-                           datasets).fetchone()[0]
+    query = "SELECT COUNT(obs_ID) FROM observed WHERE dataset IN " + datasets
+    cursor.execute(query)
+    reads = cursor.fetchone()[0]
     return reads
 
 def fetch_all_known_genes_detected(cursor, datasets):
@@ -447,7 +447,9 @@ def parse_datasets(dataset_file, cursor):
 def format_for_IN(l):
     """ Converts input to string that can be used for IN database query """
     
-    if type(l) is not list:
+    if type(l) is tuple:
         l = list(l)
+    if type(l) is str:
+        l = [l]
 
     return "(" + ','.join(['"' + str(x) + '"' for x in l]) + ")" 
