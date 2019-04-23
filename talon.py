@@ -1529,10 +1529,10 @@ def construct_names(gene_ID, transcript_ID, prefix, n_places):
         part of the name should be. """
 
     gene_ID_str = str(gene_ID).zfill(n_places)
-    gene_name = prefix + "-G" + gene_ID_str
+    gene_name = prefix + "G" + gene_ID_str
 
     transcript_ID_str = str(transcript_ID).zfill(n_places)
-    transcript_name = prefix + "-T" + transcript_ID_str
+    transcript_name = prefix + "T" + transcript_ID_str
 
     return gene_name, transcript_name
 
