@@ -18,6 +18,7 @@ sys.path.append(main_path)
 import dstruct as dstruct
 import query_utils as qutils
 import talon as talon
+import length_utils as lu
 
 def getOptions():
     parser = OptionParser()
@@ -29,6 +30,10 @@ def getOptions():
         help = """Which annotation version to use. Will determine which
                   annotation transcripts are considered known or novel
                   relative to. Note: must be in the TALON database.""",
+        type = "string")
+
+    parser.add_option("--build", "-b", dest = "build",
+        help = "Genome build to use. Note: must be in the TALON database.",
         type = "string")
 
     parser.add_option("--filter", dest ="filtering", action='store_true',
@@ -232,7 +237,7 @@ def fetch_abundances(database, datasets, annot, whitelist):
     return final_abundance, colnames
 
 def write_abundance_file(abundances, col_names, prefix, n_places, datasets, 
-                         novelty_types, outfile):
+                         novelty_types, transcript_lengths, outfile):
     """ Writes abundances and metadata to an output file """
 
     o = open(outfile, 'w')
@@ -242,7 +247,7 @@ def write_abundance_file(abundances, col_names, prefix, n_places, datasets,
     first_dataset_index = len(col_names) - len(datasets)
     first_colnames = col_names[0:first_dataset_index]
     dataset_colnames = col_names[first_dataset_index:]
-    all_colnames = first_colnames + novelty_type_cols + dataset_colnames
+    all_colnames = first_colnames + ["length"] + novelty_type_cols + dataset_colnames
     o.write("\t".join(all_colnames) + "\n")
 
     abundance_list = [list(elem) for elem in abundances]
@@ -263,6 +268,7 @@ def write_abundance_file(abundances, col_names, prefix, n_places, datasets,
                                                              novelty_types)
         transcript = list(transcript)
         transcript = transcript[0:first_dataset_index] + \
+                     [transcript_lengths[transcript[transcript_ID_index]]] + \
                      [ curr_novelty[x] for x in novelty_type_cols] + \
                      transcript[first_dataset_index:]
 
@@ -290,18 +296,6 @@ def write_abundance_file(abundances, col_names, prefix, n_places, datasets,
     o.close()
     return
 
-#def construct_names(gene_ID, transcript_ID, prefix, n_places):
-#    """ Create a gene and transcript name using the TALON IDs.
-#        The n_places variable indicates how many characters long the numeric
-#        part of the name should be. """
-
-#    gene_ID_str = str(gene_ID).zfill(n_places)
-#    gene_name = prefix + "-G" + gene_ID_str
-
-#    transcript_ID_str = str(transcript_ID).zfill(n_places)
-#    transcript_name = prefix + "-T" + transcript_ID_str
-
-#    return gene_name, transcript_name
 
 def get_gene_and_transcript_novelty_types(gene_ID, transcript_ID, novelty_type):
     """ Look up gene and transcript IDs in data structure to determine which types
@@ -424,6 +418,29 @@ def fetch_n_places(database):
     conn.close()
     return int(n_places)
 
+def get_transcript_lengths(database, build):
+    """ Read the transcripts from the database. Then compute the lengths. 
+        Store in a dictionary """
+
+    transcript_lengths = {} 
+
+    conn = sqlite3.connect(database)
+    conn.row_factory = sqlite3.Row
+    cursor = conn.cursor()
+
+    # Get the exon lengths
+    exon_lens = lu.get_all_exon_lengths(cursor, build)
+
+    cursor.execute("SELECT * FROM transcripts")
+    for transcript_row in cursor.fetchall():
+        transcript_ID = transcript_row['transcript_ID']
+        length = lu.get_transcript_length(transcript_row, exon_lens)
+        transcript_lengths[transcript_ID] = length
+
+    conn.close() 
+    return transcript_lengths
+
+
 def main():
     options = getOptions()
     database = options.database
@@ -439,13 +456,16 @@ def main():
     # Determine which transcripts to include
     transcript_whitelist = handle_filtering(options)
 
+    # Get transcript length dict
+    transcript_lengths = get_transcript_lengths(database, options.build)
+
     # Create the abundance file
     datasets = datasets = fetch_dataset_list(database)
     novelty_type = make_novelty_type_struct(database, datasets)
     abundances, colnames = fetch_abundances(database, datasets, annot, transcript_whitelist)
     prefix = fetch_naming_prefix(database)
     n_places = fetch_n_places(database)
-    write_abundance_file(abundances, colnames, prefix, n_places, datasets, novelty_type, outfile)
+    write_abundance_file(abundances, colnames, prefix, n_places, datasets, novelty_type, transcript_lengths, outfile)
 
 if __name__ == '__main__':
     main()
