@@ -93,9 +93,10 @@ The columns in the abundance file are as follows:
 5. Gene name from your annotation of choice (makes the file a bit more human-readable!). If the transcript is novel relative to that annotation, this will be the TALON-derived name.
 6. Transcript name from your annotation of choice. If the transcript is novel relative to that annotation, this will be the TALON-derived name.	
 7. Number of exons in the transcript
-8. Gene novelty (Known, Antisense, Intergenic)	
-9. Transcript status (Known, ISM, NIC, NNC, Antisense, Intergenic)
-10. ISM subtype (Both, Prefix, Suffix, None)  
+8. Length of transcript model (basepairs)
+9. Gene novelty (Known, Antisense, Intergenic)	
+10. Transcript status (Known, ISM, NIC, NNC, Antisense, Intergenic)
+11. ISM subtype (Both, Prefix, Suffix, None)  
 **---------------------------- Remaining columns -----------------------------**  
 One column per dataset, with a count indicating how many times the current transcript was observed in that dataset. 
 
