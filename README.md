@@ -66,6 +66,9 @@ Options:
                         Which annotation version to use. Will determine which
                         annotation transcripts are considered known or novel
                         relative to. Note: must be in the TALON database.
+  -b BUILD, --build=BUILD
+                        Genome build to use. Note: must be in the TALON
+                        database.
   --filter              If this option is set, the transcripts in the
                         database will be filtered prior to GTF creation
                         (for more information, see
