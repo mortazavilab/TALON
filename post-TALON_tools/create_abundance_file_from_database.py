@@ -445,7 +445,13 @@ def main():
     options = getOptions()
     database = options.database
     annot = options.annot
+    build = options.build
     outfile = create_outname(options)
+
+    check_annot_validity(annot, database)
+
+    if build == None:
+        raise ValueError("Please provide a valid genome build name")
 
     check_annot_validity(annot, database)
 
@@ -457,7 +463,7 @@ def main():
     transcript_whitelist = handle_filtering(options)
 
     # Get transcript length dict
-    transcript_lengths = get_transcript_lengths(database, options.build)
+    transcript_lengths = get_transcript_lengths(database, build)
 
     # Create the abundance file
     datasets = datasets = fetch_dataset_list(database)
