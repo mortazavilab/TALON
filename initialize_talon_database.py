@@ -89,7 +89,7 @@ def init_run_info(database, idprefix, min_length, cutoff_5p, cutoff_3p):
     c.execute('INSERT INTO run_info ' + cols + ' VALUES ' + '(?,?)',
                ('min_length', min_length))
     c.execute('INSERT INTO run_info ' + cols + ' VALUES ' + '(?,?)',
-               ('n_places', 11))
+               ('n_places', 9))
 
     conn.commit()
     conn.close()
