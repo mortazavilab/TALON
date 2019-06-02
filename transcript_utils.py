@@ -14,6 +14,8 @@ def compute_alignment_coverage(CIGAR):
     unaligned_bases = 0.0
     ops, counts = split_cigar(CIGAR)
     for op,ct in zip(ops, counts):
+        if op == "N":
+            continue
         if op == "H" or op == "S":
             unaligned_bases += ct
         total_bases += ct
