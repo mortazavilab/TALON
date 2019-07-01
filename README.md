@@ -9,7 +9,7 @@ To learn more, please see our preprint in BioRxiv: https://www.biorxiv.org/conte
 # Installation
 Newer version of TALON (v4.0+) are designed to be run with Python 3.7 (tested specifically with Python 3.7.2). Older versions of TALON use Python 2.7.
 
-To install TALON, simply download the files using Github's "Download ZIP" button, then unzip them in the directory where you would like to store the program. Alternately, you can download a specific version of the program from the Releases tab. The TALON scripts can now be run directly from the command line- just include the path.
+To install TALON, simply download the files using Github's "Download ZIP" button, then unzip them in the directory where you would like to store the program. Alternately, you can download a specific version of the program from the Releases tab. The TALON scripts are run directly from the command line- just include the path.
 
 # How to run
 
