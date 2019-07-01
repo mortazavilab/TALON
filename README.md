@@ -14,7 +14,7 @@ To install TALON, simply download the files using Github's "Download ZIP" button
 # How to run
 
 ## Initializing a TALON database
-The first step in using TALON is to initialize a SQLite database from the GTF annotation of your choice (i.e. GENCODE). This step is done using initialize_talon_database.py, and only needs to be performed once.  
+The first step in using TALON is to initialize a SQLite database from the GTF annotation of your choice (i.e. GENCODE). This step is done using initialize_talon_database.py, and only needs to be performed once. Keep track of the build and annotation names you choose, as these will be used downstream when running TALON and its utilities.
 
 ```
 python initialize_talon_database.py --h
