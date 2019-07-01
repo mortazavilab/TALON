@@ -1,7 +1,10 @@
+<img align="left" width="400" src="diagram.png">
 TALON is a Python program for identifying known and novel genes/isoforms
 in long read transcriptome data sets. TALON is technology-agnostic in that it
 works from mapped SAM files, allowing data from different sequencing platforms
 (i.e. PacBio and Oxford Nanopore) to be analyzed side by side. 
+
+To learn more, please see our preprint in BioRxiv: https://www.biorxiv.org/content/10.1101/672931v1
 
 # Installation
 Newer version of TALON (v4.0+) are designed to be run with Python 3.7 (tested specifically with Python 3.7.2). Older versions of TALON use Python 2.7.
@@ -31,7 +34,7 @@ Options:
 ```
 
 ## Running TALON
-Now that you've initilialized your database, you're ready to annotate long read datasets using TALON. 
+Now that you've initilialized your database, you're ready to annotate long read datasets using TALON. The input database is modified in place to track and quantify transcripts in the provided dataset(s).
 
 ```
 python talon.py --h
@@ -49,7 +52,7 @@ Options:
   --o OUTPREFIX         Prefix for output files
 ```
 
-## Post-TALON utilities
+## TALON utilities
 
 ### Obtaining an abundance matrix from your TALON database
 If you would like to extract an abundance matrix for your TALON-processed datasets, use the script *create_abundance_file_from_database.py* from the post-TALON_tools directory.
