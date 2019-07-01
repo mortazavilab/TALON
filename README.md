@@ -54,6 +54,35 @@ Options:
 
 ## TALON utilities
 
+### Filtering your transcriptome
+If you have run TALON on biological replicates or other datasets you would like to leverage for quality control, you might want to obtain a filtered list of transcripts that are 1) known, or 2) reproducible in at least two of your datasets. To get such a list, run the following TALON utility:
+```
+python post-TALON_tools/filter_talon_transcripts.py --h
+
+Options:
+  -h, --help            show this help message and exit
+  --db=FILE             TALON database
+  -a ANNOT, --annot=ANNOT
+                        The name of the annotation version to use. 
+                        Will determine which annotation transcripts 
+                        are considered known or novel relative to. 
+                        Note: must be in the TALON database.
+  -p FILE, --pairings=FILE
+                        Optional: A file indicating which datasets 
+                        should be considered together when filtering 
+                        novel transcripts (i.e. biological replicates). 
+                        Format: Each line of the file constitutes a group, 
+                        with member datasets separated by commas. 
+                        If no file is provided, then novel transcripts 
+                        appearing in any two datasets will be accepted.
+  --o=FILE              Outfile name
+```
+The columns in the resulting output file are:
+1. TALON gene ID (an integer). This is the same type of ID found in column 1 of TALON abundance files. 
+2. TALON transcript ID (an integer). This is the same type of ID found in column 2 of TALON abundance files. 
+3. Novelty category designation of transcript.
+
+
 ### Obtaining an abundance matrix from your TALON database
 If you would like to extract an abundance matrix for your TALON-processed datasets, use the script *create_abundance_file_from_database.py* from the post-TALON_tools directory.
 
