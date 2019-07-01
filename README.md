@@ -132,5 +132,34 @@ The columns in the abundance file are as follows:
 **---------------------------- Remaining columns -----------------------------**  
 One column per dataset, with a count indicating how many times the current transcript was observed in that dataset. 
 
+### Obtaining a custom GTF transcriptome annotation from a TALON database
+ 
+```
+python post-TALON_tools/create_GTF_from_database.py --h
+
+Options:
+  -h, --help            show this help message and exit
+  --db=FILE             TALON database
+  -b BUILD, --build=BUILD
+                        Genome build to use. Note: must be in the TALON
+                        database.
+  -a ANNOT, --annot=ANNOT
+                        Which annotation version to use. Will determine which
+                        annotation transcripts are considered known or novel
+                        relative to. Note: must be in the TALON database.
+  --whitelist=FILE      Whitelist file of transcripts to include in the
+                        output. First column should be TALON gene ID,
+                        second column should be TALON transcript ID. 
+                        Other columns are ignored.
+  --observed            If this option is set, the GTF file will only
+                        include transcripts that were observed in at least one
+                        dataset (redundant if dataset file provided).
+  -d FILE, --datasets=FILE
+                        Optional: A file indicating which datasets should be
+                        included (one dataset name per line). Default is to
+                        include                   all datasets.
+  --o=FILE              Prefix for output GTF
+```
+
 # License
 MIT, see LICENSE
