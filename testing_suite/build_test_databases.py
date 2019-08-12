@@ -72,6 +72,8 @@ try:
         "--f", "input_files/intergenic_GM12878/config.csv",
         "--db", "scratch/chr22.db",
         "--build", "hg38",
+        "--cov", "0",
+        "--identity", "0",
         "--o", "scratch/intergenic_GM12878" ])
 except Exception as e:
     print(e)
@@ -84,6 +86,8 @@ try:
         "--f", "input_files/chr11_and_Tcf3/config.csv",
         "--db", "scratch/chr11_and_Tcf3.db", 
         "--build", "mm10",
+        "--cov", "0",
+        "--identity", "0",
         "--o", "scratch/chr11_and_Tcf3" ])
 except Exception as e:
     print(e)
