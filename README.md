@@ -16,7 +16,7 @@ To install TALON, simply download the files using Github's "Download ZIP" button
 ## Initializing a TALON database
 The first step in using TALON is to initialize a SQLite database from the GTF annotation of your choice (i.e. GENCODE). This step is done using initialize_talon_database.py, and only needs to be performed once. Keep track of the build and annotation names you choose, as these will be used downstream when running TALON and its utilities.
 
-NOTE: The GTF file you use must contain genes, transcripts, and exons. If the file does not contain explicit gene entries, key tables of the database will be empty and you will experience problems in the downstream analysis.
+NOTE: The GTF file you use must contain genes, transcripts, and exons. If the file does not contain explicit gene and/or transcript entries, key tables of the database will be empty and you will experience problems in the downstream analysis. We have included a script, reformat_gtf.py, that can convert this type of GTF into the proper format.
 
 ```
 python initialize_talon_database.py --h
