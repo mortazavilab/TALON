@@ -250,7 +250,7 @@ def create_gtf(database, annot, genome_build, whitelist, outfile):
                                             copy.copy(gene_annotation_dict),
                                        copy.copy(transcript_annotation_dict))
             o.write(transcript_GTF_line + "\n")
-            if transcript_entry["n_exons"] != None:
+            if transcript_entry["n_exons"] != 1:
                 transcript_edges = [str(transcript_entry["start_exon"])] + \
                                    str(transcript_entry["jn_path"]).split(",")+ \
                                    [str(transcript_entry["end_exon"])]
