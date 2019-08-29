@@ -12,6 +12,7 @@ Newer version of TALON (v4.0+) are designed to be run with Python 3.7 (tested sp
 To install TALON, simply download the files using Github's "Download ZIP" button, then unzip them in the directory where you would like to store the program. Alternately, you can download a specific version of the program from the Releases tab. The TALON scripts are run directly from the command line- just include the path.
 
 # How to run
+For a small, self-contained example with all necessary files included, see https://github.com/dewyman/TALON/tree/master/example
 
 ## Initializing a TALON database
 The first step in using TALON is to initialize a SQLite database from the GTF annotation of your choice (i.e. GENCODE). This step is done using initialize_talon_database.py, and only needs to be performed once. Keep track of the build and annotation names you choose, as these will be used downstream when running TALON and its utilities.
