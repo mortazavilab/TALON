@@ -56,10 +56,7 @@ o = opt.outprefix
 filtering = opt.filtering
 pairings = opt.pairings_file
 create_abundance_file_arguments = (
-    "python {}/create_abundance_file_from_database.py --db {} "
-    "--annot {} "
-    "--build {} "
-    "--o {}".format(tpath, db, annot, build, o))
+    "--db {} --annot {} --build {} --o {}".format(tpath, db, annot, build, o))
 
 if filtering:
 	create_abundance_file_arguments+= ' --filter'
