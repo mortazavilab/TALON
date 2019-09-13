@@ -49,7 +49,9 @@ setup(
         "Topic :: Scientific/Engineering :: Bio-Informatics"
     ],
     python_requires=">=3.5",  # pathlib is python3. Python <=3.4 is deprecated
-    install_requires=[],
+    install_requires=[
+        "pandas"
+    ],
     entry_points={
         "console_scripts": [
             'talon=talon.talon:main',
