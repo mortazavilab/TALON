@@ -23,9 +23,6 @@ from setuptools import find_packages, setup
 with open("README.md", "r") as readme_file:
     LONG_DESCRIPTION = readme_file.read()
 
-with open("requirements.txt") as requirements_file:
-    REQUIREMENTS = requirements_file.readlines()
-
 setup(
     name="talon",
     version="4.3.0-dev",
@@ -51,7 +48,9 @@ setup(
         "Topic :: Scientific/Engineering :: Bio-Informatics"
     ],
     python_requires=">=3.7",  # As mentioned in README
-    install_requires=REQUIREMENTS,
+    install_requires=[
+        "pandas"
+    ],
     entry_points={
         "console_scripts": [
             'talon=talon.talon:main',
