@@ -6,9 +6,6 @@
 
 from optparse import OptionParser
 import sqlite3
-import warnings
-import sys
-import os
 from pathlib import Path
 
 def getOptions():
