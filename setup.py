@@ -23,6 +23,8 @@ from setuptools import find_packages, setup
 with open("README.md", "r") as readme_file:
     LONG_DESCRIPTION = readme_file.read()
 
+with open("requirements.txt") as requirements_file:
+    REQUIREMENTS = requirements_file.readlines()
 
 setup(
     name="talon",
@@ -48,18 +50,15 @@ setup(
         "License :: OSI Approved :: MIT License",
         "Topic :: Scientific/Engineering :: Bio-Informatics"
     ],
-    python_requires=">=3.5",  # pathlib is python3. Python <=3.4 is deprecated
-    install_requires=[
-        "pandas"
-    ],
+    python_requires=">=3.7",  # As mentioned in README
+    install_requires=REQUIREMENTS,
     entry_points={
         "console_scripts": [
             'talon=talon.talon:main',
-            'talon_initialize_database='
-            'talon.initialize_talon_database.py:main',
+            'talon_initialize_database=talon.initialize_talon_database.py:main',
             'talon_filter_transcripts=talon.post.filter_talon_transcripts:main',
-            'talon_create_GTF_ubundance_from_database=talon.post.create_GTF_abundance_from_dabase'
-
+            'talon_create_abundance_file_from_database=talon.post.create_abundance_from_database:main',
+            'talon_create_GTF_from_database=talon.post.create_GTF_from_database:main',
         ]
     }
 )

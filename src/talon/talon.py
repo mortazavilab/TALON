@@ -10,13 +10,13 @@ import argparse
 from functools import reduce
 import sqlite3
 import sys
-import dstruct
+from . import dstruct
 import operator
 #import os
 from pathlib import Path
 import warnings
-import transcript_utils as tutils
-import query_utils as qutils
+from . import transcript_utils as tutils
+from . import query_utils as qutils
 #talon_path = (os.path.abspath(__file__))
 #print(sys.path)
 #main_path = "/".join(talon_path.split("/")[0:-2])
