@@ -37,6 +37,7 @@ setup(
     zip_safe=False,
     packages=find_packages('src'),
     package_dir={'': 'src'},
+    package_data={'talon.post': ["r_scripts/*.R"]},
     url="https://github.com/dewyman/TALON",
     classifiers=[
         "Programming Language :: Python :: 3 :: Only",
@@ -56,7 +57,8 @@ setup(
             'talon_filter_transcripts=talon.post.filter_talon_transcripts:main',
             'talon_create_abundance_file_from_database=talon.post.create_abundance_from_database:main',
             'talon_create_GTF_from_database=talon.post.create_GTF_from_database:main',
-            'talon_reformat_gtf=talon.reformat_gtf:main'
+            'talon_reformat_gtf=talon.reformat_gtf:main',
+            'talon_generate_report=talon.post.generate_talon_report:main'
         ]
     }
 )
