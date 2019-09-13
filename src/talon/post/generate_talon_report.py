@@ -8,7 +8,11 @@ R_SCRIPT_FILE = Path(__file__).parent / Path("r_scripts") / Path(
 
 def main():
     args = ["Rscript", str(R_SCRIPT_FILE)] + sys.argv[1:]
-    subprocess.run(args, stdout=sys.stdout, stderr=sys.stderr)
+    try:
+        subprocess.run(args, stdout=sys.stdout, stderr=sys.stderr)
+    except FileNotFoundError as e:
+        print("This is a wrapper command for an R script. "
+              "Do you have GNU R installed?\n" + str(e))
 
 
 if __name__ == "__main__":
