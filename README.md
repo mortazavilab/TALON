@@ -11,7 +11,7 @@ Newer version of TALON (v4.0+) are designed to be run with Python 3.7 (tested sp
 
 To install TALON, simply download the files using Github's "Download ZIP" button, then unzip them in the directory where you would like to store the program. Alternately, you can download a specific version of the program from the Releases tab.
 Go to the directory and run `pip install .`. This will install TALON. You can now run the commands from anywhere.
-NOTE: Talon versions 4.2 and lower are not installable. Check the README of those releases to see how you can run the scripts from the directory.
+NOTE: Talon versions 4.2 and lower are not installable. Check the README of those releases to see how you can run the scripts from the install directory.
 
 # How to run
 For a small, self-contained example with all necessary files included, see https://github.com/dewyman/TALON/tree/master/example
@@ -91,7 +91,7 @@ The columns in the resulting output file are:
 
 
 ### Obtaining an abundance matrix from your TALON database
-If you would like to extract an abundance matrix for your TALON-processed datasets, use the tool *talon_create_abundance_file_from_database* from the post-TALON_tools directory.
+If you would like to extract an abundance matrix for your TALON-processed datasets, use the tool *talon_create_abundance_file_from_database*.
 
 ```
 talon_create_abundance_file_from_database --h
