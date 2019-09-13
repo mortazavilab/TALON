@@ -3,7 +3,6 @@
 language: python
 
 env:
-  - PY_VERSION="3.6"
   - PY_VERSION="3.7"
 
 services:
