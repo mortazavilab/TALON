@@ -54,7 +54,7 @@ setup(
     entry_points={
         "console_scripts": [
             'talon=talon.talon:main',
-            'talon_initialize_database=talon.initialize_talon_database.py:main',
+            'talon_initialize_database=talon.initialize_talon_database:main',
             'talon_filter_transcripts=talon.post.filter_talon_transcripts:main',
             'talon_create_abundance_file_from_database=talon.post.create_abundance_from_database:main',
             'talon_create_GTF_from_database=talon.post.create_GTF_from_database:main',
