@@ -11,6 +11,7 @@ Newer version of TALON (v4.0+) are designed to be run with Python 3.7 (tested sp
 
 To install TALON, simply download the files using Github's "Download ZIP" button, then unzip them in the directory where you would like to store the program. Alternately, you can download a specific version of the program from the Releases tab.
 Go to the directory and run `pip install .`. This will install TALON. You can now run the commands from anywhere.
+NOTE: Talon versions 4.2 and lower are not installable. Check the README of those releases to see how you can run the scripts from the directory.
 
 # How to run
 For a small, self-contained example with all necessary files included, see https://github.com/dewyman/TALON/tree/master/example
@@ -48,7 +49,7 @@ Usage: talon [options]
 Options:
 -h, --help            Show help message and exit
 --f                   Comma-delimited dataset config file providing sam files for TALON to run on, as well as metadata that   will be tracked in the dataset table. The required format is: dataset name, sample description, platform, sam file (full path).
-  --db FILE,            TALON database. Created using talon_initialize_database
+  --db FILE,            TALON database. Created using talon_initialize_database.
   --build STRING,       Genome build (i.e. hg38) to use. Must be in the
                         database.
   --cov, -c             Minimum alignment coverage in order to use a SAM entry. Default = 0.9
