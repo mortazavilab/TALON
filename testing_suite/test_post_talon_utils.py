@@ -1,10 +1,7 @@
 import pytest
 import subprocess
-import sys
-sys.path.append("../")
-sys.path.append("../post-TALON_tools")
-import post_utils as putils
-import query_utils as qutils
+
+from talon import query_utils as qutils
 
 @pytest.mark.integration
 

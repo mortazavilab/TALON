@@ -1,8 +1,5 @@
 import pytest
-import sys
-import sqlite3
-sys.path.append("..")
-import talon as talon
+from talon import talon
 @pytest.mark.dbunit
 
 class TestAllSJsKnown(object):
