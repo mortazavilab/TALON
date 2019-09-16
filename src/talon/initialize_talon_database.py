@@ -9,10 +9,9 @@
 import sqlite3
 from sqlite3 import Error
 from optparse import OptionParser
-import gene as Gene
-import transcript as Transcript
-import edge as Edge
-import warnings
+from . import gene as Gene
+from . import transcript as Transcript
+from . import edge as Edge
 import os
 import time
 

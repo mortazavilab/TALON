@@ -1,7 +1,5 @@
 import pytest
-import sys
-sys.path.append("..")
-import transcript_utils as tu
+from talon import transcript_utils as tu
 @pytest.mark.unit
 
 class TestSplitMD(object):

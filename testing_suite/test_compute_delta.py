@@ -1,7 +1,5 @@
 import pytest
-import sys
-sys.path.append("..")
-import talon as talon
+from talon import talon
 @pytest.mark.unit
 
 class TestComputeDelta(object):

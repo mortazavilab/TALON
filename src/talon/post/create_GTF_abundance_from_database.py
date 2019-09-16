@@ -8,6 +8,10 @@ from optparse import OptionParser
 import subprocess
 import os
 import sys
+import shlex
+from .create_abundance_file_from_database import main as create_abundance_file_main
+from .filter_talon_transcripts import main as filter_transcripts_main
+from .create_GTF_from_database import main as gtf_from_db_main
 
 parser = OptionParser(description="""A script to generate a GTF and abundance file
 							with the same filtering options.""")
@@ -51,40 +55,36 @@ build = opt.build
 o = opt.outprefix
 filtering = opt.filtering
 pairings = opt.pairings_file
-cmd = """python {}/create_abundance_file_from_database.py --db {} 
-	   		--annot {} 
-	   		--build {} 
-	   		--o {}""".format(tpath, db, annot, build, o)
+create_abundance_file_arguments = (
+    "--db {} --annot {} --build {} --o {}".format(tpath, db, annot, build, o))
 
 if filtering:
-	cmd+=' --filter'
+	create_abundance_file_arguments+= ' --filter'
 	if pairings != None:
-		cmd+=' --pairings {}'.format(pairings)
-# print(cmd)
-subprocess.run(cmd.split())
+		create_abundance_file_arguments+= ' --pairings {}'.format(pairings)
+
+# TODO: Call a function with argument instead of using argv and calling main
+sys.argv = ["create_abundance_file_from_database.py"] + shlex.split(
+	create_abundance_file_arguments)
+create_abundance_file_main()
 
 # make whitelist file for GTF
 if filtering:
 	outfile = o+'_whitelist'
-	cmd = """python {}/filter_talon_transcripts.py 
-				--db {} 
-				--annot {} 
-				--o {}""".format(tpath, db, annot, outfile)
+	filter_arguments = "--db {} --annot {} --o {}".format(
+		tpath, db, annot, outfile)
 	if pairings != None:
-		cmd+=' --pairings {}'.format(pairings)
-	# print(cmd)
-	subprocess.run(cmd.split())
+		filter_arguments+=' --pairings {}'.format(pairings)
+	sys.argv = ["filter_talon_transcripts.py"] + shlex.split(filter_arguments)
+	filter_transcripts_main()
 
 # make GTF
-cmd = """python {}/create_GTF_from_database.py 
-			--db {} 
-			--build {} 
-			--annot {} 
-			--o {}""".format(tpath, db, build, annot, o)
+gtf_from_db_arguments = "--db {} --build {} --annot {} --o {}".format(
+	tpath, db, build, annot, o)
 if filtering:
-	cmd+=' --whitelist {}'.format(outfile)
+	gtf_from_db_arguments +=' --whitelist {}'.format(outfile)
 else:
-	cmd+=' --observed'
+	gtf_from_db_arguments +=' --observed'
 	# pfile = open(pairings, 'r')
 	# pairing_str = pfile.read()
 	# pfile.close()
@@ -93,6 +93,5 @@ else:
 	# ofile = open(ofile, 'w')
 	# ofile.write(pairing_str)
 	# cmd+=' --datasets {}'.format(o+'_datasets')
-
-# print(cmd)
-subprocess.run(cmd.split())
+sys.argv = ["create_GTF_from_database.py"] + shlex.split(gtf_from_db_arguments)
+gtf_from_db_main()

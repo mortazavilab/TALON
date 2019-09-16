@@ -1,13 +1,7 @@
 # Utilities for the post-TALON scripts
-import os
-from pathlib import Path
 import sqlite3
-import sys
-script_dir = os.path.dirname(os.path.realpath(__file__))
-sys.path.append(os.path.abspath(os.path.join(script_dir, os.pardir)))
-main_path = "/".join(script_dir.split("/")[0:-1])
-sys.path.append(main_path)
-import query_utils as qutils
+
+from .. import query_utils as qutils
 
 def handle_filtering(database, annot, observed, whitelist_file, dataset_file):
     """ Determines which transcripts to allow in the analysis. This can be done

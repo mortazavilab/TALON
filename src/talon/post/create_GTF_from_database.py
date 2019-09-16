@@ -9,18 +9,11 @@ import itertools
 import operator
 from optparse import OptionParser
 import sqlite3
-import warnings
-#import filter_talon_transcripts as filt
-import post_utils as putils
-import pdb
-import sys
-import os
+
+from . import post_utils as putils
 from pathlib import Path
-script_dir = os.path.dirname(os.path.realpath(__file__))
-sys.path.append(os.path.abspath(os.path.join(script_dir, os.pardir)))
-main_path = "/".join(script_dir.split("/")[0:-1])
-sys.path.append(main_path)
-import query_utils as qutils
+
+from .. import query_utils as qutils
 
 def getOptions():
     parser = OptionParser()

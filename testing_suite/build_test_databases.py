@@ -6,7 +6,7 @@ import sys
 
 try:
    subprocess.check_output(
-       ["python", "../initialize_talon_database.py",
+       ["talon_initialize_database",
         "--f", "input_files/toy_transcript/toy_annot.gtf",
         "--a",  "toy_annot",
         "--l", "0",
@@ -17,7 +17,7 @@ except Exception as e:
 
 try:
     subprocess.check_output(
-       ["python", "../initialize_talon_database.py",
+       ["talon_initialize_database",
         "--f", "input_files/Canx_example/Canx.gtf",
         "--a",  "gencode_vM7",
         "--l", "0",
@@ -28,7 +28,7 @@ except Exception as e:
 
 try:
     subprocess.check_output(
-       ["python", "../initialize_talon_database.py",
+       ["talon_initialize_database",
         "--f", "input_files/Map2k4_example/Map2k4.gtf",
         "--a",  "gencode_vM7",
         "--l", "0",
@@ -39,7 +39,7 @@ except Exception as e:
 
 try:
     subprocess.check_output(
-       ["python", "../initialize_talon_database.py",
+       ["talon_initialize_database",
         "--f", "input_files/chr11_and_Tcf3/chr11_and_Tcf3.gtf",
         "--a",  "gencode_vM7",
         "--5p", "500",
@@ -53,7 +53,7 @@ except Exception as e:
 
 try:
     subprocess.check_output(
-       ["python", "../initialize_talon_database.py",
+       ["talon_initialize_database",
         "--f", "input_files/intergenic_GM12878/chr22.gtf",
         "--a",  "gencode_vM7",
         "--5p", "500",
@@ -68,7 +68,7 @@ except Exception as e:
 # Actually perform the chr22 TALON run
 try:
     subprocess.check_output(
-       ["python", "../talon.py",
+       ["talon",
         "--f", "input_files/intergenic_GM12878/config.csv",
         "--db", "scratch/chr22.db",
         "--build", "hg38",
@@ -82,7 +82,7 @@ except Exception as e:
 # Actually perform the chr11_and_Tcf3 TALON run
 try:
     subprocess.check_output(
-       ["python", "../talon.py", 
+       ["talon",
         "--f", "input_files/chr11_and_Tcf3/config.csv",
         "--db", "scratch/chr11_and_Tcf3.db", 
         "--build", "mm10",
@@ -96,7 +96,7 @@ except Exception as e:
 # Run the whitelist filtering script on the chr11_and_Tcf3 TALON results
 try:
     subprocess.check_output(
-       ["python", "../post-TALON_tools/filter_talon_transcripts.py",
+       ["talon_filter_transcripts",
         "--db", "scratch/chr11_and_Tcf3.db",
         "-a", "gencode_vM7",
         "-p", "input_files/chr11_and_Tcf3/pairings.csv",
@@ -108,7 +108,7 @@ except Exception as e:
 # Run GTF script on chr11_and_Tcf3 TALON results with whitelist
 try:
     subprocess.check_output(
-       ["python", "../post-TALON_tools/create_GTF_from_database.py",
+       ["talon_create_GTF_from_database",
         "--db", "scratch/chr11_and_Tcf3.db",
         "-a", "gencode_vM7",
         "--build", "mm10",
