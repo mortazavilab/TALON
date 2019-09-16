@@ -1,10 +1,6 @@
 import pytest
-import sys
 import sqlite3
-sys.path.append("..")
-import query_utils as qutils
-import dstruct
-from helper_fns import *
+from talon import query_utils as qutils
 @pytest.mark.dbunit
 
 class TestQueries(object):

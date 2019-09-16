@@ -8,14 +8,8 @@
 
 from optparse import OptionParser
 import sqlite3
-import sys
-import warnings
-import os
 from pathlib import Path
-script_path = os.path.abspath(__file__)
-main_path = "/".join(script_path.split("/")[0:-2])
-sys.path.append(main_path)
-import query_utils as qutils
+from .. import query_utils as qutils
 
 def filter_talon_transcripts(database, annot, dataset_pairings = None,
                                               known_filtered = False,

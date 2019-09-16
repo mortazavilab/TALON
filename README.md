@@ -2,27 +2,29 @@
 TALON is a Python program for identifying known and novel genes/isoforms
 in long read transcriptome data sets. TALON is technology-agnostic in that it
 works from mapped SAM files, allowing data from different sequencing platforms
-(i.e. PacBio and Oxford Nanopore) to be analyzed side by side. 
+(i.e. PacBio and Oxford Nanopore) to be analyzed side by side.
 
 To learn more, please see our preprint in BioRxiv: https://www.biorxiv.org/content/10.1101/672931v1
 
 # Installation
 Newer version of TALON (v4.0+) are designed to be run with Python 3.7 (tested specifically with Python 3.7.2). Older versions of TALON use Python 2.7.
 
-To install TALON, simply download the files using Github's "Download ZIP" button, then unzip them in the directory where you would like to store the program. Alternately, you can download a specific version of the program from the Releases tab. The TALON scripts are run directly from the command line- just include the path.
+To install TALON, simply download the files using Github's "Download ZIP" button, then unzip them in the directory where you would like to store the program. Alternately, you can download a specific version of the program from the Releases tab.
+Go to the directory and run `pip install .`. This will install TALON. You can now run the commands from anywhere.
+NOTE: Talon versions 4.2 and lower are not installable. Check the README of those releases to see how you can run the scripts from the install directory.
 
 # How to run
 For a small, self-contained example with all necessary files included, see https://github.com/dewyman/TALON/tree/master/example
 
 ## Initializing a TALON database
-The first step in using TALON is to initialize a SQLite database from the GTF annotation of your choice (i.e. GENCODE). This step is done using initialize_talon_database.py, and only needs to be performed once. Keep track of the build and annotation names you choose, as these will be used downstream when running TALON and its utilities.
+The first step in using TALON is to initialize a SQLite database from the GTF annotation of your choice (i.e. GENCODE). This step is done using talon_initialize_database, and only needs to be performed once. Keep track of the build and annotation names you choose, as these will be used downstream when running TALON and its utilities.
 
-NOTE: The GTF file you use must contain genes, transcripts, and exons. If the file does not contain explicit gene and/or transcript entries, key tables of the database will be empty and you will experience problems in the downstream analysis. We have included a script, reformat_gtf.py, that can convert this type of GTF into the proper format.
+NOTE: The GTF file you use must contain genes, transcripts, and exons. If the file does not contain explicit gene and/or transcript entries, key tables of the database will be empty and you will experience problems in the downstream analysis. We have included a tool, talon_reformat_gtf, that can convert this type of GTF into the proper format.
 
 ```
-python initialize_talon_database.py --h
+talon_initialize_database --h
 
-Usage: initialize_talon_database.py [options]
+Usage: talon_initialize_database [options]
 
 Options:
   -h, --help           Show help message and exit
@@ -37,17 +39,17 @@ Options:
 ```
 
 ## Running TALON
-Now that you've initilialized your database, you're ready to annotate long read datasets using TALON. The input database is modified in place to track and quantify transcripts in the provided dataset(s). You can add more datasets at any time by creating a config file for them and running this command. 
+Now that you've initilialized your database, you're ready to annotate long read datasets using TALON. The input database is modified in place to track and quantify transcripts in the provided dataset(s). You can add more datasets at any time by creating a config file for them and running this command.
 
 ```
-python talon.py --h
+talon --h
 
-Usage: talon.py [options]
+Usage: talon [options]
 
 Options:
 -h, --help            Show help message and exit
 --f                   Comma-delimited dataset config file providing sam files for TALON to run on, as well as metadata that   will be tracked in the dataset table. The required format is: dataset name, sample description, platform, sam file (full path).
-  --db FILE,            TALON database. Created using build_talon_annotation.py
+  --db FILE,            TALON database. Created using talon_initialize_database.
   --build STRING,       Genome build (i.e. hg38) to use. Must be in the
                         database.
   --cov, -c             Minimum alignment coverage in order to use a SAM entry. Default = 0.9
@@ -60,39 +62,41 @@ Options:
 ### Filtering your transcriptome
 If you have run TALON on biological replicates or other datasets you would like to leverage for quality control, you might want to obtain a filtered list of transcripts that are 1) known, or 2) reproducible in at least two of your datasets. To get such a list, run the following TALON utility:
 ```
-python post-TALON_tools/filter_talon_transcripts.py --h
+talon_filter_transcripts --h
+
+Usage: talon_filter_transcripts [options]
 
 Options:
   -h, --help            show this help message and exit
   --db=FILE             TALON database
   -a ANNOT, --annot=ANNOT
-                        The name of the annotation version to use. 
-                        Will determine which annotation transcripts 
-                        are considered known or novel relative to. 
+                        The name of the annotation version to use.
+                        Will determine which annotation transcripts
+                        are considered known or novel relative to.
                         Note: must be in the TALON database.
   -p FILE, --pairings=FILE
-                        Optional: A file indicating which datasets 
-                        should be considered together when filtering 
-                        novel transcripts (i.e. biological replicates). 
-                        Format: Each line of the file constitutes a group, 
-                        with member datasets separated by commas. 
-                        If no file is provided, then novel transcripts 
+                        Optional: A file indicating which datasets
+                        should be considered together when filtering
+                        novel transcripts (i.e. biological replicates).
+                        Format: Each line of the file constitutes a group,
+                        with member datasets separated by commas.
+                        If no file is provided, then novel transcripts
                         appearing in any two datasets will be accepted.
   --o=FILE              Outfile name
 ```
 The columns in the resulting output file are:
-1. TALON gene ID (an integer). This is the same type of ID found in column 1 of TALON abundance files. 
-2. TALON transcript ID (an integer). This is the same type of ID found in column 2 of TALON abundance files. 
+1. TALON gene ID (an integer). This is the same type of ID found in column 1 of TALON abundance files.
+2. TALON transcript ID (an integer). This is the same type of ID found in column 2 of TALON abundance files.
 3. Novelty category designation of transcript.
 
 
 ### Obtaining an abundance matrix from your TALON database
-If you would like to extract an abundance matrix for your TALON-processed datasets, use the script *create_abundance_file_from_database.py* from the post-TALON_tools directory.
+If you would like to extract an abundance matrix for your TALON-processed datasets, use the tool *talon_create_abundance_file_from_database*.
 
 ```
-python post-TALON_tools/create_abundance_file_from_database.py --h
+talon_create_abundance_file_from_database --h
 
-Usage: create_abundance_file_from_database.py [options]
+Usage: talon_create_abundance_file_from_database [options]
 
 Options:
   -h, --help            show this help message and exit
@@ -107,7 +111,7 @@ Options:
   --filter              If this option is set, the transcripts in the
                         database will be filtered prior to GTF creation
                         (for more information, see
-                        filter_talon_transcripts.py)
+                        talon_filter_transcripts)
   -p FILE, --pairings=FILE
                         Optional (only relevant if filter = true): A file
                         indicating which datasets should be
@@ -122,23 +126,23 @@ Options:
 ```
 The columns in the abundance file are as follows:
 1. TALON gene ID
-2. TALON transcript ID	
+2. TALON transcript ID
 3. Gene ID from your annotation of choice. If the gene is novel relative to that annotation, this will be 'NA'.
 4. Transcript ID from your annotation of choice. If the transcript is novel relative to that annotation, this will be 'NA'.
 5. Gene name from your annotation of choice (makes the file a bit more human-readable!). If the transcript is novel relative to that annotation, this will be the TALON-derived name.
-6. Transcript name from your annotation of choice. If the transcript is novel relative to that annotation, this will be the TALON-derived name.	
+6. Transcript name from your annotation of choice. If the transcript is novel relative to that annotation, this will be the TALON-derived name.
 7. Number of exons in the transcript
 8. Length of transcript model (basepairs)
-9. Gene novelty (Known, Antisense, Intergenic)	
+9. Gene novelty (Known, Antisense, Intergenic)
 10. Transcript status (Known, ISM, NIC, NNC, Antisense, Intergenic)
 11. ISM subtype (Both, Prefix, Suffix, None)  
 **---------------------------- Remaining columns -----------------------------**  
-One column per dataset, with a count indicating how many times the current transcript was observed in that dataset. 
+One column per dataset, with a count indicating how many times the current transcript was observed in that dataset.
 
 ### Obtaining a custom GTF transcriptome annotation from a TALON database
- 
+
 ```
-python post-TALON_tools/create_GTF_from_database.py --h
+talon_create_GTF_from_database --h
 
 Options:
   -h, --help            show this help message and exit
@@ -152,7 +156,7 @@ Options:
                         relative to. Note: must be in the TALON database.
   --whitelist=FILE      Whitelist file of transcripts to include in the
                         output. First column should be TALON gene ID,
-                        second column should be TALON transcript ID. 
+                        second column should be TALON transcript ID.
                         Other columns are ignored.
   --observed            If this option is set, the GTF file will only
                         include transcripts that were observed in at least one

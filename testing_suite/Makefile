@@ -7,11 +7,13 @@ test :
 unit :
 	set -e;
 	make clean;
+	python build_test_databases.py;
 	pytest -v -m unit;
 
 integration :
 	set -e;
 	make clean;
+	python build_test_databases.py;
 	pytest -v -m integration;
 
 clean :

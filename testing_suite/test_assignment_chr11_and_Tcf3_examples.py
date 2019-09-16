@@ -1,9 +1,6 @@
 import pytest
-import sys
 import sqlite3
-sys.path.append("..")
-import talon as talon
-from helper_fns import *
+from .helper_fns import fetch_correct_ID
 @pytest.mark.integration
 
 class TestAssignments(object):

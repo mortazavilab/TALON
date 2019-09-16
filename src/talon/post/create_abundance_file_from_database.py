@@ -5,20 +5,16 @@
 # for each transcript in the TALON database across datasets. Modified by 
 # filtering option.
 
-from optparse import OptionParser
 import sqlite3
-import sys
-import os
-import filter_talon_transcripts as filt
+from optparse import OptionParser
 from pathlib import Path
-script_dir = os.path.dirname(os.path.realpath(__file__))
-sys.path.append(os.path.abspath(os.path.join(script_dir, os.pardir)))
-main_path = "/".join(script_dir.split("/")[0:-1])
-sys.path.append(main_path)
-import dstruct as dstruct
-import query_utils as qutils
-import talon as talon
-import length_utils as lu
+
+from . import filter_talon_transcripts as filt
+from .. import dstruct as dstruct
+from .. import length_utils as lu
+from .. import query_utils as qutils
+from .. import talon as talon
+
 
 def getOptions():
     parser = OptionParser()

@@ -1,9 +1,6 @@
 import pytest
-import sys
-import sqlite3
-sys.path.append("..")
-import talon as talon
-from helper_fns import *
+from talon import talon
+from .helper_fns import fetch_correct_ID, get_db_cursor
 @pytest.mark.integration
 
 class TestIdentifyISM(object):

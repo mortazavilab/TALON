@@ -1,9 +1,7 @@
 import pytest
-import sys
 import sqlite3
-from helper_fns import *
-sys.path.append("..")
-import length_utils as lu
+from .helper_fns import get_db_cursor
+from talon import length_utils as lu
 @pytest.mark.unit
 
 class TestComputeExonLens(object):
