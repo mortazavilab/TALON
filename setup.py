@@ -59,6 +59,7 @@ setup(
             'talon_create_GTF_from_database=talon.post.create_GTF_from_database:main',
             'talon_reformat_gtf=talon.reformat_gtf:main',
             'talon_generate_report=talon.post.generate_talon_report:main'
+            'talon_summarize=talon.post.summarize_datasets:main'
         ]
     }
 )
