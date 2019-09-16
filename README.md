@@ -7,16 +7,20 @@ works from mapped SAM files, allowing data from different sequencing platforms
 To learn more, please see our preprint in BioRxiv: https://www.biorxiv.org/content/10.1101/672931v1
 
 # Installation
-Newer version of TALON (v4.0+) are designed to be run with Python 3.7 (tested specifically with Python 3.7.2). Older versions of TALON use Python 2.7.
+Newer version of TALON (v4.0+) are designed to be run with Python 3.7 (tested specifically with Python 3.7.2). 
 
 To install TALON, simply download the files using Github's "Download ZIP" button, then unzip them in the directory where you would like to store the program. Alternately, you can download a specific version of the program from the Releases tab.
+
 Go to the directory and run `pip install .`. This will install TALON. You can now run the commands from anywhere.
-NOTE: Talon versions 4.2 and lower are not installable. Check the README of those releases to see how you can run the scripts from the install directory.
+
+NOTE: Talon versions 4.2 and lower are not installable. Check the README of those releases to see how you can run the scripts from the install directory, or visit the wiki here: https://github.com/dewyman/TALON/wiki/Archived-TALON-documentation.
 
 # How to run
 For a small, self-contained example with all necessary files included, see https://github.com/dewyman/TALON/tree/master/example
 
 ## Initializing a TALON database
+For documentation of TALON versions 4.2 and lower, see https://github.com/dewyman/TALON/wiki/Archived-TALON-documentation.
+
 The first step in using TALON is to initialize a SQLite database from the GTF annotation of your choice (i.e. GENCODE). This step is done using talon_initialize_database, and only needs to be performed once. Keep track of the build and annotation names you choose, as these will be used downstream when running TALON and its utilities.
 
 NOTE: The GTF file you use must contain genes, transcripts, and exons. If the file does not contain explicit gene and/or transcript entries, key tables of the database will be empty and you will experience problems in the downstream analysis. We have included a tool, talon_reformat_gtf, that can convert this type of GTF into the proper format.
