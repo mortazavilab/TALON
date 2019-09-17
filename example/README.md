@@ -1,21 +1,24 @@
 # TALON example
 
+## User note
+This example was initially constructed for TALON v4.2. In the packaged versions since, the commands have changed since TALON does not need to be run from a specific path. If you are using a TALON version below 4.3, please see the archived documentation here for the correct commands: https://github.com/dewyman/TALON/wiki/Archived-TALON-Example-Instructions-(v4.2). 
+
+## Tutorial
 Use the provided files to try TALON out on chromosome 21 PacBio SAM reads from two biological replicates of human cell line GM12878. 
 
 First, initialize the TALON database from the provided GTF annotation of chromosome 21:
+
 ```
-python ../initialize_talon_database.py \
+talon_initialize_database \
         --f gencode.v29.chr21.gtf \
         --a gencode_v29 \
         --g hg38 \
         --o example_talon
 ```
 
-
-
 Now, use the provided config file and the newly initialized database to annotate and quantify the reads. The database is modified in place.
 ```
-python ../talon.py \
+talon \
        --f config.csv \
        --db example_talon.db \
        --build hg38 \
@@ -25,7 +28,7 @@ The file 'example_talon_QC.log' contains a record of each input transcript along
 
 Now, we can explore the results of the run. To summarize how many of each transxcript were found (prior to any filtering), run:
 ```
-python ../post-TALON_tools/summarize_datasets.py \
+talon_summarize \
        --db example_talon.db \
        --v \
        --o example
@@ -33,7 +36,7 @@ python ../post-TALON_tools/summarize_datasets.py \
 
 To create an abundance matrix without filtering (for use computing gene expression), we run the following:
 ```
-python ../post-TALON_tools/create_abundance_file_from_database.py \
+talon_abundance \
        --db example_talon.db \
        -a gencode_v29 \
        --build hg38 \
@@ -42,7 +45,7 @@ python ../post-TALON_tools/create_abundance_file_from_database.py \
 
 We can also generate a filtered abundance matrix where we require transcripts to be either a) known, or b) detected in both replicates (for transcript-level expression):
 ```
-python ../post-TALON_tools/create_abundance_file_from_database.py \
+talon_abundance \
        --db example_talon.db \
        -a gencode_v29 \
        --filter \
