@@ -98,9 +98,9 @@ The columns in the resulting output file are:
 If you would like to extract an abundance matrix for your TALON-processed datasets, use the tool *talon_create_abundance_file_from_database*.
 
 ```
-talon_create_abundance_file_from_database --h
+talon_abundance --h
 
-Usage: talon_create_abundance_file_from_database [options]
+Usage: talon_abundance [options]
 
 Options:
   -h, --help            show this help message and exit
@@ -146,7 +146,7 @@ One column per dataset, with a count indicating how many times the current trans
 ### Obtaining a custom GTF transcriptome annotation from a TALON database
 
 ```
-talon_create_GTF_from_database --h
+talon_create_GTF --h
 
 Options:
   -h, --help            show this help message and exit
