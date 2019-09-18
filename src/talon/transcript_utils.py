@@ -37,12 +37,11 @@ def compute_alignment_identity(MD_tag, SEQ):
 
     return matches/total_bases
 
-def splitMD(MD_tag):
+def splitMD(MD):
         """ Takes MD tag and splits into two lists:
             one with capital letters (match operators), and one with
             the number of bases that each operation applies to. """
 
-        MD = str(MD_tag).split(":")[2]
         operations = []
 
         # Split MD string where type changes.

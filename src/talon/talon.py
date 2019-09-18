@@ -1918,7 +1918,7 @@ def annotate_sam_transcripts(sam_file: str, dataset, cursor, struct_collection, 
             # For transcripts that pass QC, parse the attributes to 
             # determine the chromosome, positions, and strand of the transcript
             try:
-                read_ID, chrom, positions, strand, read_length = parse_transcript(line) 
+                read_ID, chrom, positions, strand, read_length = parse_transcript(line)
             except:
                 message = "Problem parsing transcript '%s'. Skipping.." \
                            % line.split("\t")[0]
@@ -2038,12 +2038,11 @@ def parse_transcript(sam_read):
 def check_read_quality(sam_record, struct_collection):
     """ Process an individual sam read and return quality attributes. """
 
-    sam = sam_read.split("\t")
-    read_ID = record.query_name
-    flag = record.flag
-    cigar = record.cigar
-    seq = sam[9]
-    read_length = record.query_length
+    read_ID = sam_record.query_name
+    flag = sam_record.flag
+    cigar = sam_record.cigarstring
+    seq = sam_record.query
+    read_length = sam_record.query_length
 
     # Only use uniquely mapped transcripts
     if flag not in ["0", "16"]:
@@ -2055,15 +2054,15 @@ def check_read_quality(sam_record, struct_collection):
 
     # Locate the MD field of the sam transcript
     try:
-        md_index = [i for i, s in enumerate(sam) if s.startswith('MD:Z:')][0]
-    except:
+        md_tag = sam_record.get_tag('MD')
+    except KeyError:
         raise ValueError("SAM transcript %s lacks an MD tag" % read_ID)
 
     # Only use reads where alignment coverage and identity exceed
     # cutoffs
     coverage = tutils.compute_alignment_coverage(cigar)
-    identity = tutils.compute_alignment_identity(sam[md_index], seq)   
- 
+    identity = tutils.compute_alignment_identity(md_tag, seq)
+
     if coverage < struct_collection.run_info.min_coverage or \
        identity < struct_collection.run_info.min_identity:
         return [read_ID, 0, 1, read_length, coverage, identity]
