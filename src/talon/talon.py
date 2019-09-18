@@ -17,12 +17,8 @@ from pathlib import Path
 import warnings
 from . import transcript_utils as tutils
 from . import query_utils as qutils
-#talon_path = (os.path.abspath(__file__))
-#print(sys.path)
-#main_path = "/".join(talon_path.split("/")[0:-2])
-#sys.path.append(main_path + "/post-TALON_tools")
-#print(sys.path)
-#import summarize_datasets
+
+import pysam
 
 def get_args():
     """ Fetches the arguments for the program """
@@ -1667,43 +1663,43 @@ def process_all_sam_files(sam_files, dataset_list, cursor, struct_collection,
 
     # Initialize QC output file
     qc_file = outprefix + "_talon_QC.log"
-    o = open(qc_file, 'w')
-    o.write("# TALON run filtering settings:\n")
-    o.write("# Fraction read aligned: " + \
-            str(struct_collection.run_info.min_coverage) + "\n")
-    o.write("# Min read identity to reference: " + \
-            str(struct_collection.run_info.min_identity) + "\n")
-    o.write("# Min transcript length: " + \
-            str(struct_collection.run_info.min_length) + "\n")
-    o.write("-------------------------------------------\n")
-    o.write("\t".join(["dataset", "read_ID", "passed_QC", "primary_mapped", 
-                       "read_length", "fraction_aligned", "identity"]) + "\n")
+
+    with open(qc_file, 'w') as o:  # closes the file if any error occurs within the block
+        o.write("# TALON run filtering settings:\n")
+        o.write("# Fraction read aligned: " + \
+                str(struct_collection.run_info.min_coverage) + "\n")
+        o.write("# Min read identity to reference: " + \
+                str(struct_collection.run_info.min_identity) + "\n")
+        o.write("# Min transcript length: " + \
+                str(struct_collection.run_info.min_length) + "\n")
+        o.write("-------------------------------------------\n")
+        o.write("\t".join(["dataset", "read_ID", "passed_QC", "primary_mapped",
+                           "read_length", "fraction_aligned", "identity"]) + "\n")
 
 
-    for sam, d_metadata in zip(sam_files, dataset_list):
-        print("Working with dataset %s..." % d_metadata[0])
+        for sam, d_metadata in zip(sam_files, dataset_list):
+            print("Working with dataset %s..." % d_metadata[0])
 
-        # Create annotation entry for this dataset
-        struct_collection.run_info['dataset'] += 1
-        d_id = struct_collection.run_info['dataset']     
-        d_name = d_metadata[0]
-        novel_datasets += [(d_id, d_name, d_metadata[1], d_metadata[2])]
+            # Create annotation entry for this dataset
+            struct_collection.run_info['dataset'] += 1
+            d_id = struct_collection.run_info['dataset']
+            d_name = d_metadata[0]
+            novel_datasets += [(d_id, d_name, d_metadata[1], d_metadata[2])]
 
-        # Now process the current sam file
-        observed_transcripts, gene_annotations, transcript_annotations, \
-        exon_annotations, abundance = annotate_sam_transcripts(sam, d_name, cursor, struct_collection, o)
- 
-        # Consolidate the outputs
-        all_observed_transcripts.extend(observed_transcripts)
-        all_gene_annotations.extend(gene_annotations)
-        all_transcript_annotations.extend(transcript_annotations)
-        all_exon_annotations.extend(exon_annotations)
-        all_abundance.extend(abundance)
+            # Now process the current sam file
+            observed_transcripts, gene_annotations, transcript_annotations, \
+            exon_annotations, abundance = annotate_sam_transcripts(sam, d_name, cursor, struct_collection, o)
 
-    o.close()
-    
-    return novel_datasets, all_observed_transcripts, all_gene_annotations, \
-           all_transcript_annotations, all_exon_annotations, all_abundance
+            # Consolidate the outputs
+            all_observed_transcripts.extend(observed_transcripts)
+            all_gene_annotations.extend(gene_annotations)
+            all_transcript_annotations.extend(transcript_annotations)
+            all_exon_annotations.extend(exon_annotations)
+            all_abundance.extend(abundance)
+
+
+        return novel_datasets, all_observed_transcripts, all_gene_annotations, \
+               all_transcript_annotations, all_exon_annotations, all_abundance
 
 
 def compute_delta(orig_pos, new_pos, strand):
@@ -1898,7 +1894,7 @@ def identify_monoexon_transcript(chrom, positions, strand, cursor, location_dict
                    'end_delta': diff_3p}
     return annotations
 
-def annotate_sam_transcripts(sam_file, dataset, cursor, struct_collection, QC_file):
+def annotate_sam_transcripts(sam_file: str, dataset, cursor, struct_collection, QC_file):
     """ Process SAM transcripts and annotate the ones that pass QC """
 
     observed_transcripts = []
@@ -1907,16 +1903,11 @@ def annotate_sam_transcripts(sam_file, dataset, cursor, struct_collection, QC_fi
     exon_annotations = []
     abundance = {}
 
-    with open(sam_file) as sam:
-        for line in sam:
-            line = line.strip()
-
-            # Ignore header
-            if line.startswith("@"):
-                continue
-
+    mode = "rb" if sam_file.endswith(".bam") else "r"
+    with pysam.AlignmentFile(sam_file, mode) as sam:
+        for record in sam:
             # Check whether we should try annotating this read or not
-            qc_metrics = check_read_quality(line, struct_collection)
+            qc_metrics = check_read_quality(record, struct_collection)
             passed_qc = qc_metrics[1]
             QC_file.write("\t".join([str(x) for x in [dataset] + qc_metrics]) \
                           + "\n")
@@ -2044,15 +2035,15 @@ def parse_transcript(sam_read):
     return read_ID, chromosome, positions, strand, read_length
     
 
-def check_read_quality(sam_read, struct_collection):
+def check_read_quality(sam_record, struct_collection):
     """ Process an individual sam read and return quality attributes. """
 
     sam = sam_read.split("\t")
-    read_ID = sam[0]
-    flag = sam[1]
-    cigar = sam[5]
+    read_ID = record.query_name
+    flag = record.flag
+    cigar = record.cigar
     seq = sam[9]
-    read_length = len(seq)
+    read_length = record.query_length
 
     # Only use uniquely mapped transcripts
     if flag not in ["0", "16"]:
