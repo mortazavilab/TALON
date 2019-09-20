@@ -2012,42 +2012,6 @@ def annotate_sam_transcripts(sam_file: str, dataset, cursor, struct_collection, 
            exon_annotations, abundance_rows
             
 
-def parse_transcript(sam_read):
-    """ Given a SAM transcript, parse the entry to obtain:
-           - read ID
-           - chromosome
-           - positions (start, splice sites, end) ordered from 5' to 3'
-           - strand
-           - read length
-    """
-    sam = sam_read.split("\t")
-    read_ID = sam[0]
-    flag = int(sam[1])
-    chromosome = sam[2]
-    sam_start = int(sam[3]) # Start is earliest alignment position
-    cigar = sam[5]
-    seq = sam[9]
-    read_length = len(seq) 
-    other_fields = sam[11:]
-
-    # Compute attributes
-    sam_end = tutils.compute_transcript_end(sam_start, cigar) 
-    intron_list = tutils.get_introns(other_fields, sam_start, cigar)
-    # Adjust intron positions by 1 to get splice sites
-    splice_sites = [x+1 if i%2==1 else x-1 for i,x in enumerate(intron_list)]
-    positions = [sam_start] + splice_sites + [sam_end]
-
-    # Flip the positions order if the read is on the minus strand
-    if flag in [16, 272]:
-        strand = "-"
-        positions = positions[::-1]
-    else:
-        strand = "+"
-
-
-    return read_ID, chromosome, positions, strand, read_length
-    
-
 def check_read_quality(sam_record, struct_collection):
     """ Process an individual sam read and return quality attributes. """
 
