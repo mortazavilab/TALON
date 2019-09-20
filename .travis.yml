@@ -6,9 +6,6 @@ dist: xenial
 python:
   - "3.7"
 
-services:
-  - docker
-
 install:
   - sudo apt update && sudo apt install bedtools
   - pip install tox
