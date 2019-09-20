@@ -1,6 +1,24 @@
+from array import array
 import pytest
 from talon.transcript_utils import get_introns, compute_jI
 @pytest.mark.unit
+
+
+class MockRecord(object):
+    """
+    MockRecord to imitate pysam.AlignedSegment for testing.
+    """
+    def __init__(self, fields):
+        self.fields = fields
+        self.tags = {field.split(":")[0]:field.split(":")[2]
+                     for field in fields}
+
+    def get_tag(self, tag):
+        if tag == "jI":
+            jI = self.tags[tag]
+            return array("i", [int(i) for i in jI.split(",")[1:]])
+        else:
+            return self.tags[tag]
 
 class TestGetIntrons(object):
     def test_noIntrons(self):
@@ -13,7 +31,7 @@ class TestGetIntrons(object):
         start = 107056706 
         cigar = "2578M"
 
-        assert get_introns(fields, start, cigar) == []
+        assert get_introns(MockRecord(fields), start, cigar) == []
 
     def test_multiexon_without_jI(self):
         """ This example (from transcript c3098/f3p2/3199 in
@@ -29,7 +47,7 @@ class TestGetIntrons(object):
         start = 1081827
         cigar = "2557M97N26M1371N135M1126N66M297N96M2755N" + \
                 "76M1043N94M425N113M23956N38M"
-        assert get_introns(fields, start, cigar) == jI
+        assert get_introns(MockRecord(fields), start, cigar) == jI
 
     def test_multiexon_with_jI(self):
         """ This example (from transcript c3098/f3p2/3199 in 
@@ -41,11 +59,12 @@ class TestGetIntrons(object):
                1087138,1087205,1087501,1087598,1090352,1090429, \
                1091471,1091566,1091990,1092104,1116059 ]
         fields = [ "NH:i:1", "HI:i:1", "NM:i:0", "MD:Z:3201", \
-                   "jM:B:c,22,22,22,22,22,22,22,22", jI ] 
+                   "jM:B:c,22,22,22,22,22,22,22,22", "jI:B:i," +
+                   ",".join(str(i) for i in jI) ]
         start = 1081827
         cigar = "2557M97N26M1371N135M1126N66M297N96M2755N" + \
                 "76M1043N94M425N113M23956N38M"
-        assert get_introns(fields, start, cigar) == jI
+        assert get_introns(MockRecord(fields), start, cigar) == jI
 
 def test_compute_jI():
     """ This example (from transcript c3098/f3p2/3199 in
