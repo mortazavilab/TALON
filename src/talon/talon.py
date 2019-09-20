@@ -1904,8 +1904,8 @@ def annotate_sam_transcripts(sam_file: str, dataset, cursor, struct_collection, 
     abundance = {}
 
     mode = "rb" if sam_file.endswith(".bam") else "r"
-    with pysam.AlignmentFile(sam_file, mode) as sam:
-        for record in sam:
+    with pysam.AlignmentFile(sam_file, mode) as sam:  # type: pysam.AlignmentFile
+        for record in sam:  # type: pysam.AlignedSegment
             # Check whether we should try annotating this read or not
             qc_metrics = check_read_quality(record, struct_collection)
             passed_qc = qc_metrics[1]
@@ -1917,7 +1917,6 @@ def annotate_sam_transcripts(sam_file: str, dataset, cursor, struct_collection, 
 
             # For transcripts that pass QC, parse the attributes to 
             # determine the chromosome, positions, and strand of the transcript
-
             read_ID = record.query_name
             chrom = record.reference_name
             read_length = record.query_length
@@ -2012,9 +2011,8 @@ def annotate_sam_transcripts(sam_file: str, dataset, cursor, struct_collection, 
            exon_annotations, abundance_rows
             
 
-def check_read_quality(sam_record, struct_collection):
+def check_read_quality(sam_record: pysam.AlignedSegment, struct_collection):
     """ Process an individual sam read and return quality attributes. """
-
     read_ID = sam_record.query_name
     flag = sam_record.flag
     cigar = sam_record.cigarstring
