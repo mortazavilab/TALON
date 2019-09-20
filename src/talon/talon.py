@@ -1917,13 +1917,26 @@ def annotate_sam_transcripts(sam_file: str, dataset, cursor, struct_collection, 
 
             # For transcripts that pass QC, parse the attributes to 
             # determine the chromosome, positions, and strand of the transcript
-            try:
-                read_ID, chrom, positions, strand, read_length = parse_transcript(line)
-            except:
-                message = "Problem parsing transcript '%s'. Skipping.." \
-                           % line.split("\t")[0]
-                warnings.warn(message)
-                continue
+
+            read_ID = record.query_name
+            chrom = record.reference_name
+            read_length = record.query_length
+            sam_start = record.reference_start + 1
+            sam_end = record.reference_end
+            cigar = record.cigarstring
+            flag = record.flag
+            intron_list = tutils.get_introns(other_fields, sam_start, cigar)
+            # Adjust intron positions by 1 to get splice sites
+            splice_sites = [x + 1 if i % 2 == 1 else x - 1 for i, x in
+                            enumerate(intron_list)]
+            positions = [sam_start] + splice_sites + [sam_end]
+
+            # Flip the positions order if the read is on the minus strand
+            if flag in [16, 272]:
+                strand = "-"
+                positions = positions[::-1]
+            else:
+                strand = "+"
 
             # Now identify the transcript
             location_dict = struct_collection.location_dict
