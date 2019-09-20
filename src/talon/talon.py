@@ -1698,8 +1698,8 @@ def process_all_sam_files(sam_files, dataset_list, cursor, struct_collection,
             all_abundance.extend(abundance)
 
 
-        return novel_datasets, all_observed_transcripts, all_gene_annotations, \
-               all_transcript_annotations, all_exon_annotations, all_abundance
+    return novel_datasets, all_observed_transcripts, all_gene_annotations, \
+           all_transcript_annotations, all_exon_annotations, all_abundance
 
 
 def compute_delta(orig_pos, new_pos, strand):
