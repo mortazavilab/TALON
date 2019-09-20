@@ -1925,7 +1925,7 @@ def annotate_sam_transcripts(sam_file: str, dataset, cursor, struct_collection, 
             sam_end = record.reference_end
             cigar = record.cigarstring
             flag = record.flag
-            intron_list = tutils.get_introns(other_fields, sam_start, cigar)
+            intron_list = tutils.get_introns(record, sam_start, cigar)
             # Adjust intron positions by 1 to get splice sites
             splice_sites = [x + 1 if i % 2 == 1 else x - 1 for i, x in
                             enumerate(intron_list)]
@@ -2058,7 +2058,7 @@ def check_read_quality(sam_record, struct_collection):
     read_length = sam_record.query_length
 
     # Only use uniquely mapped transcripts
-    if flag not in ["0", "16"]:
+    if flag not in [0, 16]:
         return [read_ID, 0, 0, read_length, "NA", "NA"]
 
     # Only use reads that are greater than or equal to length threshold
