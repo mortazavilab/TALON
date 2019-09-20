@@ -108,7 +108,7 @@ except Exception as e:
 # Run GTF script on chr11_and_Tcf3 TALON results with whitelist
 try:
     subprocess.check_output(
-       ["talon_create_GTF_from_database",
+       ["talon_create_GTF",
         "--db", "scratch/chr11_and_Tcf3.db",
         "-a", "gencode_vM7",
         "--build", "mm10",
