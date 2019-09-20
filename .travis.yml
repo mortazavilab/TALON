@@ -1,5 +1,3 @@
-# We use conda so we can also install bedtools.
-
 language: python
 dist: xenial
 
