@@ -10,7 +10,7 @@ services:
   - docker
 
 install:
-  - apt install bedtools
+  - sudo apt install bedtools
   - pip install tox
 
 script:
