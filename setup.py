@@ -46,9 +46,10 @@ setup(
         "License :: OSI Approved :: MIT License",
         "Topic :: Scientific/Engineering :: Bio-Informatics"
     ],
-    python_requires=">=3.7",
+    python_requires=">=3.6",
     install_requires=[
-        "pandas"
+        "pandas",
+        "pysam"
     ],
     entry_points={
         "console_scripts": [
