@@ -165,7 +165,7 @@ def make_transcript_dict(cursor, build):
 
     return transcript_dict
 
-def make_location_dict(genome_build, cursor):
+def make_location_dict(genome_build, cursor, chrom = None, start = None, end = None):
     """ Format of dict:
         chromosome -> dict(position -> SQLite3 row from location table)
 
@@ -174,8 +174,18 @@ def make_location_dict(genome_build, cursor):
             Value: SQLite3 row from location table
     """
     location_dict = {}
-    query = """SELECT * FROM location WHERE genome_build = ? """
-    cursor.execute(query, [genome_build])
+    
+    if any(val == None for val in [chrom, start,end]):
+        query = Template("""SELECT * FROM location WHERE genome_build = '$build' """)
+    else:
+        query = Template("""SELECT * FROM location 
+                            WHERE genome_build = '$build'
+                            AND chromosome = '$chrom'
+                            AND position >= $start 
+                            AND position <= $end""")
+    query = query.substitute({'build':genome_build, 'chrom':chrom,
+                              'start':start, 'end':end})
+    cursor.execute(query)
     for location in cursor.fetchall():
         chromosome = location["chromosome"]
         position = location["position"]
@@ -1661,7 +1671,8 @@ def init_run_info(cursor, genome_build, min_coverage = 0.9, min_identity = 0):
 
     return run_info
 
-def prepare_data_structures(cursor, build, min_coverage, min_identity):
+def prepare_data_structures(cursor, build, min_coverage, min_identity, 
+                            chrom = None, start = None, end = None):
     """ Initializes data structures needed for the run and organizes them
         in a dictionary for more ease of use when passing them between functions
     """
@@ -1674,7 +1685,10 @@ def prepare_data_structures(cursor, build, min_coverage, min_identity):
     edge_dict = make_edge_dict(cursor)
     transcript_dict = make_transcript_dict(cursor, build)
     vertex_2_gene = make_vertex_2_gene_dict(cursor)
-    gene_starts, gene_ends = make_gene_start_and_end_dict(cursor, build)   
+    gene_starts, gene_ends = make_gene_start_and_end_dict(cursor, build, 
+                                                          chrom = chrom,
+                                                          start = start,
+                                                          end = end)   
 
     struct_collection = dstruct.Struct() 
     struct_collection['run_info'] = run_info
