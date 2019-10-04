@@ -223,20 +223,20 @@ def make_edge_dict(cursor, build = None, chrom = None, start = None, end = None)
             Value: SQLite3 row from edge table
     """
     edge_dict = {}
-    if any(val == None for val in [chrom, start,end]):
+    if any(val == None for val in [chrom, start, end, build]):
         query = """SELECT * FROM edge"""
     else:
         query = Template("""SELECT e.* 
                             FROM edge AS e
                             LEFT JOIN location as loc1 ON e.v1 = loc1.location_ID
                             LEFT JOIN location as loc2 ON e.v2 = loc2.location_ID
-                            WHERE loc1.genome_build = 'toy_build' AND loc2.genome_build = 'toy_build'
-                                 AND loc1.chromosome = "chr1" 
-                                 AND (loc1.position >= 1 AND loc1.position <= 1000)
-                                 AND (loc2.position >= 1 AND loc2.position <= 1000);
+                            WHERE loc1.genome_build = '$build' AND loc2.genome_build = '$build'
+                                 AND loc1.chromosome = "$chrom" 
+                                 AND (loc1.position >= $start AND loc1.position <= $end)
+                                 AND (loc2.position >= $start AND loc2.position <= $end);
                          """)
         query = query.substitute({'build':build, 'chrom':chrom,
-                              'start':start, 'end':end})
+                                  'start':start, 'end':end})
     cursor.execute(query)
     for edge in cursor.fetchall():
         vertex_1 = edge["v1"]
@@ -247,11 +247,30 @@ def make_edge_dict(cursor, build = None, chrom = None, start = None, end = None)
 
     return edge_dict
 
-def make_vertex_2_gene_dict(cursor):
+def make_vertex_2_gene_dict(cursor, build = None, chrom = None, start = None, end = None):
     """ Create a dictionary that maps vertices to the genes that they belong to.
     """
     vertex_2_gene = {}
-    query = """SELECT * FROM vertex LEFT JOIN genes ON vertex.gene_ID = genes.gene_ID"""
+    if any(val == None for val in [chrom, start, end, build]):
+        query = """SELECT vertex_ID,
+                          vertex.gene_ID,
+                          strand 
+                       FROM vertex 
+                       LEFT JOIN genes ON vertex.gene_ID = genes.gene_ID"""
+    else: 
+        query = Template("""SELECT vertex_ID, 
+                                   vertex.gene_ID, 
+                                   strand 
+                            FROM vertex
+                                LEFT JOIN genes ON vertex.gene_ID = genes.gene_ID
+                                LEFT JOIN location AS loc ON vertex.vertex_ID = loc.location_ID
+                                WHERE loc.genome_build = '$build'
+                                     AND loc.chromosome = '$chrom' 
+                                     AND (loc.position >= $start AND loc.position <= $end)
+                         """)
+        query = query.substitute({'build':build, 'chrom':chrom,
+                                  'start':start, 'end':end})
+
     cursor.execute(query)
     for vertex_line in cursor.fetchall():
         vertex = vertex_line["vertex_ID"]
