@@ -136,23 +136,44 @@ def make_gene_start_and_end_dict(cursor, build, chrom = None, start = None, end 
     return gene_starts, gene_ends
            
 
-def make_transcript_dict(cursor, build):
+def make_transcript_dict(cursor, build, chrom = None, start = None, end = None):
     """ Format of dict:
             Key: tuple consisting of edges in transcript path
             Value: SQLite3 row from transcript table
     """
     transcript_dict = {}
-    query = """SELECT t.*,
-    	         loc1.chromosome as chromosome,
-                 loc1.position as start_pos,
-                 loc2.position as end_pos	
-    	       FROM transcripts AS t
-    	       LEFT JOIN location as loc1 ON t.start_vertex = loc1.location_ID 
-    	       LEFT JOIN location as loc2 ON t.end_vertex = loc2.location_ID
-    	       WHERE loc1.genome_build = ? AND loc2.genome_build = ?;
-           """
+    print(build)
+    if any(val == None for val in [chrom, start, end]):
+         query = Template("""SELECT t.*,
+        	                loc1.chromosome as chromosome,
+                                loc1.position as start_pos,
+                                loc2.position as end_pos	
+        	            FROM transcripts AS t
+        	                LEFT JOIN location as loc1 ON t.start_vertex = loc1.location_ID 
+        	                LEFT JOIN location as loc2 ON t.end_vertex = loc2.location_ID
+        	                WHERE loc1.genome_build = '$build' AND loc2.genome_build = '$build';
+                          """)
 
-    cursor.execute(query, [build, build])
+    else:
+        query = Template("""SELECT t.*,
+                                loc1.chromosome as chrom,
+                                loc1.position as start_pos,
+                                loc2.position as end_pos,
+                                MIN(loc1.position, loc2.position) as min_pos,
+                                MAX(loc1.position, loc2.position) as max_pos
+                            FROM transcripts AS t
+                                LEFT JOIN location as loc1 ON t.start_vertex = loc1.location_ID
+                                LEFT JOIN location as loc2 ON t.end_vertex = loc2.location_ID
+                                WHERE loc1.genome_build = '$build' AND loc2.genome_build = '$build'
+                                         AND chrom == '$chrom'
+                                         AND ((min_pos <= $start AND max_pos >= $end)
+                                           OR (min_pos >= $start AND max_pos <= $end)
+                                           OR (min_pos >= $start AND min_pos <= $end)
+                                           OR (max_pos >= $start AND max_pos <= $end))""")
+
+    query = query.substitute({'build':build, 'chrom':chrom,
+                                  'start':start, 'end':end})
+    cursor.execute(query)
     for transcript in cursor.fetchall():
         transcript_path = transcript["jn_path"]
         if transcript_path != None:
@@ -1681,9 +1702,13 @@ def prepare_data_structures(cursor, build, min_coverage, min_identity,
     make_temp_novel_gene_table(cursor, build)
     make_temp_monoexonic_transcript_table(cursor, build)
     run_info = init_run_info(cursor, build, min_coverage, min_identity)
-    location_dict = make_location_dict(build, cursor)
+    location_dict = make_location_dict(build, cursor, chrom = chrom,
+                                                      start = start,
+                                                      end = end)
     edge_dict = make_edge_dict(cursor)
-    transcript_dict = make_transcript_dict(cursor, build)
+    transcript_dict = make_transcript_dict(cursor, build, chrom = chrom,
+                                                          start = start,
+                                                          end = end)
     vertex_2_gene = make_vertex_2_gene_dict(cursor)
     gene_starts, gene_ends = make_gene_start_and_end_dict(cursor, build, 
                                                           chrom = chrom,
