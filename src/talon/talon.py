@@ -15,13 +15,20 @@ import operator
 #import os
 from pathlib import Path
 import warnings
+from . import process_sams as procsams
 from . import transcript_utils as tutils
 from . import query_utils as qutils
-
+#from . import init_chunk_refs as icrefs
 import pysam
+from string import Template
+
+# TODO: Add a counter that the threads increment
+# TODO: Refine multigene behavior
 
 def get_args():
     """ Fetches the arguments for the program """
+
+    # TODO: add option so that database gets copied instead of modified in-place
 
     program_desc = """TALON takes transcripts from one or more long read
                       datasets (SAM format) and assigns them transcript and gene 
@@ -53,7 +60,7 @@ def str_wrap_double(s):
     s = str(s)
     return '"' + s + '"'
 
-def make_gene_start_and_end_dict(cursor, build):
+def make_gene_start_and_end_dict(cursor, build, chrom = None, start = None, end = None):
     """ Format of dicts:
             Key: gene ID from database
             Value: dict mapping positions to start vertices (or end vertices) of 
@@ -61,24 +68,53 @@ def make_gene_start_and_end_dict(cursor, build):
     """
     gene_starts = {}
     gene_ends = {}
-    query = """SELECT  gene_ID,
-                               start_vertex,
-                               end_vertex,
-                               loc1.position as start,
-                               loc2.position as end
-               FROM transcripts
-               LEFT JOIN transcript_annotations as ta
-                   ON ta.ID = transcripts.transcript_ID
-               LEFT JOIN location as loc1
-                   ON transcripts.start_vertex = loc1.location_ID
-               LEFT JOIN location as loc2
-                   ON transcripts.end_vertex = loc2.location_ID
-               WHERE ta.attribute = 'transcript_status'
-                     AND ta.value = 'KNOWN'
-                     AND loc1.genome_build = '%s'
-                     AND loc2.genome_build = '%s'
-              """
-    cursor.execute(query % (build, build))
+    if any(val == None for val in [chrom, start,end]):
+        query = """SELECT gene_ID,
+                          start_vertex,
+                          end_vertex,
+                          loc1.position as start,
+                          loc2.position as end
+                   FROM transcripts
+                   LEFT JOIN transcript_annotations as ta
+                       ON ta.ID = transcripts.transcript_ID
+                   LEFT JOIN location as loc1
+                       ON transcripts.start_vertex = loc1.location_ID
+                   LEFT JOIN location as loc2
+                       ON transcripts.end_vertex = loc2.location_ID
+                   WHERE ta.attribute = 'transcript_status'
+                         AND ta.value = 'KNOWN'
+                         AND loc1.genome_build = '%s'
+                         AND loc2.genome_build = '%s'
+                  """
+        cursor.execute(query % (build, build))
+    else:
+        query = Template("""SELECT  gene_ID,
+                                    start_vertex,
+                                    end_vertex,
+                                    loc1.chromosome as chrom,
+                                    loc1.position as start,
+                                    loc2.position as end
+             
+                            FROM transcripts
+                            LEFT JOIN transcript_annotations as ta
+                                ON ta.ID = transcripts.transcript_ID
+                            LEFT JOIN location as loc1
+                                ON transcripts.start_vertex = loc1.location_ID
+                            LEFT JOIN location as loc2
+                                ON transcripts.end_vertex = loc2.location_ID
+                            WHERE ta.attribute = 'transcript_status'
+                                  AND ta.value = 'KNOWN'
+                                  AND loc1.genome_build = '$build'
+                                  AND loc2.genome_build = '$build'
+                                  AND chrom = '$chrom'
+                                  AND ((start <= $start AND end >= $end) 
+                                     OR (start >= $start AND end <= $end) 
+                                     OR (start >= $start AND start <= $end) 
+                                     OR (end >= $start AND end <= $end))""")
+        query = query.substitute({'build':build, 'chrom':chrom, 
+                                  'start':start, 'end':end})
+        cursor.execute(query)
+
     for entry in cursor.fetchall():
         gene_ID = entry['gene_ID']
         start_vertex = entry['start_vertex']
@@ -1630,6 +1666,7 @@ def prepare_data_structures(cursor, build, min_coverage, min_identity):
         in a dictionary for more ease of use when passing them between functions
     """
 
+    # TODO: modify queries to restrict the location of items
     make_temp_novel_gene_table(cursor, build)
     make_temp_monoexonic_transcript_table(cursor, build)
     run_info = init_run_info(cursor, build, min_coverage, min_identity)
@@ -1725,7 +1762,8 @@ def compute_delta(orig_pos, new_pos, strand):
 def identify_monoexon_transcript(chrom, positions, strand, cursor, location_dict,
                                  edge_dict, transcript_dict, vertex_2_gene,
                                  gene_starts, gene_ends, run_info):
-
+    # TODO: change genomic behavior
+    # TODO: clean up
     gene_novelty = []
     transcript_novelty = []
     exon_novelty = []
@@ -2405,6 +2443,7 @@ def main():
     outprefix = options.outprefix
 
     # Prepare data structures from the database content
+    # TODO: will move to threads
     print("Processing annotation...")
     struct_collection = prepare_data_structures(cursor, build, min_coverage, 
                                                 min_identity)
