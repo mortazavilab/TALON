@@ -217,13 +217,26 @@ def make_location_dict(genome_build, cursor, chrom = None, start = None, end = N
 
     return location_dict
     
-def make_edge_dict(cursor):
+def make_edge_dict(cursor, build = None, chrom = None, start = None, end = None):
     """ Format of dict:
             Key: vertex1_vertex2_type
             Value: SQLite3 row from edge table
     """
     edge_dict = {}
-    query = """SELECT * FROM edge"""
+    if any(val == None for val in [chrom, start,end]):
+        query = """SELECT * FROM edge"""
+    else:
+        query = Template("""SELECT e.* 
+                            FROM edge AS e
+                            LEFT JOIN location as loc1 ON e.v1 = loc1.location_ID
+                            LEFT JOIN location as loc2 ON e.v2 = loc2.location_ID
+                            WHERE loc1.genome_build = 'toy_build' AND loc2.genome_build = 'toy_build'
+                                 AND loc1.chromosome = "chr1" 
+                                 AND (loc1.position >= 1 AND loc1.position <= 1000)
+                                 AND (loc2.position >= 1 AND loc2.position <= 1000);
+                         """)
+        query = query.substitute({'build':build, 'chrom':chrom,
+                              'start':start, 'end':end})
     cursor.execute(query)
     for edge in cursor.fetchall():
         vertex_1 = edge["v1"]
@@ -1705,7 +1718,8 @@ def prepare_data_structures(cursor, build, min_coverage, min_identity,
     location_dict = make_location_dict(build, cursor, chrom = chrom,
                                                       start = start,
                                                       end = end)
-    edge_dict = make_edge_dict(cursor)
+    edge_dict = make_edge_dict(cursor, chrom = chrom, start = start,
+                               end = end)
     transcript_dict = make_transcript_dict(cursor, build, chrom = chrom,
                                                           start = start,
                                                           end = end)
