@@ -353,7 +353,8 @@ def make_temp_monoexonic_transcript_table(cursor, build, chrom = None,
     
     return
 
-def make_temp_novel_gene_table(cursor, build):
+def make_temp_novel_gene_table(cursor, build, chrom = None,
+                                          start = None, end = None):
     """ Attaches a temporary database with a table that has the following fields:
             - gene_ID
             - chromosome
@@ -381,8 +382,32 @@ def make_temp_novel_gene_table(cursor, build):
                                         WHERE loc.genome_build = '$build'
                                         GROUP BY g.gene_ID); """)
 
+    else:
+        command = Template(""" CREATE TEMPORARY TABLE IF NOT EXISTS temp_gene AS
+                                   SELECT gene_ID,
+                                     chromosome,
+                                     start,
+                                     end,
+                                     strand
+                                    FROM (SELECT g.gene_ID,
+                                              loc.chromosome,
+                                              MIN(loc.position) as start,
+                                              MAX(loc.position) as end,
+                                              g.strand
+                                        FROM genes as g
+                                        LEFT JOIN vertex as v ON g.gene_ID = v.gene_ID
+                                        LEFT JOIN location as loc ON loc.location_ID = v.vertex_ID
+                                        WHERE loc.genome_build = '$build'
+                                        GROUP BY g.gene_ID)
+                                    WHERE chromosome = '$chrom'
+                                        AND ((start <= $start AND end >= $end)
+                                          OR (start >= $start AND end <= $end)
+                                          OR (start >= $start AND start <= $end)
+                                          OR (end >= $start AND end <= $end)); """)
 
-    cursor.execute(command % (build))
+    command = command.substitute({'build':build, 'chrom':chrom,
+                                  'start':start, 'end':end})
+    cursor.execute(command)
     return
 
 def search_for_vertex_at_pos(chromosome, position, location_dict):
