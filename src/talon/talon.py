@@ -285,7 +285,8 @@ def make_vertex_2_gene_dict(cursor, build = None, chrom = None, start = None, en
 
     return vertex_2_gene
 
-def make_temp_monoexonic_transcript_table(cursor, build):
+def make_temp_monoexonic_transcript_table(cursor, build, chrom = None, 
+                                          start = None, end = None):
     """ Attaches a temporary database with a table that has the following fields:
             - gene_ID
             - transcript_ID
@@ -296,23 +297,59 @@ def make_temp_monoexonic_transcript_table(cursor, build):
         The purpose is to allow location-based matching for monoexonic query
         transcripts. """
 
-    command = """ CREATE TEMPORARY TABLE IF NOT EXISTS temp_monoexon AS
-                  SELECT t.gene_ID, 
-                         t.transcript_ID, 
-			 loc1.chromosome, 
-			 loc1.position as start,
-                         loc2.position as end,
-			 genes.strand,
-                         t.start_vertex,
-                         t.end_vertex,
-                         t.start_exon as exon_ID
-                  FROM transcripts as t
-	          LEFT JOIN location as loc1 ON loc1.location_ID = t.start_vertex
-	          LEFT JOIN location as loc2 ON loc2.location_ID = t.end_vertex
-	          LEFT JOIN genes ON genes.gene_ID = t.gene_ID
-                  WHERE n_exons = 1 AND loc1.genome_build = '%s' 
-	          AND loc2.genome_build = '%s' """
-    cursor.execute(command % (build, build))
+    if any(val == None for val in [chrom, start, end]):
+        command = Template(""" CREATE TEMPORARY TABLE IF NOT EXISTS temp_monoexon AS
+                                   SELECT t.gene_ID, 
+                                      t.transcript_ID, 
+			              loc1.chromosome, 
+			              loc1.position as start,
+                                      loc2.position as end,
+			              genes.strand,
+                                      t.start_vertex,
+                                      t.end_vertex,
+                                      t.start_exon as exon_ID
+                                   FROM transcripts as t
+	                           LEFT JOIN location as loc1 
+                                       ON loc1.location_ID = t.start_vertex
+	                           LEFT JOIN location as loc2 
+                                       ON loc2.location_ID = t.end_vertex
+	                           LEFT JOIN genes 
+                                       ON genes.gene_ID = t.gene_ID
+                                   WHERE n_exons = 1 
+                                       AND loc1.genome_build = '$build' 
+	                               AND loc2.genome_build = '$build' """)
+    else:
+        command = Template(""" CREATE TEMPORARY TABLE IF NOT EXISTS temp_monoexon AS
+                                   SELECT t.gene_ID,
+                                      t.transcript_ID,
+                                      loc1.chromosome,
+                                      loc1.position as start,
+                                      loc2.position as end,
+                                      genes.strand,
+                                      t.start_vertex,
+                                      t.end_vertex,
+                                      t.start_exon as exon_ID,
+                                      MIN(loc1.position, loc2.position) as min_pos,
+                                      MAX(loc1.position, loc2.position) as max_pos
+                                   FROM transcripts as t
+                                   LEFT JOIN location as loc1
+                                       ON loc1.location_ID = t.start_vertex
+                                   LEFT JOIN location as loc2
+                                       ON loc2.location_ID = t.end_vertex
+                                   LEFT JOIN genes
+                                       ON genes.gene_ID = t.gene_ID
+                                   WHERE n_exons = 1
+                                   AND loc1.genome_build = '$build'
+                                   AND loc2.genome_build = '$build'
+                                   AND loc1.chromosome = '$chrom'
+                                   AND ((min_pos <= $start AND max_pos >= $end)
+                                       OR (min_pos >= $start AND max_pos <= $end)
+                                       OR (min_pos >= $start AND min_pos <= $end)
+                                       OR (max_pos >= $start AND max_pos <= $end))""")        
+
+    command = command.substitute({'build':build, 'chrom':chrom,
+                                  'start':start, 'end':end})
+    cursor.execute(command)
     
     return
 
@@ -326,22 +363,24 @@ def make_temp_novel_gene_table(cursor, build):
         The purpose is to track novel genes from this run in order to match
         transcripts to them when other forms of gene assignment have failed.
     """
-    command = """ CREATE TEMPORARY TABLE IF NOT EXISTS temp_gene AS 
-                  SELECT gene_ID,
-                    chromosome,
-                    start,
-                    end,
-                    strand
-                   FROM (SELECT g.gene_ID,
-                             loc.chromosome,
-                             MIN(loc.position) as start,
-                             MAX(loc.position) as end,
-                             g.strand
-                       FROM genes as g
-                       LEFT JOIN vertex as v ON g.gene_ID = v.gene_ID
-                       LEFT JOIN location as loc ON loc.location_ID = v.vertex_ID
-                       WHERE loc.genome_build = '%s'
-                       GROUP BY g.gene_ID); """
+    if any(val == None for val in [chrom, start, end]):
+        command = Template(""" CREATE TEMPORARY TABLE IF NOT EXISTS temp_gene AS 
+                                   SELECT gene_ID,
+                                     chromosome,
+                                     start,
+                                     end,
+                                     strand
+                                    FROM (SELECT g.gene_ID,
+                                              loc.chromosome,
+                                              MIN(loc.position) as start,
+                                              MAX(loc.position) as end,
+                                              g.strand
+                                        FROM genes as g
+                                        LEFT JOIN vertex as v ON g.gene_ID = v.gene_ID
+                                        LEFT JOIN location as loc ON loc.location_ID = v.vertex_ID
+                                        WHERE loc.genome_build = '$build'
+                                        GROUP BY g.gene_ID); """)
+
 
     cursor.execute(command % (build))
     return
@@ -1732,17 +1771,20 @@ def prepare_data_structures(cursor, build, min_coverage, min_identity,
 
     # TODO: modify queries to restrict the location of items
     make_temp_novel_gene_table(cursor, build)
-    make_temp_monoexonic_transcript_table(cursor, build)
+    make_temp_monoexonic_transcript_table(cursor, build, chrom = chrom,
+                                                      start = start,
+                                                      end = end)
     run_info = init_run_info(cursor, build, min_coverage, min_identity)
     location_dict = make_location_dict(build, cursor, chrom = chrom,
                                                       start = start,
                                                       end = end)
-    edge_dict = make_edge_dict(cursor, chrom = chrom, start = start,
+    edge_dict = make_edge_dict(cursor, build = build, chrom = chrom, start = start,
                                end = end)
     transcript_dict = make_transcript_dict(cursor, build, chrom = chrom,
                                                           start = start,
                                                           end = end)
-    vertex_2_gene = make_vertex_2_gene_dict(cursor)
+    vertex_2_gene = make_vertex_2_gene_dict(cursor, build = build, chrom = chrom, 
+                                            start = start, end = end )
     gene_starts, gene_ends = make_gene_start_and_end_dict(cursor, build, 
                                                           chrom = chrom,
                                                           start = start,
