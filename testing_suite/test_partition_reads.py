@@ -16,7 +16,7 @@ class TestPartitionReads(object):
         datasets = ["dataset1"]
         tmp_dir = "scratch/test_read_partition/"
 
-        read_groups = procsam.partition_reads(sams, datasets, tmp_dir = tmp_dir)
+        read_groups, intervals = procsam.partition_reads(sams, datasets, tmp_dir = tmp_dir)
 
         # Check length and membership of read groups
         assert len(read_groups) == 2 
@@ -24,3 +24,6 @@ class TestPartitionReads(object):
         assert [ entry.query_name for entry in read_groups[0] ] == ["read_1", "read_2"]
         assert [ entry.query_name for entry in read_groups[1] ] == ["read_3"]
         
+        # Check the intervals 
+        assert intervals[0] == ("chr1", 1, 1000)
+        assert intervals[1] == ("chr2", 1, 100)

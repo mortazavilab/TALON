@@ -40,12 +40,13 @@ def preprocess_sam(sam_files, datasets, tmp_dir = "talon_tmp/", n_threads = 0):
                             "files have headers."))
     return merged_bam
 
-def partition_reads(sam_files, datasets, n_threads = 0):
+def partition_reads(sam_files, datasets, tmp_dir = "talon_tmp/", n_threads = 0):
     """ Use bedtools merge to create non-overlapping intervals from all of the
         transcripts in a series of SAM/BAM files. Then, iterate over the intervals
         to extract all reads inside of them from the pysam object."""
 
-    merged_bam = preprocess_sam(sam_files, datasets, n_threads = n_threads)
+    merged_bam = preprocess_sam(sam_files, datasets, tmp_dir = tmp_dir, 
+                                n_threads = n_threads)
 
     try:
         all_reads = pybedtools.BedTool(merged_bam).bam_to_bed()
@@ -58,13 +59,15 @@ def partition_reads(sam_files, datasets, n_threads = 0):
     intervals = sorted_reads.merge()
 
     # Now open each sam file using pysam and extract the reads
+    coords = []
     read_groups = []
     with pysam.AlignmentFile(merged_bam) as bam:  # type: pysam.AlignmentFile
         for interval in intervals:
             reads = get_reads_in_interval(bam, interval.chrom,
                                           interval.start, interval.end)
             read_groups.append(reads)
-    return read_groups
+            coords.append((interval.chrom, interval.start + 1, interval.end))
+    return read_groups, coords
 
 def get_reads_in_interval(sam, chrom, start, end):
     """ Given an open pysam.AlignmentFile, return only the reads that overlap
