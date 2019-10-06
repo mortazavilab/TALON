@@ -21,9 +21,35 @@ from . import query_utils as qutils
 #from . import init_chunk_refs as icrefs
 import pysam
 from string import Template
+from multiprocessing import Pool, Process, Value, Lock
 
 # TODO: Add a counter that the threads increment
 # TODO: Refine multigene behavior
+
+class Counter(object):
+    def __init__(self, initval=0):
+        self.val = Value('i', initval)
+        self.lock = Lock()
+
+    def increment(self):
+        with self.lock:
+            self.val.value += 1
+
+    def value(self):
+        with self.lock:
+            return self.val.value
+
+def get_counters(cursor):
+    """ Fetch counter values from the database and create counter objects 
+        that will be accessible to all of the threads during the parallel run    """
+    # Fetch counter values
+    cursor.execute("SELECT * FROM counters WHERE category == 'genes'")
+    gene_counter = Counter(initval = cursor.fetchone()['count'])
+    
+    #for counter in cursor.fetchall():
+    #    counter_name = counter['category']
+    #    run_info[counter_name] = counter['count']    
+    return gene_counter
 
 def get_args():
     """ Fetches the arguments for the program """
@@ -1795,19 +1821,17 @@ def prepare_data_structures(cursor, build, min_coverage, min_identity,
     """
 
     # TODO: modify queries to restrict the location of items
-    make_temp_novel_gene_table(cursor, build)
+    make_temp_novel_gene_table(cursor, build, chrom = chrom, start = start,
+                               end = end)
     make_temp_monoexonic_transcript_table(cursor, build, chrom = chrom,
-                                                      start = start,
-                                                      end = end)
+                                          start = start, end = end)
     run_info = init_run_info(cursor, build, min_coverage, min_identity)
-    location_dict = make_location_dict(build, cursor, chrom = chrom,
-                                                      start = start,
-                                                      end = end)
+    location_dict = make_location_dict(build, cursor, chrom = chrom, start = start,
+                                       end = end)
     edge_dict = make_edge_dict(cursor, build = build, chrom = chrom, start = start,
                                end = end)
     transcript_dict = make_transcript_dict(cursor, build, chrom = chrom,
-                                                          start = start,
-                                                          end = end)
+                                           start = start, end = end)
     vertex_2_gene = make_vertex_2_gene_dict(cursor, build = build, chrom = chrom, 
                                             start = start, end = end )
     gene_starts, gene_ends = make_gene_start_and_end_dict(cursor, build, 
@@ -2581,6 +2605,9 @@ def main():
     min_identity = float(options.min_identity)
     outprefix = options.outprefix
 
+    # Set globally accessible counters
+    gene_counter = get_counters(cursor)
+
     # Prepare data structures from the database content
     # TODO: will move to threads
     print("Processing annotation...")
@@ -2611,10 +2638,56 @@ def main():
     #write_counts_log_file(cursor, outprefix)
     conn.close()
 
+def parallel_talon(reads, build, min_coverage = 0, min_identity = 0):
+    """  """
+    print("Processing annotation...")
+    struct_collection = prepare_data_structures(cursor, build, min_coverage,
+                                                min_identity)
+    # Read and annotate input sam files. Also, write output QC log file.
+    print("Processing SAM files...")
+    print("-------------------------------------")
+    datasets, observed_transcripts, gene_annotations, transcript_annotations, \
+    transcript_annotations, exon_annotations, abundance \
+                      = process_all_sam_files(sam_files, dataset_list, cursor,
+                                              struct_collection, outprefix)
+    print("-------------------------------------")
+
+    # Update database
+    batch_size = 10000
+    update_database(cursor, batch_size, datasets, observed_transcripts,
+                    gene_annotations, transcript_annotations, exon_annotations,
+                    abundance, struct_collection)
+    # Validate database
+    check_database_integrity(cursor)
+    conn.commit()
+    conn.close()
 
 if __name__ == '__main__':
     #pr = cProfile.Profile()
     #pr.enable()
-    main()
+    """ Runs program """
+    options = get_args()
+    sam_files, dataset_list = check_inputs(options)
+
+    # Fire up the database connection
+    database = options.database
+    conn = sqlite3.connect(database)
+    conn.row_factory = sqlite3.Row
+    cursor = conn.cursor()
+
+    # Input parameters
+    build = options.build
+    min_coverage = float(options.min_coverage)
+    min_identity = float(options.min_identity)
+    outprefix = options.outprefix
+
+    # Set globally accessible counters
+    gene_counter = get_counters(cursor)
+
+    # Partition the reads
+    read_groups, intervals = procsam.partition_reads(sam_files, datasets)
+    with Pool(processes=1) as pool:
+        pool.map(parallel_talon, read_groups, build = build)
+
     #pr.disable()
     #pr.print_stats()
