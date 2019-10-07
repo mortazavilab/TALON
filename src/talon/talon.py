@@ -10,11 +10,11 @@ import argparse
 from functools import reduce
 import sqlite3
 import sys
-from . import dstruct
 import operator
-#import os
+import os
 from pathlib import Path
 import warnings
+from . import dstruct
 from . import process_sams as procsams
 from . import transcript_utils as tutils
 from . import query_utils as qutils
@@ -1435,7 +1435,8 @@ def check_inputs(options):
     return sam_files, dataset_metadata
 
 
-def init_run_info(database, genome_build, min_coverage = 0.9, min_identity = 0):
+def init_run_info(database, genome_build, min_coverage = 0.9, min_identity = 0,
+                  tmp_dir = "talon_tmp/"):
     """ Initializes a dictionary that keeps track of important run information
         such as the desired genome build, the prefix for novel identifiers,
         and the novel counters for the run. """
@@ -1448,6 +1449,8 @@ def init_run_info(database, genome_build, min_coverage = 0.9, min_identity = 0):
         run_info.build = genome_build
         run_info.min_coverage = min_coverage
         run_info.min_identity = min_identity
+        run_info.tmp_dir = tmp_dir
+        os.system("mkdir -p %s " % (tmp_dir)) 
 
         # Fetch information from run_info table
         cursor.execute("""SELECT * FROM run_info""")
@@ -1870,39 +1873,39 @@ def annotate_sam_transcripts(sam_file: str, dataset, cursor, struct_collection, 
            exon_annotations, abundance_rows
             
 
-def check_read_quality(sam_record: pysam.AlignedSegment, struct_collection):
-    """ Process an individual sam read and return quality attributes. """
-    read_ID = sam_record.query_name
-    flag = sam_record.flag
-    cigar = sam_record.cigarstring
-    seq = sam_record.query
-    read_length = sam_record.query_length
-
-    # Only use uniquely mapped transcripts
-    if flag not in [0, 16]:
-        return [read_ID, 0, 0, read_length, "NA", "NA"]
-
-    # Only use reads that are greater than or equal to length threshold
-    if read_length < struct_collection.run_info.min_length:
-        return [read_ID, 0, 1, read_length, "NA", "NA"]
-
-    # Locate the MD field of the sam transcript
-    try:
-        md_tag = sam_record.get_tag('MD')
-    except KeyError:
-        raise ValueError("SAM transcript %s lacks an MD tag" % read_ID)
-
-    # Only use reads where alignment coverage and identity exceed
-    # cutoffs
-    coverage = tutils.compute_alignment_coverage(cigar)
-    identity = tutils.compute_alignment_identity(md_tag, seq)
-
-    if coverage < struct_collection.run_info.min_coverage or \
-       identity < struct_collection.run_info.min_identity:
-        return [read_ID, 0, 1, read_length, coverage, identity]
-
-    # At this point, the read has passed the quality control
-    return [read_ID, 1, 1, read_length, coverage, identity]
+#def check_read_quality(sam_record: pysam.AlignedSegment, struct_collection):
+#    """ Process an individual sam read and return quality attributes. """
+#    read_ID = sam_record.query_name
+#    flag = sam_record.flag
+#    cigar = sam_record.cigarstring
+#    seq = sam_record.query
+#    read_length = sam_record.query_length
+#
+#    # Only use uniquely mapped transcripts
+#    if flag not in [0, 16]:
+#        return [read_ID, 0, 0, read_length, "NA", "NA"]
+#
+#    # Only use reads that are greater than or equal to length threshold
+#    if read_length < struct_collection.run_info.min_length:
+#        return [read_ID, 0, 1, read_length, "NA", "NA"]
+#
+#    # Locate the MD field of the sam transcript
+#    try:
+#        md_tag = sam_record.get_tag('MD')
+#    except KeyError:
+#        raise ValueError("SAM transcript %s lacks an MD tag" % read_ID)
+#
+#    # Only use reads where alignment coverage and identity exceed
+#    # cutoffs
+#    coverage = tutils.compute_alignment_coverage(cigar)
+#    identity = tutils.compute_alignment_identity(md_tag, seq)
+#
+#    if coverage < struct_collection.run_info.min_coverage or \
+#       identity < struct_collection.run_info.min_identity:
+#        return [read_ID, 0, 1, read_length, coverage, identity]
+#
+#    # At this point, the read has passed the quality control
+#    return [read_ID, 1, 1, read_length, coverage, identity]
     
 def update_database(cursor, batch_size, datasets, observed_transcripts, 
                     gene_annotations, transcript_annotations, exon_annotations,
@@ -2221,29 +2224,29 @@ def check_database_integrity(cursor):
 
     return
 
-def write_counts_log_file(cursor, outprefix):
-    """ Create a log file with the following columns:
-            - dataset name
-            - Number of reads annotated
-            - Number of known genes detected (total)
-            - Number of novel genes detected (total)
-            - Number of known transcripts detected (total)
-            - Number of novel transcripts detected (total)
-            Breakdowns by category
-            - Number of antisense genes detected
-            - Number of intergenic genes detected
-            - Number of known transcripts
-            - Number of FSM transcripts detected (perfect + with novelty)
-            - Number of total ISM transcripts detected
-            - Number of suffix ISMs detected
-            - Number of antisense transcripts detected
-            - Number of genomic transcripts detected
-    """
-
-    # Run utility
-    summarize_datasets.write_counts_file(cursor, outprefix)
-
-    return 
+#def write_counts_log_file(cursor, outprefix):
+#    """ Create a log file with the following columns:
+#            - dataset name
+#            - Number of reads annotated
+#            - Number of known genes detected (total)
+#            - Number of novel genes detected (total)
+#            - Number of known transcripts detected (total)
+#            - Number of novel transcripts detected (total)
+#            Breakdowns by category
+#            - Number of antisense genes detected
+#            - Number of intergenic genes detected
+#            - Number of known transcripts
+#            - Number of FSM transcripts detected (perfect + with novelty)
+#            - Number of total ISM transcripts detected
+#            - Number of suffix ISMs detected
+#            - Number of antisense transcripts detected
+#            - Number of genomic transcripts detected
+#    """
+#
+#    # Run utility
+#    summarize_datasets.write_counts_file(cursor, outprefix)
+#
+#    return 
 
 #def main():
 #    """ Runs program """
@@ -2297,22 +2300,46 @@ def write_counts_log_file(cursor, outprefix):
 #    conn.close()
 
 def parallel_talon(read_file, interval, database, run_info):
-    """  """
+    """ Manage TALON processing of a single chunk of the input. Initialize
+        reference data structures covering only the provided interval region,
+        then send the read file to the annotation step. Once annotation is 
+        complete, return the data tuples generated so that they can be 
+        added to the database, OR alternately, pickle them and write to file
+        where they can be accessed later. """
     print("---------------------------------------------------")
-    print("Processing annotation...")
-    print(interval)
 
     with sqlite3.connect(database) as conn:
         conn.row_factory = sqlite3.Row
         cursor = conn.cursor()
 
+        print("Processing annotation for interval %s:%d-%d..." % interval)
         struct_collection = prepare_data_structures(cursor, run_info,
                                                     chrom = interval[0], 
                                                     start = interval[1], 
                                                     end = interval[2])
 
         print("Annotating reads...")
-    # Open QC file in tmp directory. Tmp dir name should be in run info.
+        interval_id = "%s_%d_%d" % interval
+
+        # TODO: Open QC file in tmp directory.
+        qc_dir = run_info.tmp_dir + "QC_logs/"
+        os.system("mkdir -p %s" % qc_dir)
+        fname = qc_dir + interval_id + ".QC.log"
+        with open(fname, 'w') as QC_file:
+            with pysam.AlignmentFile(read_file, "rb") as sam:
+                for record in sam:  # type: pysam.AlignedSegment
+                    # Check whether we should try annotating this read or not
+                    print(record.query_name)
+                    qc_metrics = tutils.check_read_quality(record, run_info)
+
+                    passed_qc = qc_metrics[2]
+                    QC_file.write("\t".join([str(x) for x in qc_metrics]) + "\n")
+
+                    if not passed_qc:
+                        continue    
+            #o.write("\t".join(["dataset", "read_ID", "passed_QC", "primary_mapped",
+            #               "read_length", "fraction_aligned", "identity"]) + "\n")
+            
     # Also open read annotation output file
     # Open provided alignment file and iterate over the reads
 
@@ -2322,6 +2349,7 @@ def parallel_talon(read_file, interval, database, run_info):
     
     #conn.close()
     return
+
     # Read and annotate input sam files. Also, write output QC log file.
     #print("Annotating reads...")
     #print("-------------------------------------")
@@ -2383,7 +2411,7 @@ def main():
 
 
     # TODO: Update database and validate. Concatenate outfiles
-
+        #TODO: header for QC log file
 if __name__ == '__main__':
     main()
     #pr.disable()
