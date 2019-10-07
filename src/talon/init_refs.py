@@ -1,4 +1,6 @@
-
+# TALON: Techonology-Agnostic Long Read Analysis Pipeline
+# Author: Dana Wyman
+# -----------------------------------------------------------------------------
 # Contains functions that query the database to initialize various data 
 # structures for the TALON run.
 # ---------------------------------------------------------------------
