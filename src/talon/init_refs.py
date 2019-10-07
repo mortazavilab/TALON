@@ -205,7 +205,6 @@ def make_transcript_dict(cursor, build, chrom = None, start = None, end = None):
             Value: SQLite3 row from transcript table
     """
     transcript_dict = {}
-    print(build)
     if any(val == None for val in [chrom, start, end]):
          query = Template("""SELECT t.*,
                                 loc1.chromosome as chromosome,
