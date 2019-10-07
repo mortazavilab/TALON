@@ -40,17 +40,23 @@ class Counter(object):
         with self.lock:
             return self.val.value
 
-def get_counters(cursor):
+def get_counters(database):
     """ Fetch counter values from the database and create counter objects 
         that will be accessible to all of the threads during the parallel run    """
-    # Fetch counter values
-    cursor.execute("SELECT * FROM counters WHERE category == 'genes'")
-    gene_counter = Counter(initval = cursor.fetchone()['count'])
+
+    with sqlite3.connect(database) as conn:
+        conn.row_factory = sqlite3.Row
+        cursor = conn.cursor()
+
+        # Fetch counter values
+        cursor.execute("SELECT * FROM counters WHERE category == 'genes'")
+        global gene_counter
+        gene_counter = Counter(initval = cursor.fetchone()['count'])
     
     #for counter in cursor.fetchall():
     #    counter_name = counter['category']
     #    run_info[counter_name] = counter['count']    
-    return gene_counter
+    return #gene_counter
 
 def get_args():
     """ Fetches the arguments for the program """
@@ -1872,40 +1878,6 @@ def annotate_sam_transcripts(sam_file: str, dataset, cursor, struct_collection, 
     return observed_transcripts, gene_annotations, transcript_annotations, \
            exon_annotations, abundance_rows
             
-
-#def check_read_quality(sam_record: pysam.AlignedSegment, struct_collection):
-#    """ Process an individual sam read and return quality attributes. """
-#    read_ID = sam_record.query_name
-#    flag = sam_record.flag
-#    cigar = sam_record.cigarstring
-#    seq = sam_record.query
-#    read_length = sam_record.query_length
-#
-#    # Only use uniquely mapped transcripts
-#    if flag not in [0, 16]:
-#        return [read_ID, 0, 0, read_length, "NA", "NA"]
-#
-#    # Only use reads that are greater than or equal to length threshold
-#    if read_length < struct_collection.run_info.min_length:
-#        return [read_ID, 0, 1, read_length, "NA", "NA"]
-#
-#    # Locate the MD field of the sam transcript
-#    try:
-#        md_tag = sam_record.get_tag('MD')
-#    except KeyError:
-#        raise ValueError("SAM transcript %s lacks an MD tag" % read_ID)
-#
-#    # Only use reads where alignment coverage and identity exceed
-#    # cutoffs
-#    coverage = tutils.compute_alignment_coverage(cigar)
-#    identity = tutils.compute_alignment_identity(md_tag, seq)
-#
-#    if coverage < struct_collection.run_info.min_coverage or \
-#       identity < struct_collection.run_info.min_identity:
-#        return [read_ID, 0, 1, read_length, coverage, identity]
-#
-#    # At this point, the read has passed the quality control
-#    return [read_ID, 1, 1, read_length, coverage, identity]
     
 def update_database(cursor, batch_size, datasets, observed_transcripts, 
                     gene_annotations, transcript_annotations, exon_annotations,
@@ -2307,7 +2279,6 @@ def parallel_talon(read_file, interval, database, run_info):
         added to the database, OR alternately, pickle them and write to file
         where they can be accessed later. """
     print("---------------------------------------------------")
-
     with sqlite3.connect(database) as conn:
         conn.row_factory = sqlite3.Row
         cursor = conn.cursor()
@@ -2335,19 +2306,43 @@ def parallel_talon(read_file, interval, database, run_info):
                     passed_qc = qc_metrics[2]
                     QC_file.write("\t".join([str(x) for x in qc_metrics]) + "\n")
 
-                    if not passed_qc:
-                        continue    
-            #o.write("\t".join(["dataset", "read_ID", "passed_QC", "primary_mapped",
-            #               "read_length", "fraction_aligned", "identity"]) + "\n")
-            
-    # Also open read annotation output file
-    # Open provided alignment file and iterate over the reads
+                    if passed_qc:
+                        annotate_read(record, run_info, struct_collection)
 
-        # Check whether read passes coverage and identity QC
+    return
 
-        # If it passes, continue to annotation step.
-    
-    #conn.close()
+def annotate_read(sam_record: pysam.AlignedSegment, run_info, struct_collection):            
+    """ """
+    # Parse attributes to determine the chromosome, positions, and strand of the transcript
+    read_ID = sam_record.query_name
+    chrom = sam_record.reference_name
+    strand = "-" if sam_record.is_reverse else "+"
+    read_length = sam_record.query_length
+    sam_start = sam_record.reference_start + 1
+    sam_end = sam_record.reference_end
+    cigar = sam_record.cigarstring
+
+    # TODO: see if we can do this faster with pysam
+    intron_list = tutils.get_introns(sam_record, sam_start, cigar)
+
+    # Adjust intron positions by 1 to get splice sites
+    splice_sites = [x + 1 if i % 2 == 1 else x - 1 for i, x in
+                    enumerate(intron_list)]
+    positions = [sam_start] + splice_sites + [sam_end]
+
+    # Flip the positions' order if the read is on the minus strand
+    if strand == "-":
+        positions = positions[::-1]
+
+    # Now identify the transcript
+    location_dict = struct_collection.location_dict
+    edge_dict = struct_collection.edge_dict
+    transcript_dict = struct_collection.transcript_dict
+    vertex_2_gene = struct_collection.vertex_2_gene
+    gene_starts = struct_collection.gene_starts
+    gene_ends = struct_collection.gene_ends
+ 
+
     return
 
     # Read and annotate input sam files. Also, write output QC log file.
@@ -2389,7 +2384,9 @@ def main():
 
     # Set globally accessible counters
     run_info = init_run_info(database, build, min_coverage, min_identity)
-    #gene_counter = get_counters(database)
+    get_counters(database)
+    print(gene_counter.value())
+    ###exit()
 
     # Create annotation entry for each dataset
     datasets = []
@@ -2409,7 +2406,7 @@ def main():
                                          repeat(database), 
                                          repeat(run_info)))
 
-
+    print(gene_counter.value())
     # TODO: Update database and validate. Concatenate outfiles
         #TODO: header for QC log file
 if __name__ == '__main__':
