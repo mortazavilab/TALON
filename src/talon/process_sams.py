@@ -43,7 +43,13 @@ def preprocess_sam(sam_files, datasets, tmp_dir = "talon_tmp/", n_threads = 0):
 def partition_reads(sam_files, datasets, tmp_dir = "talon_tmp/", n_threads = 0):
     """ Use bedtools merge to create non-overlapping intervals from all of the
         transcripts in a series of SAM/BAM files. Then, iterate over the intervals
-        to extract all reads inside of them from the pysam object."""
+        to extract all reads inside of them from the pysam object.
+       
+        Returns:
+            - List of lists: sublists contain psam reads from a given interval
+            - List of tuple intervals
+            - filename of merged bam file (to keep track of the header)
+           """
 
     merged_bam = preprocess_sam(sam_files, datasets, tmp_dir = tmp_dir, 
                                 n_threads = n_threads)
@@ -67,7 +73,32 @@ def partition_reads(sam_files, datasets, tmp_dir = "talon_tmp/", n_threads = 0):
                                           interval.start, interval.end)
             read_groups.append(reads)
             coords.append((interval.chrom, interval.start + 1, interval.end))
-    return read_groups, coords
+
+    # Keep track of header from the merged bam file
+    #with pysam.AlignmentFile(merged_bam, "rb") as f:
+    #    header = f.header
+
+    return read_groups, coords, merged_bam
+
+def write_reads_to_file(read_groups, intervals, header_template, tmp_dir = "talon_tmp/"):
+    """ For each read group, iterate over the reads and write them to a file
+        named for the interval they belong to. This step is necessary because
+        Pysam objects cannot be pickled. """
+ 
+    tmp_dir = tmp_dir + "interval_files/"
+    os.system("mkdir -p %s " % (tmp_dir))
+ 
+    outbam_names = []
+    with pysam.AlignmentFile(header_template, "rb") as template:
+        for group, interval in zip(read_groups, intervals):
+            fname = tmp_dir + "_".join([str(x) for x in interval]) + ".bam"
+            outbam_names.append(fname)
+            with pysam.AlignmentFile(fname, "wb", template = template) as f:
+                for read in group:
+                    f.write(read)
+        
+    return outbam_names
+
 
 def get_reads_in_interval(sam, chrom, start, end):
     """ Given an open pysam.AlignmentFile, return only the reads that overlap
