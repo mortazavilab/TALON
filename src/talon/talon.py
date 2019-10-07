@@ -1382,57 +1382,56 @@ def check_inputs(options):
         raise ValueError("Database file '%s' does not exist!" % database)
 
     # Make sure that the genome build exists in the provided TALON database.
-    conn = sqlite3.connect(database)
-    cursor = conn.cursor()
-    cursor.execute(""" SELECT DISTINCT name FROM genome_build """)
-    builds = [ str(x[0]) for x in cursor.fetchall() ]
-    if options.build not in builds:
-        build_names = ", ".join(list(builds))
-        raise ValueError("Please specify a genome build that exists in the" +
-                          " database. The choices are: " + build_names)
+    with sqlite3.connect(database) as conn:
+        cursor = conn.cursor()
+        cursor.execute(""" SELECT DISTINCT name FROM genome_build """)
+        builds = [ str(x[0]) for x in cursor.fetchall() ]
+        if options.build not in builds:
+            build_names = ", ".join(list(builds))
+            raise ValueError("Please specify a genome build that exists in the" +
+                             " database. The choices are: " + build_names)
 
-    # Make sure that each input dataset is not already in the database, and
-    # also make sure that each dataset name is unique
-    sam_files = []
-    dataset_metadata = []
-    curr_datasets = []
+        # Make sure that each input dataset is not already in the database, and
+        # also make sure that each dataset name is unique
+        sam_files = []
+        dataset_metadata = []
+        curr_datasets = []
 
-    cursor.execute(""" SELECT dataset_name FROM dataset """)
-    existing_datasets = [ str(x[0]) for x in cursor.fetchall() ]
+        cursor.execute(""" SELECT dataset_name FROM dataset """)
+        existing_datasets = [ str(x[0]) for x in cursor.fetchall() ]
 
-    with open(options.config_file, 'r') as f:
-        for line in f:
-            line = line.strip().split(',')
-            curr_sam = line[3]
-            if len(line) != 4:
-                raise ValueError('Incorrect number of comma-separated fields'+ \
-                                 ' in config file. There should be four: ' + \
-                                 '(dataset name, sample description, ' + \
-                                 'platform, associated sam file).')
+        with open(options.config_file, 'r') as f:
+            for line in f:
+                line = line.strip().split(',')
+                curr_sam = line[3]
+                if len(line) != 4:
+                    raise ValueError('Incorrect number of comma-separated fields'+ \
+                                     ' in config file. There should be four: ' + \
+                                     '(dataset name, sample description, ' + \
+                                     'platform, associated sam file).')
 
-            # Make sure that the sam file exists
-            if not Path(curr_sam).exists():
-                raise ValueError("SAM file '%s' does not exist!" % curr_sam)
+                # Make sure that the sam file exists
+                if not Path(curr_sam).exists():
+                    raise ValueError("SAM file '%s' does not exist!" % curr_sam)
 
-            metadata = (line[0], line[1], line[2])
-            dataname = metadata[0]
-            if dataname in existing_datasets:
-                warnings.warn("Ignoring dataset with name '" + dataname + \
-                              "' because it is already in the database.")
-            elif dataname in curr_datasets:
-                warnings.warn("Skipping duplicated instance of dataset '" + \
-                               dataname + "'.")
-            elif curr_sam in sam_files:
-                warnings.warn("Skipping duplicated instance of sam file '" + \
-                               curr_sam  + "'.")
-            else:
-                dataset_metadata.append(metadata)
-                curr_datasets.append(dataname)
-                if not curr_sam.endswith(".sam"):
-                    raise ValueError('Last field in config file must be a .sam file')
-                sam_files.append(curr_sam)      
+                metadata = (line[0], line[1], line[2])
+                dataname = metadata[0]
+                if dataname in existing_datasets:
+                    warnings.warn("Ignoring dataset with name '" + dataname + \
+                                  "' because it is already in the database.")
+                elif dataname in curr_datasets:
+                    warnings.warn("Skipping duplicated instance of dataset '" + \
+                                   dataname + "'.")
+                elif curr_sam in sam_files:
+                    warnings.warn("Skipping duplicated instance of sam file '" + \
+                                   curr_sam  + "'.")
+                else:
+                    dataset_metadata.append(metadata)
+                    curr_datasets.append(dataname)
+                    if not curr_sam.endswith(".sam"):
+                        raise ValueError('Last field in config file must be a .sam file')
+                    sam_files.append(curr_sam)      
 
-    conn.close()
     return sam_files, dataset_metadata
 
 
@@ -1441,33 +1440,29 @@ def init_run_info(database, genome_build, min_coverage = 0.9, min_identity = 0):
         such as the desired genome build, the prefix for novel identifiers,
         and the novel counters for the run. """
 
-    conn = sqlite3.connect(database)
-    conn.row_factory = sqlite3.Row
-    cursor = conn.cursor()
+    with sqlite3.connect(database) as conn:
+        conn.row_factory = sqlite3.Row
+        cursor = conn.cursor()
 
-    run_info = dstruct.Struct()
-    run_info.build = genome_build
-    run_info.min_coverage = min_coverage
-    run_info.min_identity = min_identity
+        run_info = dstruct.Struct()
+        run_info.build = genome_build
+        run_info.min_coverage = min_coverage
+        run_info.min_identity = min_identity
 
-    # Fetch information from run_info table
-    cursor.execute("""SELECT * FROM run_info""")
-    for info in cursor.fetchall():
-        info_name = info['item']
-        value = info['value']
-        if info_name != "idprefix":
-            value = int(value)
-        run_info[info_name] = value
+        # Fetch information from run_info table
+        cursor.execute("""SELECT * FROM run_info""")
+        for info in cursor.fetchall():
+            info_name = info['item']
+            value = info['value']
+            if info_name != "idprefix":
+                value = int(value)
+            run_info[info_name] = value
 
-    # Fetch counters
-    query = "SELECT * FROM counters WHERE category != 'genome_build'"
-    cursor.execute(query)
+        # Fetch dataset counter
+        query = "SELECT * FROM counters WHERE category == 'dataset'"
+        cursor.execute(query)
+        run_info.dataset = cursor.fetchone()['count']
 
-    #for counter in cursor.fetchall():
-    #    counter_name = counter['category']
-    #    run_info[counter_name] = counter['count']
-
-    conn.close()
     return run_info
 
 def prepare_data_structures(cursor, run_info, chrom = None, start = None, end = None):
@@ -2307,16 +2302,16 @@ def parallel_talon(read_file, interval, database, run_info):
     print("Processing annotation...")
     print(interval)
 
-    conn = sqlite3.connect(database)
-    conn.row_factory = sqlite3.Row
-    cursor = conn.cursor()
+    with sqlite3.connect(database) as conn:
+        conn.row_factory = sqlite3.Row
+        cursor = conn.cursor()
 
-    struct_collection = prepare_data_structures(cursor, run_info,
-                                                chrom = interval[0], 
-                                                start = interval[1], 
-                                                end = interval[2])
+        struct_collection = prepare_data_structures(cursor, run_info,
+                                                    chrom = interval[0], 
+                                                    start = interval[1], 
+                                                    end = interval[2])
 
-    print("Annotating reads...")
+        print("Annotating reads...")
     # Open QC file in tmp directory. Tmp dir name should be in run info.
     # Also open read annotation output file
     # Open provided alignment file and iterate over the reads
@@ -2325,27 +2320,27 @@ def parallel_talon(read_file, interval, database, run_info):
 
         # If it passes, continue to annotation step.
     
-    conn.close()
+    #conn.close()
     return
     # Read and annotate input sam files. Also, write output QC log file.
-    print("Annotating reads...")
-    print("-------------------------------------")
-    datasets, observed_transcripts, gene_annotations, transcript_annotations, \
-    transcript_annotations, exon_annotations, abundance \
-                      = process_all_sam_files(sam_files, dataset_list, cursor,
-                                              struct_collection, outprefix)
-    print("-------------------------------------")
+    #print("Annotating reads...")
+    #print("-------------------------------------")
+    #datasets, observed_transcripts, gene_annotations, transcript_annotations, \
+    #transcript_annotations, exon_annotations, abundance \
+    #                  = process_all_sam_files(sam_files, dataset_list, cursor,
+    #                                          struct_collection, outprefix)
+    #print("-------------------------------------")
 
     # Update database
-    batch_size = 10000
-    update_database(cursor, batch_size, datasets, observed_transcripts,
-                    gene_annotations, transcript_annotations, exon_annotations,
-                    abundance, struct_collection)
+    #batch_size = 10000
+    #update_database(cursor, batch_size, datasets, observed_transcripts,
+    #                gene_annotations, transcript_annotations, exon_annotations,
+    #                abundance, struct_collection)
     # Validate database
-    check_database_integrity(cursor)
-    conn.commit()
-    conn.close()
-    gene_counter.increment()
+    #check_database_integrity(cursor)
+    #conn.commit()
+    #conn.close()
+    #gene_counter.increment()
 
 #if __name__ == '__main__':
     #pr = cProfile.Profile()
@@ -2356,14 +2351,7 @@ def main():
     """ Runs program """
     options = get_args()
     sam_files, dset_metadata = check_inputs(options)
-    datasets = [ x[0] for x in dset_metadata ]
  
-    # Fire up the database connection
-    #database = options.database
-    #conn = sqlite3.connect(database)
-    #conn.row_factory = sqlite3.Row
-    #cursor = conn.cursor()
-
     # Input parameters
     database = options.database
     build = options.build
@@ -2375,25 +2363,26 @@ def main():
     run_info = init_run_info(database, build, min_coverage, min_identity)
     #gene_counter = get_counters(database)
 
-    # TODO: deal with dataset information at this stage, not in parallel func
+    # Create annotation entry for each dataset
+    datasets = []
+    dataset_db_entries = []
+    for d_name, description, platform in dset_metadata:
+        run_info['dataset'] += 1
+        d_id = run_info['dataset']
+        datasets.append(d_name)
+        dataset_db_entries.append((d_id, d_name, description, platform))
 
     # Partition the reads
     read_groups, intervals, header_file = procsams.partition_reads(sam_files, datasets)
     read_files = procsams.write_reads_to_file(read_groups, intervals, header_file)
 
     with Pool(processes=1) as pool:
-        #func = partial(parallel_wrapper, build, min_coverage, min_identity)
-        print(read_groups)
-        #exit()
-        #read_groups = [1,2,3]
-        #pool.map(parallel_talon, read_files)
         pool.starmap(parallel_talon, zip(read_files, intervals, 
                                          repeat(database), 
                                          repeat(run_info)))
-                                         #repeat(build), 
-                                         #repeat(min_coverage), 
-                                         #repeat(min_identity)))
-        #pool.map(func, read_groups)
+
+
+    # TODO: Update database and validate. Concatenate outfiles
 
 if __name__ == '__main__':
     main()
