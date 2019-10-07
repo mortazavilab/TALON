@@ -838,7 +838,6 @@ def process_ISM(chrom, positions, strand, edge_IDs, vertex_IDs, all_matches, tra
 
     # Iterate over matches to characterize ISMs
     for match in all_matches:
-        transcript_ID = transcript_counter.increment()
 
         # Add ISM
         ISM.append(str(match['transcript_ID']))
@@ -2407,7 +2406,9 @@ def main():
     # Set globally accessible counters
     run_info = init_run_info(database, build, min_coverage, min_identity)
     get_counters(database)
-    print(observed_counter.value())
+    print("Genes: %d" % gene_counter.value())
+    print("Transcripts: %d" % transcript_counter.value())
+    print("Observed: %d" % observed_counter.value())
     ###exit()
 
     # Create annotation entry for each dataset
@@ -2428,7 +2429,9 @@ def main():
                                          repeat(database), 
                                          repeat(run_info)))
 
-    print(observed_counter.value())
+    print("Genes: %d" % gene_counter.value())
+    print("Transcripts: %d" % transcript_counter.value())
+    print("Observed: %d" % observed_counter.value())
     # TODO: Update database and validate. Concatenate outfiles
         #TODO: header for QC log file
 if __name__ == '__main__':
