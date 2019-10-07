@@ -18,10 +18,11 @@ import warnings
 from . import process_sams as procsams
 from . import transcript_utils as tutils
 from . import query_utils as qutils
-#from . import init_chunk_refs as icrefs
+from . import init_refs as init_refs
 import pysam
-from string import Template
+#from string import Template
 from multiprocessing import Pool, Process, Value, Lock
+from itertools import repeat
 
 # TODO: Add a counter that the threads increment
 # TODO: Refine multigene behavior
@@ -85,356 +86,6 @@ def str_wrap_double(s):
     """ Adds double quotes around the input string """
     s = str(s)
     return '"' + s + '"'
-
-def make_gene_start_and_end_dict(cursor, build, chrom = None, start = None, end = None):
-    """ Format of dicts:
-            Key: gene ID from database
-            Value: dict mapping positions to start vertices (or end vertices) of 
-                   KNOWN transcripts from that gene
-    """
-    gene_starts = {}
-    gene_ends = {}
-    if any(val == None for val in [chrom, start,end]):
-        query = """SELECT gene_ID,
-                          start_vertex,
-                          end_vertex,
-                          loc1.position as start,
-                          loc2.position as end
-                   FROM transcripts
-                   LEFT JOIN transcript_annotations as ta
-                       ON ta.ID = transcripts.transcript_ID
-                   LEFT JOIN location as loc1
-                       ON transcripts.start_vertex = loc1.location_ID
-                   LEFT JOIN location as loc2
-                       ON transcripts.end_vertex = loc2.location_ID
-                   WHERE ta.attribute = 'transcript_status'
-                         AND ta.value = 'KNOWN'
-                         AND loc1.genome_build = '%s'
-                         AND loc2.genome_build = '%s'
-                  """
-        cursor.execute(query % (build, build))
-    else:
-        query = Template("""SELECT  gene_ID,
-                                    start_vertex,
-                                    end_vertex,
-                                    loc1.chromosome as chrom,
-                                    loc1.position as start,
-                                    loc2.position as end
-             
-                            FROM transcripts
-                            LEFT JOIN transcript_annotations as ta
-                                ON ta.ID = transcripts.transcript_ID
-                            LEFT JOIN location as loc1
-                                ON transcripts.start_vertex = loc1.location_ID
-                            LEFT JOIN location as loc2
-                                ON transcripts.end_vertex = loc2.location_ID
-                            WHERE ta.attribute = 'transcript_status'
-                                  AND ta.value = 'KNOWN'
-                                  AND loc1.genome_build = '$build'
-                                  AND loc2.genome_build = '$build'
-                                  AND chrom = '$chrom'
-                                  AND ((start <= $start AND end >= $end) 
-                                     OR (start >= $start AND end <= $end) 
-                                     OR (start >= $start AND start <= $end) 
-                                     OR (end >= $start AND end <= $end))""")
-        query = query.substitute({'build':build, 'chrom':chrom, 
-                                  'start':start, 'end':end})
-        cursor.execute(query)
-
-    for entry in cursor.fetchall():
-        gene_ID = entry['gene_ID']
-        start_vertex = entry['start_vertex']
-        end_vertex = entry['end_vertex']
-        start_pos = entry['start']
-        end_pos = entry['end']
-        try:
-            gene_starts[gene_ID][start_pos] = start_vertex
-        except:
-            gene_starts[gene_ID] = {}
-            gene_starts[gene_ID][start_pos] = start_vertex
-
-        try:
-            gene_ends[gene_ID][end_pos] = end_vertex
-        except:
-            gene_ends[gene_ID] = {}
-            gene_ends[gene_ID][end_pos] = end_vertex
-
-    return gene_starts, gene_ends
-           
-
-def make_transcript_dict(cursor, build, chrom = None, start = None, end = None):
-    """ Format of dict:
-            Key: tuple consisting of edges in transcript path
-            Value: SQLite3 row from transcript table
-    """
-    transcript_dict = {}
-    print(build)
-    if any(val == None for val in [chrom, start, end]):
-         query = Template("""SELECT t.*,
-        	                loc1.chromosome as chromosome,
-                                loc1.position as start_pos,
-                                loc2.position as end_pos	
-        	            FROM transcripts AS t
-        	                LEFT JOIN location as loc1 ON t.start_vertex = loc1.location_ID 
-        	                LEFT JOIN location as loc2 ON t.end_vertex = loc2.location_ID
-        	                WHERE loc1.genome_build = '$build' AND loc2.genome_build = '$build';
-                          """)
-
-    else:
-        query = Template("""SELECT t.*,
-                                loc1.chromosome as chrom,
-                                loc1.position as start_pos,
-                                loc2.position as end_pos,
-                                MIN(loc1.position, loc2.position) as min_pos,
-                                MAX(loc1.position, loc2.position) as max_pos
-                            FROM transcripts AS t
-                                LEFT JOIN location as loc1 ON t.start_vertex = loc1.location_ID
-                                LEFT JOIN location as loc2 ON t.end_vertex = loc2.location_ID
-                                WHERE loc1.genome_build = '$build' AND loc2.genome_build = '$build'
-                                         AND chrom == '$chrom'
-                                         AND ((min_pos <= $start AND max_pos >= $end)
-                                           OR (min_pos >= $start AND max_pos <= $end)
-                                           OR (min_pos >= $start AND min_pos <= $end)
-                                           OR (max_pos >= $start AND max_pos <= $end))""")
-
-    query = query.substitute({'build':build, 'chrom':chrom,
-                                  'start':start, 'end':end})
-    cursor.execute(query)
-    for transcript in cursor.fetchall():
-        transcript_path = transcript["jn_path"]
-        if transcript_path != None:
-            transcript_path = transcript_path.split(",") + \
-                              [transcript["start_exon"], transcript["end_exon"]]
-            transcript_path = frozenset([ int(x) for x in transcript_path])
-        else:
-            transcript_path = frozenset([transcript["start_exon"]])
-        transcript_dict[transcript_path] = transcript
-
-    return transcript_dict
-
-def make_location_dict(genome_build, cursor, chrom = None, start = None, end = None):
-    """ Format of dict:
-        chromosome -> dict(position -> SQLite3 row from location table)
-
-        old:
-            Key: chromosome, pos
-            Value: SQLite3 row from location table
-    """
-    location_dict = {}
-    
-    if any(val == None for val in [chrom, start,end]):
-        query = Template("""SELECT * FROM location WHERE genome_build = '$build' """)
-    else:
-        query = Template("""SELECT * FROM location 
-                            WHERE genome_build = '$build'
-                            AND chromosome = '$chrom'
-                            AND position >= $start 
-                            AND position <= $end""")
-    query = query.substitute({'build':genome_build, 'chrom':chrom,
-                              'start':start, 'end':end})
-    cursor.execute(query)
-    for location in cursor.fetchall():
-        chromosome = location["chromosome"]
-        position = location["position"]
-        try:
-            location_dict[chromosome][position] = location
-        except:
-            location_dict[chromosome] = {position: location} 
-
-    return location_dict
-    
-def make_edge_dict(cursor, build = None, chrom = None, start = None, end = None):
-    """ Format of dict:
-            Key: vertex1_vertex2_type
-            Value: SQLite3 row from edge table
-    """
-    edge_dict = {}
-    if any(val == None for val in [chrom, start, end, build]):
-        query = """SELECT * FROM edge"""
-    else:
-        query = Template("""SELECT e.* 
-                            FROM edge AS e
-                            LEFT JOIN location as loc1 ON e.v1 = loc1.location_ID
-                            LEFT JOIN location as loc2 ON e.v2 = loc2.location_ID
-                            WHERE loc1.genome_build = '$build' AND loc2.genome_build = '$build'
-                                 AND loc1.chromosome = "$chrom" 
-                                 AND (loc1.position >= $start AND loc1.position <= $end)
-                                 AND (loc2.position >= $start AND loc2.position <= $end);
-                         """)
-        query = query.substitute({'build':build, 'chrom':chrom,
-                                  'start':start, 'end':end})
-    cursor.execute(query)
-    for edge in cursor.fetchall():
-        vertex_1 = edge["v1"]
-        vertex_2 = edge["v2"]
-        edge_type = edge["edge_type"]
-        key = (vertex_1, vertex_2, edge_type)
-        edge_dict[key] = edge
-
-    return edge_dict
-
-def make_vertex_2_gene_dict(cursor, build = None, chrom = None, start = None, end = None):
-    """ Create a dictionary that maps vertices to the genes that they belong to.
-    """
-    vertex_2_gene = {}
-    if any(val == None for val in [chrom, start, end, build]):
-        query = """SELECT vertex_ID,
-                          vertex.gene_ID,
-                          strand 
-                       FROM vertex 
-                       LEFT JOIN genes ON vertex.gene_ID = genes.gene_ID"""
-    else: 
-        query = Template("""SELECT vertex_ID, 
-                                   vertex.gene_ID, 
-                                   strand 
-                            FROM vertex
-                                LEFT JOIN genes ON vertex.gene_ID = genes.gene_ID
-                                LEFT JOIN location AS loc ON vertex.vertex_ID = loc.location_ID
-                                WHERE loc.genome_build = '$build'
-                                     AND loc.chromosome = '$chrom' 
-                                     AND (loc.position >= $start AND loc.position <= $end)
-                         """)
-        query = query.substitute({'build':build, 'chrom':chrom,
-                                  'start':start, 'end':end})
-
-    cursor.execute(query)
-    for vertex_line in cursor.fetchall():
-        vertex = vertex_line["vertex_ID"]
-        gene = vertex_line["gene_ID"]
-        strand = vertex_line["strand"]
-
-        if vertex in vertex_2_gene:
-            vertex_2_gene[vertex].add((gene, strand))
-        else:
-            vertex_2_gene[vertex] = set()
-            vertex_2_gene[vertex].add((gene, strand))
-
-    return vertex_2_gene
-
-def make_temp_monoexonic_transcript_table(cursor, build, chrom = None, 
-                                          start = None, end = None):
-    """ Attaches a temporary database with a table that has the following fields:
-            - gene_ID
-            - transcript_ID
-            - chromosome
-            - start (min position)
-            - end (max position)
-            - strand
-        The purpose is to allow location-based matching for monoexonic query
-        transcripts. """
-
-    if any(val == None for val in [chrom, start, end]):
-        command = Template(""" CREATE TEMPORARY TABLE IF NOT EXISTS temp_monoexon AS
-                                   SELECT t.gene_ID, 
-                                      t.transcript_ID, 
-			              loc1.chromosome, 
-			              loc1.position as start,
-                                      loc2.position as end,
-			              genes.strand,
-                                      t.start_vertex,
-                                      t.end_vertex,
-                                      t.start_exon as exon_ID
-                                   FROM transcripts as t
-	                           LEFT JOIN location as loc1 
-                                       ON loc1.location_ID = t.start_vertex
-	                           LEFT JOIN location as loc2 
-                                       ON loc2.location_ID = t.end_vertex
-	                           LEFT JOIN genes 
-                                       ON genes.gene_ID = t.gene_ID
-                                   WHERE n_exons = 1 
-                                       AND loc1.genome_build = '$build' 
-	                               AND loc2.genome_build = '$build' """)
-    else:
-        command = Template(""" CREATE TEMPORARY TABLE IF NOT EXISTS temp_monoexon AS
-                                   SELECT t.gene_ID,
-                                      t.transcript_ID,
-                                      loc1.chromosome,
-                                      loc1.position as start,
-                                      loc2.position as end,
-                                      genes.strand,
-                                      t.start_vertex,
-                                      t.end_vertex,
-                                      t.start_exon as exon_ID,
-                                      MIN(loc1.position, loc2.position) as min_pos,
-                                      MAX(loc1.position, loc2.position) as max_pos
-                                   FROM transcripts as t
-                                   LEFT JOIN location as loc1
-                                       ON loc1.location_ID = t.start_vertex
-                                   LEFT JOIN location as loc2
-                                       ON loc2.location_ID = t.end_vertex
-                                   LEFT JOIN genes
-                                       ON genes.gene_ID = t.gene_ID
-                                   WHERE n_exons = 1
-                                   AND loc1.genome_build = '$build'
-                                   AND loc2.genome_build = '$build'
-                                   AND loc1.chromosome = '$chrom'
-                                   AND ((min_pos <= $start AND max_pos >= $end)
-                                       OR (min_pos >= $start AND max_pos <= $end)
-                                       OR (min_pos >= $start AND min_pos <= $end)
-                                       OR (max_pos >= $start AND max_pos <= $end))""")        
-
-    command = command.substitute({'build':build, 'chrom':chrom,
-                                  'start':start, 'end':end})
-    cursor.execute(command)
-    
-    return
-
-def make_temp_novel_gene_table(cursor, build, chrom = None,
-                                          start = None, end = None):
-    """ Attaches a temporary database with a table that has the following fields:
-            - gene_ID
-            - chromosome
-            - start
-            - end
-            - strand
-        The purpose is to track novel genes from this run in order to match
-        transcripts to them when other forms of gene assignment have failed.
-    """
-    if any(val == None for val in [chrom, start, end]):
-        command = Template(""" CREATE TEMPORARY TABLE IF NOT EXISTS temp_gene AS 
-                                   SELECT gene_ID,
-                                     chromosome,
-                                     start,
-                                     end,
-                                     strand
-                                    FROM (SELECT g.gene_ID,
-                                              loc.chromosome,
-                                              MIN(loc.position) as start,
-                                              MAX(loc.position) as end,
-                                              g.strand
-                                        FROM genes as g
-                                        LEFT JOIN vertex as v ON g.gene_ID = v.gene_ID
-                                        LEFT JOIN location as loc ON loc.location_ID = v.vertex_ID
-                                        WHERE loc.genome_build = '$build'
-                                        GROUP BY g.gene_ID); """)
-
-    else:
-        command = Template(""" CREATE TEMPORARY TABLE IF NOT EXISTS temp_gene AS
-                                   SELECT gene_ID,
-                                     chromosome,
-                                     start,
-                                     end,
-                                     strand
-                                    FROM (SELECT g.gene_ID,
-                                              loc.chromosome,
-                                              MIN(loc.position) as start,
-                                              MAX(loc.position) as end,
-                                              g.strand
-                                        FROM genes as g
-                                        LEFT JOIN vertex as v ON g.gene_ID = v.gene_ID
-                                        LEFT JOIN location as loc ON loc.location_ID = v.vertex_ID
-                                        WHERE loc.genome_build = '$build'
-                                        GROUP BY g.gene_ID)
-                                    WHERE chromosome = '$chrom'
-                                        AND ((start <= $start AND end >= $end)
-                                          OR (start >= $start AND end <= $end)
-                                          OR (start >= $start AND start <= $end)
-                                          OR (end >= $start AND end <= $end)); """)
-
-    command = command.substitute({'build':build, 'chrom':chrom,
-                                  'start':start, 'end':end})
-    cursor.execute(command)
-    return
 
 def search_for_vertex_at_pos(chromosome, position, location_dict):
     """ Given a chromosome and a position (1-based), this function queries the 
@@ -1785,10 +1436,14 @@ def check_inputs(options):
     return sam_files, dataset_metadata
 
 
-def init_run_info(cursor, genome_build, min_coverage = 0.9, min_identity = 0):
+def init_run_info(database, genome_build, min_coverage = 0.9, min_identity = 0):
     """ Initializes a dictionary that keeps track of important run information
         such as the desired genome build, the prefix for novel identifiers,
         and the novel counters for the run. """
+
+    conn = sqlite3.connect(database)
+    conn.row_factory = sqlite3.Row
+    cursor = conn.cursor()
 
     run_info = dstruct.Struct()
     run_info.build = genome_build
@@ -1808,45 +1463,53 @@ def init_run_info(cursor, genome_build, min_coverage = 0.9, min_identity = 0):
     query = "SELECT * FROM counters WHERE category != 'genome_build'"
     cursor.execute(query)
 
-    for counter in cursor.fetchall():
-        counter_name = counter['category']
-        run_info[counter_name] = counter['count']
+    #for counter in cursor.fetchall():
+    #    counter_name = counter['category']
+    #    run_info[counter_name] = counter['count']
 
+    conn.close()
     return run_info
 
-def prepare_data_structures(cursor, build, min_coverage, min_identity, 
-                            chrom = None, start = None, end = None):
+def prepare_data_structures(cursor, run_info, chrom = None, start = None, end = None):
     """ Initializes data structures needed for the run and organizes them
         in a dictionary for more ease of use when passing them between functions
     """
+    build = run_info.build
+    min_coverage = run_info.min_coverage
+    min_identity = run_info.min_identity
 
-    # TODO: modify queries to restrict the location of items
-    make_temp_novel_gene_table(cursor, build, chrom = chrom, start = start,
-                               end = end)
-    make_temp_monoexonic_transcript_table(cursor, build, chrom = chrom,
+    init_refs.make_temp_novel_gene_table(cursor, build, chrom = chrom, 
+                                         start = start, end = end)
+
+    init_refs.make_temp_monoexonic_transcript_table(cursor, build, chrom = chrom,
                                           start = start, end = end)
-    run_info = init_run_info(cursor, build, min_coverage, min_identity)
-    location_dict = make_location_dict(build, cursor, chrom = chrom, start = start,
-                                       end = end)
-    edge_dict = make_edge_dict(cursor, build = build, chrom = chrom, start = start,
-                               end = end)
-    transcript_dict = make_transcript_dict(cursor, build, chrom = chrom,
+
+    location_dict = init_refs.make_location_dict(build, cursor, chrom = chrom, 
+                                                 start = start, end = end)
+
+    edge_dict = init_refs.make_edge_dict(cursor, build = build, chrom = chrom, 
+                                         start = start, end = end)
+
+    transcript_dict = init_refs.make_transcript_dict(cursor, build, chrom = chrom,
                                            start = start, end = end)
-    vertex_2_gene = make_vertex_2_gene_dict(cursor, build = build, chrom = chrom, 
-                                            start = start, end = end )
-    gene_starts, gene_ends = make_gene_start_and_end_dict(cursor, build, 
-                                                          chrom = chrom,
-                                                          start = start,
-                                                          end = end)   
+
+    vertex_2_gene = init_refs.make_vertex_2_gene_dict(cursor, build = build, 
+                                                      chrom = chrom, 
+                                                      start = start, end = end)
+
+    gene_starts, gene_ends = init_refs.make_gene_start_and_end_dict(cursor, 
+                                                                    build, 
+                                                                    chrom = chrom,
+                                                                    start = start,
+                                                                    end = end)   
 
     struct_collection = dstruct.Struct() 
-    struct_collection['run_info'] = run_info
-    struct_collection['location_dict'] = location_dict
-    struct_collection['edge_dict'] = edge_dict
-    struct_collection['transcript_dict'] = transcript_dict
-    struct_collection['vertex_2_gene'] = vertex_2_gene 
-    struct_collection['gene_starts'] = gene_starts
-    struct_collection['gene_ends'] = gene_ends
+    struct_collection.location_dict = location_dict
+    struct_collection.edge_dict = edge_dict
+    struct_collection.transcript_dict = transcript_dict
+    struct_collection.vertex_2_gene = vertex_2_gene 
+    struct_collection.gene_starts = gene_starts
+    struct_collection.gene_ends = gene_ends
 
     return struct_collection
 
@@ -2587,64 +2250,85 @@ def write_counts_log_file(cursor, outprefix):
 
     return 
 
-def main():
-    """ Runs program """
+#def main():
+#    """ Runs program """
+#
+#    options = get_args()
+#    sam_files, dataset_list = check_inputs(options)
+#
+#    # Fire up the database connection
+#    database = options.database
+#    conn = sqlite3.connect(database)
+#    conn.row_factory = sqlite3.Row
+#    cursor = conn.cursor()
+#
+#    # Input parameters
+#    build = options.build
+#    min_coverage = float(options.min_coverage)
+#    min_identity = float(options.min_identity)
+#    outprefix = options.outprefix
+#
+#    # Set globally accessible counters
+#    gene_counter = get_counters(cursor)
+#
+#    # Prepare data structures from the database content
+#    # TODO: will move to threads
+#    print("Processing annotation...")
+#    struct_collection = prepare_data_structures(cursor, build, min_coverage, 
+#                                                min_identity)
+#
+#    # Read and annotate input sam files. Also, write output QC log file.
+#    print("Processing SAM files...")
+#    print("-------------------------------------")
+#    datasets, observed_transcripts, gene_annotations, transcript_annotations, \
+#    exon_annotations, abundance = process_all_sam_files(sam_files, dataset_list, cursor, 
+#                                      struct_collection, outprefix)
+#    print("-------------------------------------")
+#
+#    # Update database
+#    batch_size = 10000
+#    update_database(cursor, batch_size, datasets, observed_transcripts,
+#                    gene_annotations, transcript_annotations, exon_annotations,
+#                    abundance, struct_collection)
+#
+#    # Validate database
+#    check_database_integrity(cursor) 
+#    conn.commit()
+#
+#    # TODO: output files
+#    # Write a file enumerating how many known/novel genes and transcripts
+#    # were detected in each dataset
+#    #write_counts_log_file(cursor, outprefix)
+#    conn.close()
 
-    options = get_args()
-    sam_files, dataset_list = check_inputs(options)
+def parallel_talon(read_file, interval, database, run_info):
+    """  """
+    print("---------------------------------------------------")
+    print("Processing annotation...")
+    print(interval)
 
-    # Fire up the database connection
-    database = options.database
     conn = sqlite3.connect(database)
     conn.row_factory = sqlite3.Row
     cursor = conn.cursor()
 
-    # Input parameters
-    build = options.build
-    min_coverage = float(options.min_coverage)
-    min_identity = float(options.min_identity)
-    outprefix = options.outprefix
+    struct_collection = prepare_data_structures(cursor, run_info,
+                                                chrom = interval[0], 
+                                                start = interval[1], 
+                                                end = interval[2])
 
-    # Set globally accessible counters
-    gene_counter = get_counters(cursor)
+    print("Annotating reads...")
+    # Open QC file in tmp directory. Tmp dir name should be in run info.
+    # Also open read annotation output file
+    # Open provided alignment file and iterate over the reads
 
-    # Prepare data structures from the database content
-    # TODO: will move to threads
-    print("Processing annotation...")
-    struct_collection = prepare_data_structures(cursor, build, min_coverage, 
-                                                min_identity)
+        # Check whether read passes coverage and identity QC
 
-    # Read and annotate input sam files. Also, write output QC log file.
-    print("Processing SAM files...")
-    print("-------------------------------------")
-    datasets, observed_transcripts, gene_annotations, transcript_annotations, \
-    exon_annotations, abundance = process_all_sam_files(sam_files, dataset_list, cursor, 
-                                      struct_collection, outprefix)
-    print("-------------------------------------")
-
-    # Update database
-    batch_size = 10000
-    update_database(cursor, batch_size, datasets, observed_transcripts,
-                    gene_annotations, transcript_annotations, exon_annotations,
-                    abundance, struct_collection)
-
-    # Validate database
-    check_database_integrity(cursor) 
-    conn.commit()
-
-    # TODO: output files
-    # Write a file enumerating how many known/novel genes and transcripts
-    # were detected in each dataset
-    #write_counts_log_file(cursor, outprefix)
+        # If it passes, continue to annotation step.
+    
     conn.close()
-
-def parallel_talon(reads, build, min_coverage = 0, min_identity = 0):
-    """  """
-    print("Processing annotation...")
-    struct_collection = prepare_data_structures(cursor, build, min_coverage,
-                                                min_identity)
+    return
     # Read and annotate input sam files. Also, write output QC log file.
-    print("Processing SAM files...")
+    print("Annotating reads...")
     print("-------------------------------------")
     datasets, observed_transcripts, gene_annotations, transcript_annotations, \
     transcript_annotations, exon_annotations, abundance \
@@ -2661,33 +2345,59 @@ def parallel_talon(reads, build, min_coverage = 0, min_identity = 0):
     check_database_integrity(cursor)
     conn.commit()
     conn.close()
+    gene_counter.increment()
 
-if __name__ == '__main__':
+#if __name__ == '__main__':
     #pr = cProfile.Profile()
     #pr.enable()
+
+
+def main():
     """ Runs program """
     options = get_args()
-    sam_files, dataset_list = check_inputs(options)
-
+    sam_files, dset_metadata = check_inputs(options)
+    datasets = [ x[0] for x in dset_metadata ]
+ 
     # Fire up the database connection
-    database = options.database
-    conn = sqlite3.connect(database)
-    conn.row_factory = sqlite3.Row
-    cursor = conn.cursor()
+    #database = options.database
+    #conn = sqlite3.connect(database)
+    #conn.row_factory = sqlite3.Row
+    #cursor = conn.cursor()
 
     # Input parameters
+    database = options.database
     build = options.build
     min_coverage = float(options.min_coverage)
     min_identity = float(options.min_identity)
     outprefix = options.outprefix
 
     # Set globally accessible counters
-    gene_counter = get_counters(cursor)
+    run_info = init_run_info(database, build, min_coverage, min_identity)
+    #gene_counter = get_counters(database)
+
+    # TODO: deal with dataset information at this stage, not in parallel func
 
     # Partition the reads
-    read_groups, intervals = procsam.partition_reads(sam_files, datasets)
-    with Pool(processes=1) as pool:
-        pool.map(parallel_talon, read_groups, build = build)
+    read_groups, intervals, header_file = procsams.partition_reads(sam_files, datasets)
+    read_files = procsams.write_reads_to_file(read_groups, intervals, header_file)
 
+    with Pool(processes=1) as pool:
+        #func = partial(parallel_wrapper, build, min_coverage, min_identity)
+        print(read_groups)
+        #exit()
+        #read_groups = [1,2,3]
+        #pool.map(parallel_talon, read_files)
+        pool.starmap(parallel_talon, zip(read_files, intervals, 
+                                         repeat(database), 
+                                         repeat(run_info)))
+                                         #repeat(build), 
+                                         #repeat(min_coverage), 
+                                         #repeat(min_identity)))
+        #pool.map(func, read_groups)
+
+if __name__ == '__main__':
+    main()
     #pr.disable()
     #pr.print_stats()
+
+
