@@ -35,14 +35,16 @@ class Counter(object):
     def increment(self):
         with self.lock:
             self.val.value += 1
-
+            return self.val.value
+ 
     def value(self):
         with self.lock:
             return self.val.value
 
 def get_counters(database):
     """ Fetch counter values from the database and create counter objects 
-        that will be accessible to all of the threads during the parallel run    """
+        that will be accessible to all of the threads during the parallel run
+    """
 
     with sqlite3.connect(database) as conn:
         conn.row_factory = sqlite3.Row
@@ -52,11 +54,24 @@ def get_counters(database):
         cursor.execute("SELECT * FROM counters WHERE category == 'genes'")
         global gene_counter
         gene_counter = Counter(initval = cursor.fetchone()['count'])
-    
-    #for counter in cursor.fetchall():
-    #    counter_name = counter['category']
-    #    run_info[counter_name] = counter['count']    
-    return #gene_counter
+
+        cursor.execute("SELECT * FROM counters WHERE category == 'transcripts'")
+        global transcript_counter
+        transcript_counter = Counter(initval = cursor.fetchone()['count'])
+
+        cursor.execute("SELECT * FROM counters WHERE category == 'vertex'")
+        global vertex_counter
+        vertex_counter = Counter(initval = cursor.fetchone()['count'])
+
+        cursor.execute("SELECT * FROM counters WHERE category == 'edge'")
+        global edge_counter
+        edge_counter = Counter(initval = cursor.fetchone()['count'])
+
+        cursor.execute("SELECT * FROM counters WHERE category == 'observed'")
+        global observed_counter
+        observed_counter = Counter(initval = cursor.fetchone()['count'])
+
+    return 
 
 def get_args():
     """ Fetches the arguments for the program """
@@ -93,7 +108,7 @@ def str_wrap_double(s):
     s = str(s)
     return '"' + s + '"'
 
-def search_for_vertex_at_pos(chromosome, position, location_dict):
+def search_for_vertex_at_pos(chromosome, position, location_dict, run_info):
     """ Given a chromosome and a position (1-based), this function queries the 
         location dict to determine whether a vertex 
         fitting those criteria exists. Returns the row if yes, and __ if no.
@@ -148,8 +163,7 @@ def match_monoexon_vertices(chromosome, positions, strand, location_dict,
 
         if vertex_match == None:
             # If no vertex matches the position, one is created.
-            vertex_match = create_vertex(chromosome, position, run_info,
-                                         location_dict)["location_ID"]
+            vertex_match = create_vertex(chromosome, position, location_dict, run_info)["location_ID"]
             novelty.append(1)
         else:
             novelty.append(0)
@@ -159,8 +173,7 @@ def match_monoexon_vertices(chromosome, positions, strand, location_dict,
 
     return tuple(vertex_matches), tuple(novelty), diff_5p, diff_3p
 
-def match_splice_vertices(chromosome, positions, strand, location_dict,
-                                  run_info):
+def match_splice_vertices(chromosome, positions, strand, location_dict, run_info):
     """ Given a chromosome and a list of positions from the transcript in 5' to
         3' end order, this function looks for a matching vertex for each splice
         junction position (so it ignores the ends). Also returns a list where 
@@ -176,11 +189,10 @@ def match_splice_vertices(chromosome, positions, strand, location_dict,
         position = positions[curr_index]
 
         vertex_match = search_for_vertex_at_pos(chromosome, position,
-                                                     location_dict)
+                                                     location_dict, run_info)
         if vertex_match == None:
             # If no vertex matches the position, one is created.
-            vertex_match = create_vertex(chromosome, position, run_info,
-                                         location_dict)
+            vertex_match = create_vertex(chromosome, position, location_dict, run_info)
             novelty.append(1)
         else:
             novelty.append(0)
@@ -229,11 +241,10 @@ def match_all_transcript_vertices(chromosome, positions, strand, location_dict,
         # Remaining mid-transcript positions go through strict matching process
         else:
             vertex_match = search_for_vertex_at_pos(chromosome, position, 
-                                                     location_dict)
+                                                     location_dict, run_info)
         if vertex_match == None:
             # If no vertex matches the position, one is created.
-            vertex_match = create_vertex(chromosome, position, run_info, 
-                                         location_dict)
+            vertex_match = create_vertex(chromosome, position, location_dict, run_info)
             novelty.append(1)
         else:
             novelty.append(0)
@@ -353,24 +364,23 @@ def permissive_vertex_search(chromosome, position, strand, sj_pos, pos_type,
     for dist in range(1,max_dist):
         curr_pos = position + dist*direction_priority
         if curr_pos > search_window_start and curr_pos < search_window_end: 
-            match = search_for_vertex_at_pos(chromosome, curr_pos, locations)
+            match = search_for_vertex_at_pos(chromosome, curr_pos, locations, run_info)
             if match != None:
                 dist = compute_delta(curr_pos, position, strand)
                 return match['location_ID'], dist
 
         curr_pos = position - dist*direction_priority
         if curr_pos > search_window_start and curr_pos < search_window_end:
-            match = search_for_vertex_at_pos(chromosome, curr_pos, locations)
+            match = search_for_vertex_at_pos(chromosome, curr_pos, locations, run_info)
             if match != None:
                 dist = compute_delta(curr_pos, position, strand)
                 return match['location_ID'], dist
 
     return None, None       
             
-def create_vertex(chromosome, position, run_info, location_dict):
+def create_vertex(chromosome, position, location_dict, run_info):
     """ Creates a novel vertex and adds it to the location data structure. """
-    run_info.vertex += 1
-    new_ID = run_info.vertex
+    new_ID = vertex_counter.increment()
     new_vertex = {'location_ID': new_ID,
                   'genome_build': run_info.build,
                   'chromosome': chromosome,
@@ -383,10 +393,9 @@ def create_vertex(chromosome, position, run_info, location_dict):
 
     return new_vertex
 
-def create_edge(vertex_1, vertex_2, edge_type, strand, edge_dict, run_info):
+def create_edge(vertex_1, vertex_2, edge_type, strand, edge_dict): 
     """ Creates a novel edge and adds it to the edge data structure. """
-    run_info.edge += 1
-    new_ID = run_info.edge
+    new_ID = edge_counter.increment()
     new_edge = {'edge_ID': new_ID,
                 'v1': vertex_1,
                 'v2': vertex_2,
@@ -396,11 +405,10 @@ def create_edge(vertex_1, vertex_2, edge_type, strand, edge_dict, run_info):
 
     return new_edge
 
-def create_gene(chromosome, start, end, strand, memory_cursor, run_info):
+def create_gene(chromosome, start, end, strand, memory_cursor):
     """ Create a novel gene and add it to the temporary table.
     """
-    run_info.genes += 1
-    new_ID = run_info.genes
+    new_ID = gene_counter.increment()
 
     new_gene = ( new_ID, chromosome, min(start, end), max(start, end), strand )
     cols = '("gene_ID", "chromosome", "start", "end", "strand")' 
@@ -409,11 +417,10 @@ def create_gene(chromosome, start, end, strand, memory_cursor, run_info):
     return new_ID
 
 def create_transcript(chromosome, start_pos, end_pos, gene_ID, edge_IDs, vertex_IDs, 
-                      transcript_dict, run_info):
+                      transcript_dict):
     """Creates a novel transcript and adds it to the transcript data structure.
     """
-    run_info.transcripts += 1
-    new_ID = run_info.transcripts
+    new_ID = transcript_counter.increment()
     if len(edge_IDs) > 1:
         jn_path = ",".join(map(str, edge_IDs[1:-1]))
     else:
@@ -491,13 +498,13 @@ def match_all_splice_edges(vertices, strand, edge_dict, run_info):
 
         edge_match, curr_novelty = match_or_create_edge(vertex_1, vertex_2, 
                                                         edge_type, strand, 
-                                                        edge_dict, run_info)
+                                                        edge_dict)
         edge_matches.append(edge_match)
         novelty.append(curr_novelty)
 
     return edge_matches, novelty
 
-def match_or_create_edge(vertex_1, vertex_2, edge_type, strand, edge_dict, run_info):
+def match_or_create_edge(vertex_1, vertex_2, edge_type, strand, edge_dict):
     """ Searches for edge match to provided set of vertices. If none found, 
         creates a new edge. """
     novelty = 0
@@ -506,7 +513,7 @@ def match_or_create_edge(vertex_1, vertex_2, edge_type, strand, edge_dict, run_i
     if edge_match == None:
         # If no edge matches the position, one is created.
         edge_match = create_edge(vertex_1, vertex_2, edge_type, strand,
-                                     edge_dict, run_info)
+                                     edge_dict)
         novelty = 1
     return edge_match["edge_ID"], novelty
 
@@ -532,7 +539,7 @@ def match_all_transcript_edges(vertices, strand, edge_dict, run_info):
         
         edge_match, curr_novelty = match_or_create_edge(vertex_1, vertex_2, 
                                                         edge_type, strand,
-                                                        edge_dict, run_info) 
+                                                        edge_dict) 
         edge_matches.append(edge_match)
         novelty.append(curr_novelty)
                                                 
@@ -737,14 +744,13 @@ def process_5p(chrom, positions, strand, vertex_IDs, gene_ID, gene_starts, edge_
                                          "start", gene_ID, gene_starts,
                                          locations, run_info)
     if start_vertex == None:
-        start_vertex = create_vertex(chrom, positions[0], run_info,
-                                             locations)['location_ID']
+        start_vertex = create_vertex(chrom, positions[0], locations, run_info)['location_ID']
 
     # Then get the start exon
     start_exon, start_novelty = match_or_create_edge(start_vertex,
                                                      vertex_IDs[0],
                                                      "exon", strand,
-                                                     edge_dict, run_info)
+                                                     edge_dict)
 
     # If known_start == 1, the start vertex is a known startpoint of this gene.
     #  start novelty refers to the novelty of the first exon (1 if yes, 0 if no)
@@ -762,13 +768,12 @@ def process_3p(chrom, positions, strand, vertex_IDs, gene_ID, gene_ends, edge_di
                                           "end", gene_ID, gene_ends,
                                           locations, run_info)
     if end_vertex == None:
-        end_vertex = create_vertex(chrom, positions[-1], run_info,
-                                   locations)['location_ID']
+        end_vertex = create_vertex(chrom, positions[-1], locations, run_info)['location_ID']
     # Then get the end exon
     end_exon, end_novelty = match_or_create_edge(vertex_IDs[-1],
                                                  end_vertex,
                                                  "exon", strand,
-                                                  edge_dict, run_info)
+                                                  edge_dict)
     # If known_end == 1, the end vertex is a known endpoint of this gene.
     # end novelty refers to the novelty of the final exon (1 if yes, 0 if no)
     return end_vertex, end_exon, end_novelty, known_end, diff_3p
@@ -825,7 +830,7 @@ def process_ISM(chrom, positions, strand, edge_IDs, vertex_IDs, all_matches, tra
     if known_start and known_end:
         novel_transcript = create_transcript(chrom, positions[0], positions[-1],
                                               gene_ID, edge_IDs, vertex_IDs,
-                                              transcript_dict, run_info)
+                                              transcript_dict)
         transcript_ID = novel_transcript['transcript_ID']
         novelty = [(transcript_ID, run_info.idprefix, "TALON",
                         "NIC_transcript", "TRUE")]
@@ -833,7 +838,7 @@ def process_ISM(chrom, positions, strand, edge_IDs, vertex_IDs, all_matches, tra
 
     # Iterate over matches to characterize ISMs
     for match in all_matches:
-        transcript_ID = run_info.transcripts + 1
+        transcript_ID = transcript_counter.increment()
 
         # Add ISM
         ISM.append(str(match['transcript_ID']))
@@ -872,7 +877,7 @@ def process_ISM(chrom, positions, strand, edge_IDs, vertex_IDs, all_matches, tra
 
     novel_transcript = create_transcript(chrom, positions[0], positions[-1],
                                               gene_ID, edge_IDs, vertex_IDs,
-                                              transcript_dict, run_info)
+                                              transcript_dict)
 
     transcript_ID = novel_transcript['transcript_ID']
 
@@ -956,7 +961,7 @@ def process_NIC(chrom, positions, strand, edge_IDs, vertex_IDs, transcript_dict,
     # Create a new transcript of that gene
     novel_transcript = create_transcript(chrom, positions[0], positions[-1],
                                               gene_ID, edge_IDs, vertex_IDs,
-                                              transcript_dict, run_info)
+                                              transcript_dict)
     transcript_ID = novel_transcript["transcript_ID"]
     novelty = [(transcript_ID, run_info.idprefix, "TALON",
                          "NIC_transcript","TRUE")]
@@ -1029,7 +1034,7 @@ def process_NNC(chrom, positions, strand, edge_IDs, vertex_IDs, transcript_dict,
     
     transcript_ID = create_transcript(chrom, positions[0], positions[-1],
                                               gene_ID, edge_IDs, vertex_IDs,
-                                              transcript_dict, run_info)["transcript_ID"]
+                                              transcript_dict)["transcript_ID"]
 
     novelty.append((transcript_ID, run_info.idprefix, "TALON",
                                "NNC_transcript", "TRUE"))
@@ -1081,10 +1086,10 @@ def process_spliced_antisense(chrom, positions, strand, edge_IDs, vertex_IDs, tr
     start_end_info["vertex_IDs"] = vertex_IDs    
 
     gene_ID = create_gene(chrom, positions[0], positions[-1],
-                              strand, cursor, run_info)
+                              strand, cursor)
     transcript_ID = create_transcript(chrom, positions[0], positions[-1],
                                               gene_ID, edge_IDs, vertex_IDs,
-                                              transcript_dict, run_info)["transcript_ID"]
+                                              transcript_dict)["transcript_ID"]
 
     # Handle gene annotations
     gene_novelty.append((gene_ID, run_info.idprefix, "TALON",
@@ -1140,24 +1145,23 @@ def process_remaining_mult_cases(chrom, positions, strand, edge_IDs, vertex_IDs,
 
     if gene_ID == None:
         gene_ID = create_gene(chrom, positions[0], positions[-1],
-                          strand, cursor, run_info)
+                          strand, cursor)
 
         gene_novelty.append((gene_ID, run_info.idprefix, "TALON",
                      "intergenic_novel","TRUE"))
 
         transcript_ID = create_transcript(chrom, positions[0], positions[-1],
                                               gene_ID, edge_IDs, vertex_IDs,
-                                              transcript_dict, run_info)["transcript_ID"]
+                                              transcript_dict)["transcript_ID"]
         transcript_novelty.append((transcript_ID, run_info.idprefix, "TALON",
                               "intergenic_transcript", "TRUE"))
 
     elif match_strand != strand:
         anti_gene_ID = gene_ID
-        gene_ID = create_gene(chrom, positions[0], positions[-1],
-                          strand, cursor, run_info)
+        gene_ID = create_gene(chrom, positions[0], positions[-1], strand, cursor)
         transcript_ID = create_transcript(chrom, positions[0], positions[-1],
                                               gene_ID, edge_IDs, vertex_IDs,
-                                              transcript_dict, run_info)["transcript_ID"]
+                                              transcript_dict)["transcript_ID"]
 
         gene_novelty.append((gene_ID, run_info.idprefix, "TALON",
                      "antisense_gene","TRUE"))
@@ -1168,7 +1172,7 @@ def process_remaining_mult_cases(chrom, positions, strand, edge_IDs, vertex_IDs,
     else:
         transcript_ID = create_transcript(chrom, positions[0], positions[-1],
                                               gene_ID, edge_IDs, vertex_IDs,
-                                              transcript_dict, run_info)["transcript_ID"]
+                                              transcript_dict)["transcript_ID"]
         transcript_novelty.append((transcript_ID, run_info.idprefix, "TALON",
                               "genomic_transcript", "TRUE"))
     
@@ -1221,8 +1225,7 @@ def identify_transcript(chrom, positions, strand, cursor, location_dict, edge_di
                                                    location_dict, run_info)
 
     # Get edge matches for transcript exons and introns based on the vertices
-    edge_IDs, e_novelty = match_all_splice_edges(vertex_IDs, strand,
-                                                     edge_dict, run_info)
+    edge_IDs, e_novelty = match_all_splice_edges(vertex_IDs, strand, edge_dict, run_info)
 
     # Check novelty of exons and splice jns. This will help us categorize 
     # what type of novelty the transcript has
@@ -1677,23 +1680,23 @@ def identify_monoexon_transcript(chrom, positions, strand, cursor, location_dict
             # Intergenic case
             if gene_ID == None:
                 gene_ID = create_gene(chrom, positions[0], positions[-1],
-                                      strand, cursor, run_info)
+                                      strand, cursor)
 
                 gene_novelty.append((gene_ID, run_info.idprefix, "TALON",
                                      "intergenic_novel","TRUE"))
                 transcript_ID = create_transcript(chrom, positions[0], positions[-1],
                                               gene_ID, edge_IDs, vertex_IDs,
-                                              transcript_dict, run_info)["transcript_ID"]
+                                              transcript_dict)["transcript_ID"]
                 transcript_novelty.append((transcript_ID, run_info.idprefix, "TALON",
                                       "intergenic_transcript", "TRUE"))     
             # Antisense case
             elif match_strand != strand:
                 anti_gene_ID = gene_ID
                 gene_ID = create_gene(chrom, positions[0], positions[-1],
-                                      strand, cursor, run_info)
+                                      strand, cursor)
                 transcript_ID = create_transcript(chrom, positions[0], positions[-1],
                                               gene_ID, edge_IDs, vertex_IDs,
-                                              transcript_dict, run_info)["transcript_ID"]
+                                              transcript_dict)["transcript_ID"]
 
                 gene_novelty.append((gene_ID, run_info.idprefix, "TALON",
                                      "antisense_gene","TRUE"))
@@ -1706,7 +1709,7 @@ def identify_monoexon_transcript(chrom, positions, strand, cursor, location_dict
             else:
                 transcript_ID = create_transcript(chrom, positions[0], positions[-1],
                                               gene_ID, edge_IDs, vertex_IDs,
-                                              transcript_dict, run_info)["transcript_ID"]
+                                              transcript_dict)["transcript_ID"]
                 transcript_novelty.append((transcript_ID, run_info.idprefix, "TALON",
                                   "genomic_transcript", "TRUE"))
 
@@ -2290,9 +2293,10 @@ def parallel_talon(read_file, interval, database, run_info):
                                                     end = interval[2])
 
         print("Annotating reads...")
+
         interval_id = "%s_%d_%d" % interval
 
-        # TODO: Open QC file in tmp directory.
+        # Open QC file in tmp directory.
         qc_dir = run_info.tmp_dir + "QC_logs/"
         os.system("mkdir -p %s" % qc_dir)
         fname = qc_dir + interval_id + ".QC.log"
@@ -2307,12 +2311,14 @@ def parallel_talon(read_file, interval, database, run_info):
                     QC_file.write("\t".join([str(x) for x in qc_metrics]) + "\n")
 
                     if passed_qc:
-                        annotate_read(record, run_info, struct_collection)
+                        annotate_read(record, cursor, run_info, struct_collection)
 
     return
 
-def annotate_read(sam_record: pysam.AlignedSegment, run_info, struct_collection):            
+def annotate_read(sam_record: pysam.AlignedSegment, cursor, run_info, struct_collection):            
     """ """
+    observed_ID = observed_counter.increment()
+
     # Parse attributes to determine the chromosome, positions, and strand of the transcript
     read_ID = sam_record.query_name
     chrom = sam_record.reference_name
@@ -2341,8 +2347,24 @@ def annotate_read(sam_record: pysam.AlignedSegment, run_info, struct_collection)
     vertex_2_gene = struct_collection.vertex_2_gene
     gene_starts = struct_collection.gene_starts
     gene_ends = struct_collection.gene_ends
- 
 
+    n_exons = len(positions)/2
+    if n_exons > 1:
+        annotation_info = identify_transcript(chrom, positions, strand,
+                                              cursor, location_dict,
+                                              edge_dict, transcript_dict,
+                                              vertex_2_gene,
+                                              gene_starts, gene_ends,
+                                              run_info)
+    else:
+        annotation_info = identify_monoexon_transcript(chrom, positions, strand,
+                                          cursor, location_dict,
+                                          edge_dict, transcript_dict,
+                                          vertex_2_gene,
+                                          gene_starts, gene_ends,
+                                          run_info)
+ 
+    #gene_counter.increment()
     return
 
     # Read and annotate input sam files. Also, write output QC log file.
@@ -2385,7 +2407,7 @@ def main():
     # Set globally accessible counters
     run_info = init_run_info(database, build, min_coverage, min_identity)
     get_counters(database)
-    print(gene_counter.value())
+    print(observed_counter.value())
     ###exit()
 
     # Create annotation entry for each dataset
@@ -2401,12 +2423,12 @@ def main():
     read_groups, intervals, header_file = procsams.partition_reads(sam_files, datasets)
     read_files = procsams.write_reads_to_file(read_groups, intervals, header_file)
 
-    with Pool(processes=1) as pool:
+    with Pool(processes=4) as pool:
         pool.starmap(parallel_talon, zip(read_files, intervals, 
                                          repeat(database), 
                                          repeat(run_info)))
 
-    print(gene_counter.value())
+    print(observed_counter.value())
     # TODO: Update database and validate. Concatenate outfiles
         #TODO: header for QC log file
 if __name__ == '__main__':
