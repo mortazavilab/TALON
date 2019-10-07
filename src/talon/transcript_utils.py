@@ -7,6 +7,41 @@ import itertools
 import re
 import pysam
 
+def check_read_quality(sam_record: pysam.AlignedSegment, run_info):
+    """ Process an individual sam read and return quality attributes. """
+    read_ID = sam_record.query_name
+    flag = sam_record.flag
+    cigar = sam_record.cigarstring
+    seq = sam_record.query
+    read_length = sam_record.query_length
+    dataset = sam_record.get_tag('RG')
+ 
+    # Only use uniquely mapped transcripts
+    if flag not in [0, 16]:
+        return [dataset, read_ID, 0, 0, read_length, "NA", "NA"]
+
+    # Only use reads that are greater than or equal to length threshold
+    if read_length < run_info.min_length:
+        return [dataset, read_ID, 0, 1, read_length, "NA", "NA"]
+
+    # Locate the MD field of the sam transcript
+    try:
+        md_tag = sam_record.get_tag('MD')
+    except KeyError:
+        raise ValueError("SAM transcript %s lacks an MD tag" % read_ID)
+
+    # Only use reads where alignment coverage and identity exceed
+    # cutoffs
+    coverage = compute_alignment_coverage(cigar)
+    identity = compute_alignment_identity(md_tag, seq)
+
+    if coverage < run_info.min_coverage or \
+       identity < run_info.min_identity:
+        return [dataset, read_ID, 0, 1, read_length, coverage, identity]
+
+    # At this point, the read has passed the quality control
+    return [dataset, read_ID, 1, 1, read_length, coverage, identity]
+
 def compute_alignment_coverage(CIGAR):
     """ This function computes what fraction of the read is actually aligned to
         the genome by excluding hard or soft-clipped bases."""
