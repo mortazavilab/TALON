@@ -2310,11 +2310,13 @@ def parallel_talon(read_file, interval, database, run_info):
                     QC_file.write("\t".join([str(x) for x in qc_metrics]) + "\n")
 
                     if passed_qc:
-                        annotate_read(record, cursor, run_info, struct_collection)
+                        annotate_read(record, cursor, run_info, 
+                        struct_collection)
 
     return
 
-def annotate_read(sam_record: pysam.AlignedSegment, cursor, run_info, struct_collection):            
+def annotate_read(sam_record: pysam.AlignedSegment, cursor, run_info, 
+                  struct_collection, mode = 1):            
     """ """
     observed_ID = observed_counter.increment()
 
@@ -2323,12 +2325,13 @@ def annotate_read(sam_record: pysam.AlignedSegment, cursor, run_info, struct_col
     chrom = sam_record.reference_name
     strand = "-" if sam_record.is_reverse else "+"
     read_length = sam_record.query_length
-    sam_start = sam_record.reference_start + 1
+    sam_start = sam_record.reference_start + mode # Bam is zero-indexed
     sam_end = sam_record.reference_end
     cigar = sam_record.cigarstring
 
     # TODO: see if we can do this faster with pysam
     intron_list = tutils.get_introns(sam_record, sam_start, cigar)
+    print(intron_list)
 
     # Adjust intron positions by 1 to get splice sites
     splice_sites = [x + 1 if i % 2 == 1 else x - 1 for i, x in
@@ -2338,6 +2341,7 @@ def annotate_read(sam_record: pysam.AlignedSegment, cursor, run_info, struct_col
     # Flip the positions' order if the read is on the minus strand
     if strand == "-":
         positions = positions[::-1]
+    print(positions)
 
     # Now identify the transcript
     location_dict = struct_collection.location_dict
@@ -2362,8 +2366,7 @@ def annotate_read(sam_record: pysam.AlignedSegment, cursor, run_info, struct_col
                                           vertex_2_gene,
                                           gene_starts, gene_ends,
                                           run_info)
- 
-    #gene_counter.increment()
+    print(annotation_info) 
     return
 
     # Read and annotate input sam files. Also, write output QC log file.
