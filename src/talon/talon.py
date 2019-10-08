@@ -1353,17 +1353,18 @@ def identify_transcript(chrom, positions, strand, cursor, location_dict, edge_di
                                      "exon_status", "NOVEL"))
 
     # Package up information for output
-    annotations = {'gene_ID': gene_ID,
-                   'transcript_ID': transcript_ID,
-                   'gene_novelty': gene_novelty,
-                   'transcript_novelty': transcript_novelty,
-                   'exon_novelty': exon_novelty,
-                   'start_vertex': start_end_info["start_vertex"],
-                   'end_vertex': start_end_info["end_vertex"],
-                   'start_exon': start_end_info["start_exon"],
-                   'end_exon': start_end_info["end_exon"],
-                   'start_delta': start_end_info["diff_5p"],
-                   'end_delta': start_end_info["diff_3p"]}
+    annotations = dstruct.Struct()
+    annotations.gene_ID = gene_ID
+    annotations.transcript_ID = transcript_ID
+    annotations.gene_novelty = gene_novelty
+    annotations.transcript_novelty = transcript_novelty
+    annotations.exon_novelty = exon_novelty
+    annotations.start_vertex = start_end_info["start_vertex"]
+    annotations.end_vertex = start_end_info["end_vertex"]
+    annotations.start_exon = start_end_info["start_exon"]
+    annotations.end_exon = start_end_info["end_exon"]
+    annotations.start_delta = start_end_info["diff_5p"]
+    annotations.end_delta = start_end_info["diff_3p"]
     
     return annotations
 
@@ -1751,136 +1752,21 @@ def identify_monoexon_transcript(chrom, positions, strand, cursor, location_dict
         cursor.execute(command, new_mono)
 
     # Package annotation information
-    annotations = {'gene_ID': gene_ID,
-                   'transcript_ID': transcript_ID,
-                   'gene_novelty': gene_novelty,
-                   'transcript_novelty': transcript_novelty,
-                   'exon_novelty': exon_novelty,
-                   'start_vertex': vertex_IDs[0],
-                   'end_vertex': vertex_IDs[-1],
-                   'start_exon': edge_IDs[0],
-                   'end_exon': edge_IDs[-1],
-                   'start_delta': diff_5p,
-                   'end_delta': diff_3p}
+    annotations = dstruct.Struct()
+    annotations.gene_ID = gene_ID
+    annotations.transcript_ID = transcript_ID
+    annotations.gene_novelty = gene_novelty
+    annotations.transcript_novelty = transcript_novelty
+    annotations.exon_novelty = exon_novelty
+    annotations.start_vertex = vertex_IDs[0]
+    annotations.end_vertex = vertex_IDs[-1]
+    annotations.start_exon = edge_IDs[0]
+    annotations.end_exon = edge_IDs[-1]
+    annotations.start_delta = diff_5p
+    annotations.end_delta = diff_3p
+
     return annotations
 
-def annotate_sam_transcripts(sam_file: str, dataset, cursor, struct_collection, QC_file):
-    """ Process SAM transcripts and annotate the ones that pass QC """
-
-    observed_transcripts = []
-    gene_annotations = []
-    transcript_annotations = []
-    exon_annotations = []
-    abundance = {}
-
-    mode = "rb" if sam_file.endswith(".bam") else "r"
-    with pysam.AlignmentFile(sam_file, mode) as sam:  # type: pysam.AlignmentFile
-        for record in sam:  # type: pysam.AlignedSegment
-            # Check whether we should try annotating this read or not
-            qc_metrics = check_read_quality(record, struct_collection)
-            passed_qc = qc_metrics[1]
-            QC_file.write("\t".join([str(x) for x in [dataset] + qc_metrics]) \
-                          + "\n")
-
-            if not passed_qc:
-                continue
-
-            # For transcripts that pass QC, parse the attributes to 
-            # determine the chromosome, positions, and strand of the transcript
-            read_ID = record.query_name
-            chrom = record.reference_name
-            read_length = record.query_length
-            sam_start = record.reference_start + 1
-            sam_end = record.reference_end
-            cigar = record.cigarstring
-            flag = record.flag
-            intron_list = tutils.get_introns(record, sam_start, cigar)
-            # Adjust intron positions by 1 to get splice sites
-            splice_sites = [x + 1 if i % 2 == 1 else x - 1 for i, x in
-                            enumerate(intron_list)]
-            positions = [sam_start] + splice_sites + [sam_end]
-
-            # Flip the positions order if the read is on the minus strand
-            if flag in [16, 272]:
-                strand = "-"
-                positions = positions[::-1]
-            else:
-                strand = "+"
-
-            # Now identify the transcript
-            location_dict = struct_collection.location_dict
-            edge_dict = struct_collection.edge_dict
-            transcript_dict = struct_collection.transcript_dict
-            vertex_2_gene = struct_collection.vertex_2_gene
-            gene_starts = struct_collection.gene_starts
-            gene_ends = struct_collection.gene_ends
-            run_info = struct_collection.run_info
-
-            #try:
-            n_exons = len(positions)/2
-            if n_exons > 1:
-                annotation_info = identify_transcript(chrom, positions, strand, 
-                                     cursor, location_dict, 
-                                     edge_dict, transcript_dict, 
-                                     vertex_2_gene, 
-                                     gene_starts, gene_ends,
-                                     run_info)
-            else:
-                annotation_info = identify_monoexon_transcript(chrom, positions, strand,
-                                                  cursor, location_dict,
-                                                  edge_dict, transcript_dict,
-                                                  vertex_2_gene,
-                                                  gene_starts, gene_ends,
-                                                  run_info)
-            #except Exception as e:
-            #    print(e)
-            #    warnings.warn("Problem identifying transcript '%s'. Skipping.."\
-            #                   % read_ID) 
-            #    sys.exit(1)
-                #continue
-                            
-            # Now that transcript has been annotated, unpack values and 
-            # create an observed entry and abundance record
-            gene_ID = annotation_info['gene_ID']
-            transcript_ID = annotation_info['transcript_ID']
-            gene_novelty = annotation_info['gene_novelty']
-            transcript_novelty = annotation_info['transcript_novelty']
-            exon_novelty = annotation_info['exon_novelty']
-            start_vertex = annotation_info['start_vertex']
-            end_vertex = annotation_info['end_vertex']
-            start_delta = annotation_info['start_delta']
-            end_delta = annotation_info['end_delta']
-            start_exon = annotation_info['start_exon']
-            end_exon = annotation_info['end_exon']
-
-            struct_collection.run_info['observed'] += 1
-            obs_ID = struct_collection.run_info['observed'] 
-            observed = (obs_ID, gene_ID, transcript_ID, read_ID, dataset, 
-                        start_vertex, end_vertex, start_exon, end_exon,
-                        start_delta, end_delta, read_length)
-            observed_transcripts.append(observed)
-
-            # Also add transcript to abundance dict
-            try:
-                abundance[transcript_ID] += 1
-            except:
-                abundance[transcript_ID] = 1
-
-            # Update annotation records
-            gene_annotations += gene_novelty
-            transcript_annotations += transcript_novelty
-            exon_annotations += exon_novelty
-
-    # Before returning abundance, reformat it as database rows
-    abundance_rows = []
-    for transcript, count in abundance.items():
-        curr_row = (transcript, dataset, count)
-        abundance_rows.append(curr_row)
-    
-    return observed_transcripts, gene_annotations, transcript_annotations, \
-           exon_annotations, abundance_rows
-            
-    
 def update_database(cursor, batch_size, datasets, observed_transcripts, 
                     gene_annotations, transcript_annotations, exon_annotations,
                     abundance, struct_collection):
@@ -2295,6 +2181,13 @@ def parallel_talon(read_file, interval, database, run_info):
 
         interval_id = "%s_%d_%d" % interval
 
+        # Initialize output structures
+        abundance = {}
+        gene_annotations = []
+        transcript_annotations = []
+        exon_annotations = []
+        observed_transcripts = []    
+
         # Open QC file in tmp directory.
         qc_dir = run_info.tmp_dir + "QC_logs/"
         os.system("mkdir -p %s" % qc_dir)
@@ -2310,18 +2203,50 @@ def parallel_talon(read_file, interval, database, run_info):
                     QC_file.write("\t".join([str(x) for x in qc_metrics]) + "\n")
 
                     if passed_qc:
-                        annotate_read(record, cursor, run_info, 
-                        struct_collection)
+                        annotation_info = annotate_read(record, cursor, run_info, 
+                                                        struct_collection)
+                        obs_entry = unpack_observed_and_abundance(annotation_info, 
+                                                                  abundance)
+                        
+                        # Update annotation records
+                        gene_annotations.extend(annotation_info.gene_novelty)
+                        transcript_annotations.extend(annotation_info.transcript_novelty)
+                        exon_annotations.extend(annotation_info.exon_novelty)
+                        observed_transcripts.append(obs_entry)
+
+    # Store or return these things
+
+    # Format rows for database entry 
+    abundance_rows = []
+    for dataset in abundance.keys():
+        for transcript, count in abundance[dataset].items():
+            curr_row = (transcript, dataset, count)
+            abundance_rows.append(curr_row)
+    print(abundance_rows)
 
     return
 
 def annotate_read(sam_record: pysam.AlignedSegment, cursor, run_info, 
                   struct_collection, mode = 1):            
-    """ """
-    observed_ID = observed_counter.increment()
-
+    """ Accepts a pysam-formatted read as input, and compares it to the 
+        annotations in struct_collection to assign it a gene and transcript
+        identity. Returns annotation_info, which is a dict that has the 
+        following attributes:
+            gene_ID
+            transcript_ID
+            gene_novelty
+            transcript_novelty
+            exon_novelty
+            start_vertex
+            end_vertex
+            start_exon
+            end_exon
+            start_delta
+            end_delta  
+    """
     # Parse attributes to determine the chromosome, positions, and strand of the transcript
     read_ID = sam_record.query_name
+    dataset = sam_record.get_tag("RG")
     chrom = sam_record.reference_name
     strand = "-" if sam_record.is_reverse else "+"
     read_length = sam_record.query_length
@@ -2329,11 +2254,9 @@ def annotate_read(sam_record: pysam.AlignedSegment, cursor, run_info,
     sam_end = sam_record.reference_end
     cigar = sam_record.cigarstring
 
-    # TODO: see if we can do this faster with pysam
     intron_list = tutils.get_introns(sam_record, sam_start, cigar)
-    print(intron_list)
 
-    # Adjust intron positions by 1 to get splice sites
+    # Adjust intron positions by 1 to get splice sites in exon terms
     splice_sites = [x + 1 if i % 2 == 1 else x - 1 for i, x in
                     enumerate(intron_list)]
     positions = [sam_start] + splice_sites + [sam_end]
@@ -2366,8 +2289,39 @@ def annotate_read(sam_record: pysam.AlignedSegment, cursor, run_info,
                                           vertex_2_gene,
                                           gene_starts, gene_ends,
                                           run_info)
+
+    annotation_info.read_ID = read_ID
+    annotation_info.dataset = dataset
+    annotation_info.location = "%s:%d-%d" % (chrom, sam_start, sam_end)
+    annotation_info.strand = strand
+    annotation_info.read_length = read_length
+    annotation_info.n_exons = n_exons
+    
     print(annotation_info) 
-    return
+    return annotation_info
+
+def unpack_observed_and_abundance(annotation_info, abundance):
+    """ Now that transcript has been annotated, unpack values and
+        create an observed entry and abundance record """
+
+    obs_ID = observed_counter.increment()
+    observed = (obs_ID, annotation_info.gene_ID, annotation_info.transcript_ID, 
+                annotation_info.read_ID, annotation_info.dataset,
+                annotation_info.start_vertex, annotation_info.end_vertex, 
+                annotation_info.start_exon, annotation_info.end_exon,
+                annotation_info.start_delta, annotation_info.end_delta, 
+                annotation_info.read_length)
+ 
+    # Also add transcript to abundance dict
+    dataset = annotation_info.dataset
+    if dataset not in abundance:
+        abundance[dataset] = {}
+    try:
+        abundance[dataset][annotation_info.transcript_ID] += 1
+    except:
+        abundance[dataset][annotation_info.transcript_ID] = 1
+ 
+    return observed
 
     # Read and annotate input sam files. Also, write output QC log file.
     #print("Annotating reads...")
