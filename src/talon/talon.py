@@ -436,7 +436,7 @@ def create_transcript(chromosome, start_pos, end_pos, gene_ID, edge_IDs, vertex_
                       'end_exon': edge_IDs[-1],
                       'start_vertex': vertex_IDs[0],
                       'end_vertex': vertex_IDs[-1],
-                      'n_exons': (len(edge_IDs) + 1)/2,
+                      'n_exons': int((len(edge_IDs) + 1)/2),
                       'chromosome': chromosome,
                       'start_pos': start_pos,
                       'end_pos': end_pos }
@@ -673,7 +673,7 @@ def process_FSM(chrom, positions, strand, edge_IDs, vertex_IDs, all_matches, gen
 
     # Check if any of the matches have the same number of exons as the query.
     # Such a match should be prioritized because it's an FSM
-    n_exons = len(positions)/2
+    n_exons = int(len(positions)/2)
     FSM_matches = [ x for x in all_matches if x['n_exons'] == n_exons ]
 
     if len(FSM_matches) == 0:
@@ -791,7 +791,7 @@ def process_ISM(chrom, positions, strand, edge_IDs, vertex_IDs, all_matches, tra
     transcript_ID = None
     novelty = []
     start_end_info = {}
-    n_exons = len(positions)/2
+    n_exons = int(len(positions)/2)
 
     ISM = []
     suffix = []
@@ -1219,7 +1219,7 @@ def identify_transcript(chrom, positions, strand, cursor, location_dict, edge_di
     """
     gene_novelty = []
     transcript_novelty = []
-    n_exons = len(positions)/2.0
+    n_exons = int(len(positions)/2.0)
     gene_ID = None
  
     # Get vertex matches for the transcript positions
@@ -1503,7 +1503,8 @@ def init_outfiles(outprefix, tmp_dir = "talon_tmp/"):
     outfiles = dstruct.Struct()  
     outfiles.qc = outprefix + "_QC.log"
     outfiles.abundance = tmp_dir + "abundance_tuples.txt"
-   
+    outfiles.transcripts = tmp_dir + "transcript_tuples.txt"  
+ 
     for fname in outfiles:
         open(outfiles[fname], 'w').close() 
  
@@ -1809,9 +1810,12 @@ def update_database(database, batch_size, outfiles):
         #print("Adding novel genes to database...")
         #add_genes(cursor)
 
-        #print("Adding novel transcripts to database...")
-        #batch_add_transcripts(cursor, struct_collection.transcript_dict, batch_size) 
+        print("Adding novel transcripts to database...")
+        batch_add_transcripts(cursor, outfiles.transcripts, batch_size) 
 
+        cursor.execute("SELECT * from transcripts")
+        for i in cursor.fetchall():
+            print(i[0])
         #print("Adding novel exons/introns to database...")
         #batch_add_edges(cursor, struct_collection.edge_dict, batch_size)
 
@@ -1826,6 +1830,7 @@ def update_database(database, batch_size, outfiles):
  
         print("Updating abundance table....")
         batch_add_abundance(cursor, outfiles.abundance, batch_size) 
+        print("committing")
         conn.commit()
     
         #print("Adding %d transcript observation(s) to database..." % len(observed_transcripts))
@@ -1954,38 +1959,27 @@ def batch_add_edges(cursor, edge_dict, batch_size):
 
     return
 
-def batch_add_transcripts(cursor, transcript_dict, batch_size):
+def batch_add_transcripts(cursor, transcript_file, batch_size):
     """ Add new transcripts to database """
 
-    transcript_entries = []
-    for transcript in list(transcript_dict.values()):
-        if type(transcript) is dict:
-            transcript_entries.append((transcript['transcript_ID'],
-                                       transcript['gene_ID'],
-                                       transcript['start_exon'],
-                                       transcript['jn_path'],
-                                       transcript['end_exon'],
-                                       transcript['start_vertex'],
-                                       transcript['end_vertex'],
-                                       transcript['n_exons']))
+    with open(transcript_file, 'r') as f:
+        while True:
+            batch = [ tuple(x.strip().split(",")) for x in islice(f, batch_size) ]
 
-    index = 0
-    while index < len(transcript_entries):
-        try:
-            transcript_batch = transcript_entries[index:index + batch_size]
-        except:
-            transcript_batch = transcript_entries[index:]
-        index += batch_size
+            if batch == []:
+                break
 
-        try:
-            cols = " (" + ", ".join([str_wrap_double(x) for x in
-                   ["transcript_id", "gene_id", "start_exon", "jn_path", 
-                     "end_exon", "start_vertex", "end_vertex", "n_exons"]]) + ") "
-            command = 'INSERT INTO "transcripts"' + cols + "VALUES " + '(?,?,?,?,?,?,?,?)'
-            cursor.executemany(command, transcript_batch)
-        except Exception as e:
-            print(e)
-            sys.exit(1)
+
+            try:
+                cols = " (" + ", ".join([str_wrap_double(x) for x in
+                       ["transcript_id", "gene_id", "start_exon", "jn_path", 
+                         "end_exon", "start_vertex", "end_vertex", "n_exons"]]) + ") "
+                command = 'INSERT INTO "transcripts"' + cols + "VALUES " + '(?,?,?,?,?,?,?,?)'
+                cursor.executemany(command, batch)
+
+            except Exception as e:
+                print(e)
+                sys.exit(1)
 
     return
 
@@ -2075,7 +2069,6 @@ def batch_add_abundance(cursor, abundance_file, batch_size):
     with open(abundance_file, 'r') as f:
         while True:
             batch = [ tuple(x.strip().split(",")) for x in islice(f, batch_size) ]
-            print(batch)
 
             if batch == []:
                 break
@@ -2247,12 +2240,35 @@ def parallel_talon(read_file, interval, database, run_info, queue):
                     exon_annotations.extend(annotation_info.exon_novelty)
                     observed_transcripts.append(obs_entry)
 
-    # Store or return these things
+    # TODO: move these operations to own function
+
+    # Write new transcripts to file
+    transcripts = struct_collection.transcript_dict
+    for transcript in list(transcripts.values()):
+        # Only write novel transcripts to file
+        if type(transcript) is dict:
+            #if transcript['jn_path'] == None:
+            #    transcript['jn_path'] = ""
+            print((transcript['transcript_ID'],
+                                       transcript['gene_ID'],
+                                       transcript['start_exon'],
+                                       transcript['jn_path'],
+                                       transcript['end_exon'],
+                                       transcript['start_vertex'],
+                                       transcript['end_vertex'],
+                                       transcript['n_exons']))
+            entry = ",".join([ str(x) for x in ( transcript['transcript_ID'],
+                                                 transcript['gene_ID'],
+                                                 transcript['start_exon'],
+                                                 transcript['jn_path'],
+                                                 transcript['end_exon'],
+                                                 transcript['start_vertex'],
+                                                 transcript['end_vertex'],
+                                                 transcript['n_exons'] ) ])
+            queue.put((run_info.outfiles.transcripts, entry))
 
     # Format rows for database entry 
-    print(abundance)
     for dataset in abundance.keys():
-        print(abundance[dataset])
         for transcript, count in abundance[dataset].items():
             curr_row = ",".join([str(transcript), dataset, str(count)])
             msg = (run_info.outfiles.abundance, curr_row)
@@ -2311,7 +2327,7 @@ def annotate_read(sam_record: pysam.AlignedSegment, cursor, run_info,
     gene_starts = struct_collection.gene_starts
     gene_ends = struct_collection.gene_ends
 
-    n_exons = len(positions)/2
+    n_exons = int(len(positions)/2)
     if n_exons > 1:
         annotation_info = identify_transcript(chrom, positions, strand,
                                               cursor, location_dict,
@@ -2406,7 +2422,6 @@ def listener(queue, timeout = 24):
             print("Shutting down message queue...")
             break
         with open(msg_fname, 'a') as f:
-            print("check")
             f.write(msg_value + "\n")
 
 def main():
