@@ -22,6 +22,8 @@ from . import init_refs as init_refs
 import pysam
 #from string import Template
 from multiprocessing import Pool, Process, Value, Lock, Manager, Queue
+from datetime import datetime, timedelta
+import time
 from itertools import repeat
 import pickle
 
@@ -2160,25 +2162,27 @@ def check_database_integrity(cursor):
 #    #write_counts_log_file(cursor, outprefix)
 #    conn.close()
 
-def parallel_talon(read_file, interval, database, run_info):
+def parallel_talon(read_file, interval, database, run_info, queue):
     """ Manage TALON processing of a single chunk of the input. Initialize
         reference data structures covering only the provided interval region,
         then send the read file to the annotation step. Once annotation is 
         complete, return the data tuples generated so that they can be 
         added to the database, OR alternately, pickle them and write to file
         where they can be accessed later. """
-    print("---------------------------------------------------")
+    #print("---------------------------------------------------")
+    pr = cProfile.Profile()
+    pr.enable()
     with sqlite3.connect(database) as conn:
         conn.row_factory = sqlite3.Row
         cursor = conn.cursor()
 
-        print("Processing annotation for interval %s:%d-%d..." % interval)
+        #print("Processing annotation for interval %s:%d-%d..." % interval)
         struct_collection = prepare_data_structures(cursor, run_info,
                                                     chrom = interval[0], 
                                                     start = interval[1], 
                                                     end = interval[2])
 
-        print("Annotating reads...")
+        #print("Annotating reads...")
 
         interval_id = "%s_%d_%d" % interval
 
@@ -2190,30 +2194,32 @@ def parallel_talon(read_file, interval, database, run_info):
         observed_transcripts = []    
 
         # Open QC file in tmp directory.
-        qc_dir = run_info.tmp_dir + "QC_logs/"
-        os.system("mkdir -p %s" % qc_dir)
-        fname = qc_dir + interval_id + ".QC.log"
-        with open(fname, 'w') as QC_file:
-            with pysam.AlignmentFile(read_file, "rb") as sam:
-                for record in sam:  # type: pysam.AlignedSegment
-                    # Check whether we should try annotating this read or not
-                    print(record.query_name)
-                    qc_metrics = tutils.check_read_quality(record, run_info)
+        #qc_dir = run_info.tmp_dir + "QC_logs/"
+        #os.system("mkdir -p %s" % qc_dir)
+        #fname = qc_dir + interval_id + ".QC.log"
+        #with open(fname, 'w') as QC_file:
+        with pysam.AlignmentFile(read_file, "rb") as sam:
+            for record in sam:  # type: pysam.AlignedSegment
+                # Check whether we should try annotating this read or not
+                #print(record.query_name)
+                qc_metrics = tutils.check_read_quality(record, run_info)
 
-                    passed_qc = qc_metrics[2]
-                    QC_file.write("\t".join([str(x) for x in qc_metrics]) + "\n")
+                passed_qc = qc_metrics[2]
+                qc_msg = ("talon_QC.log", "\t".join([str(x) for x in qc_metrics]))
+                queue.put(qc_msg)
+                #QC_file.write("\t".join([str(x) for x in qc_metrics]) + "\n")
 
-                    if passed_qc:
-                        annotation_info = annotate_read(record, cursor, run_info, 
-                                                        struct_collection)
-                        obs_entry = unpack_observed_and_abundance(annotation_info, 
-                                                                  abundance)
-                        
-                        # Update annotation records
-                        gene_annotations.extend(annotation_info.gene_novelty)
-                        transcript_annotations.extend(annotation_info.transcript_novelty)
-                        exon_annotations.extend(annotation_info.exon_novelty)
-                        observed_transcripts.append(obs_entry)
+                if passed_qc:
+                    annotation_info = annotate_read(record, cursor, run_info, 
+                                                    struct_collection)
+                    obs_entry = unpack_observed_and_abundance(annotation_info, 
+                                                              abundance)
+                    
+                    # Update annotation records
+                    gene_annotations.extend(annotation_info.gene_novelty)
+                    transcript_annotations.extend(annotation_info.transcript_novelty)
+                    exon_annotations.extend(annotation_info.exon_novelty)
+                    observed_transcripts.append(obs_entry)
 
     # Store or return these things
 
@@ -2224,6 +2230,8 @@ def parallel_talon(read_file, interval, database, run_info):
             curr_row = (transcript, dataset, count)
             abundance_rows.append(curr_row)
     print(abundance_rows)
+    pr.disable()
+    #pr.print_stats(sort='cumtime')
 
     return
 
@@ -2352,6 +2360,29 @@ def write_data_outputs():
     #pr = cProfile.Profile()
     #pr.enable()
 
+def listener(queue, fnames, timeout = 24):
+    """ During the run, this function listens for messages on the provided
+        queue. When a message is received (consisting of a filename and a 
+        string), it writes the string to that file. Timeout unit is in hours"""
+
+    # Initialize files
+    for fname in fnames:
+        open(fname, 'w').close()
+
+    # Set a timeout
+    wait_until = datetime.now() + timedelta(hours=timeout)
+
+    while True:
+        msg = queue.get()
+        #print(msg)
+        msg_fname = msg[0]
+        msg_value = msg[1]
+        with open(msg_fname, 'a') as f:
+            if datetime.now() > wait_until or msg_value == 'complete':
+                break
+            else:
+                print("check")
+                f.write(msg_value + "\n")
 
 def main():
     """ Runs program """
@@ -2387,10 +2418,35 @@ def main():
     read_files = procsams.write_reads_to_file(read_groups, intervals, header_file)
 
     # Set up a queue specifically for writing to outfiles
-    with Pool(processes=16) as pool:
-        pool.starmap(parallel_talon, zip(read_files, intervals, 
-                                         repeat(database), 
-                                         repeat(run_info)))
+    manager = Manager()
+    queue = manager.Queue()
+
+    with Pool(processes=4) as pool:
+        # Start running listener, which will monitor queue for messages
+        fnames = ["talon_QC.log"]
+        pool.apply_async(listener, (queue, fnames)) 
+
+        # Now launch the parallel TALON jobs
+        jobs = []
+        job_dict = {}
+        ct = 1 # Could use interval ID instead
+        for read_file, interval in zip(read_files, intervals):
+            job = pool.apply_async(parallel_talon, (read_file, interval, 
+                                   database, run_info, queue))
+            jobs.append(job)
+            job_dict[ct] = job
+            ct += 1
+
+        while job_dict:
+            for val in list(job_dict):
+                if job_dict[val].ready():
+                    del job_dict[val]
+                    print(f'Job {val} finished')
+            time.sleep(1) 
+
+    # now we are done, kill the listener
+    msg_done = (None, 'complete')
+    queue.put(msg_done)
 
     print("Genes: %d" % gene_counter.value())
     print("Transcripts: %d" % transcript_counter.value())
