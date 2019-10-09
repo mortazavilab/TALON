@@ -2365,7 +2365,7 @@ def listener(queue, fnames, timeout = 24):
         queue. When a message is received (consisting of a filename and a 
         string), it writes the string to that file. Timeout unit is in hours"""
 
-    # Initialize files
+    # Initialize empty files
     for fname in fnames:
         open(fname, 'w').close()
 
@@ -2377,12 +2377,12 @@ def listener(queue, fnames, timeout = 24):
         #print(msg)
         msg_fname = msg[0]
         msg_value = msg[1]
+        if datetime.now() > wait_until or msg_value == 'complete':
+            print("Shutting down message queue...")
+            break
         with open(msg_fname, 'a') as f:
-            if datetime.now() > wait_until or msg_value == 'complete':
-                break
-            else:
-                print("check")
-                f.write(msg_value + "\n")
+            print("check")
+            f.write(msg_value + "\n")
 
 def main():
     """ Runs program """
@@ -2444,9 +2444,9 @@ def main():
                     print(f'Job {val} finished')
             time.sleep(1) 
 
-    # now we are done, kill the listener
-    msg_done = (None, 'complete')
-    queue.put(msg_done)
+        # Now we are done, kill the listener
+        msg_done = (None, 'complete')
+        queue.put(msg_done)
 
     print("Genes: %d" % gene_counter.value())
     print("Transcripts: %d" % transcript_counter.value())
@@ -2457,7 +2457,5 @@ def main():
 
 if __name__ == '__main__':
     main()
-    #pr.disable()
-    #pr.print_stats()
 
 
