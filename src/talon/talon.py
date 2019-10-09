@@ -24,8 +24,8 @@ import pysam
 from multiprocessing import Pool, Process, Value, Lock, Manager, Queue
 from datetime import datetime, timedelta
 import time
-from itertools import repeat
-import pickle
+from itertools import repeat,islice
+#import pickle
 
 # TODO: Add a counter that the threads increment
 # TODO: Refine multigene behavior
@@ -1480,6 +1480,35 @@ def init_run_info(database, genome_build, min_coverage = 0.9, min_identity = 0,
 
     return run_info
 
+def init_outfiles(outprefix, tmp_dir = "talon_tmp/"):
+    """ Initialize output files for the run that all processes will be able to
+        write to via the queue. """
+
+    # If there is a tmp dir there already, remove it
+    if os.path.exists(tmp_dir):
+        os.system("rm -r %s" % tmp_dir)
+    os.system("mkdir -p %s" % tmp_dir)
+ 
+    if not tmp_dir.endswith("/"):
+        tmp_dir = tmp_dir + "/"
+
+    # Check on main outpath
+    if os.path.isdir(outprefix):
+        if not outprefix.endswith("/"):
+            outprefix = outprefix + "/" 
+        # Add default prefix
+        outprefix = outprefix + "talon"
+
+    # Now initialize the files
+    outfiles = dstruct.Struct()  
+    outfiles.qc = outprefix + "_QC.log"
+    outfiles.abundance = tmp_dir + "abundance_tuples.txt"
+   
+    for fname in outfiles:
+        open(outfiles[fname], 'w').close() 
+ 
+    return outfiles
+
 def prepare_data_structures(cursor, run_info, chrom = None, start = None, end = None):
     """ Initializes data structures needed for the run and organizes them
         in a dictionary for more ease of use when passing them between functions
@@ -1770,42 +1799,45 @@ def identify_monoexon_transcript(chrom, positions, strand, cursor, location_dict
 
     return annotations
 
-def update_database(cursor, batch_size, datasets, observed_transcripts, 
-                    gene_annotations, transcript_annotations, exon_annotations,
-                    abundance, struct_collection):
+def update_database(database, batch_size, outfiles):
     """ Adds new entries to the database. """
 
-    print("Adding novel genes to database...")
-    add_genes(cursor)
+    with sqlite3.connect(database) as conn:
+        conn.row_factory = sqlite3.Row
+        cursor = conn.cursor()
 
-    print("Adding novel transcripts to database...")
-    batch_add_transcripts(cursor, struct_collection.transcript_dict, batch_size) 
+        #print("Adding novel genes to database...")
+        #add_genes(cursor)
 
-    print("Adding novel exons/introns to database...")
-    batch_add_edges(cursor, struct_collection.edge_dict, batch_size)
+        #print("Adding novel transcripts to database...")
+        #batch_add_transcripts(cursor, struct_collection.transcript_dict, batch_size) 
 
-    print("Adding novel vertices/locations to database...")
-    batch_add_locations(cursor, struct_collection.location_dict, batch_size)
+        #print("Adding novel exons/introns to database...")
+        #batch_add_edges(cursor, struct_collection.edge_dict, batch_size)
 
-    print("Updating gene-vertex assignments...")
-    batch_add_vertex2gene(cursor, struct_collection.vertex_2_gene, batch_size)
+        #print("Adding novel vertices/locations to database...")
+        #batch_add_locations(cursor, struct_collection.location_dict, batch_size)
 
-    print("Adding %d dataset record(s) to database..." % len(datasets))
-    add_datasets(cursor, datasets)  
+        #print("Updating gene-vertex assignments...")
+        #batch_add_vertex2gene(cursor, struct_collection.vertex_2_gene, batch_size)
+
+        #print("Adding %d dataset record(s) to database..." % len(datasets))
+        #add_datasets(cursor, datasets)  
  
-    print("Updating abundance table....")
-    batch_add_abundance(cursor, abundance, batch_size) 
+        print("Updating abundance table....")
+        batch_add_abundance(cursor, outfiles.abundance, batch_size) 
+        conn.commit()
+    
+        #print("Adding %d transcript observation(s) to database..." % len(observed_transcripts))
+        #batch_add_observed(cursor, observed_transcripts, batch_size)
 
-    print("Adding %d transcript observation(s) to database..." % len(observed_transcripts))
-    batch_add_observed(cursor, observed_transcripts, batch_size)
+        #print("Updating counters...")
+        #update_counter(cursor, struct_collection.run_info)
 
-    print("Updating counters...")
-    update_counter(cursor, struct_collection.run_info)
-
-    print("Updating gene, transcript, and exon annotations...")
-    batch_add_annotations(cursor, gene_annotations, "gene", batch_size)
-    batch_add_annotations(cursor, transcript_annotations, "transcript", batch_size)
-    batch_add_annotations(cursor, exon_annotations, "exon", batch_size)
+        #print("Updating gene, transcript, and exon annotations...")
+        #batch_add_annotations(cursor, gene_annotations, "gene", batch_size)
+        #batch_add_annotations(cursor, transcript_annotations, "transcript", batch_size)
+        #batch_add_annotations(cursor, exon_annotations, "exon", batch_size)
 
     return
  
@@ -2036,26 +2068,26 @@ def batch_add_observed(cursor, observed, batch_size):
             sys.exit(1)
     return
 
-def batch_add_abundance(cursor, abundances, batch_size):
-    """ Adds abundance tuples (transcript_ID, dataset, count) to the abundance
-        table of the database """
+def batch_add_abundance(cursor, abundance_file, batch_size):
+    """ Reads abundance tuples (transcript_ID, dataset, count) from file and 
+        adds to the abundance table of the database """
 
-    index = 0
-    while index < len(abundances):
-        try:
-            batch = abundances[index:index + batch_size]
-        except:
-            batch = abundances[index:]
-        index += batch_size
+    with open(abundance_file, 'r') as f:
+        while True:
+            batch = [ tuple(x.strip().split(",")) for x in islice(f, batch_size) ]
+            print(batch)
 
-        try:
-            cols = " (" + ", ".join([str_wrap_double(x) for x in
-                   ["transcript_id", "dataset", "count"]]) + ") "
-            command = 'INSERT INTO "abundance"' + cols + "VALUES " + '(?,?,?)'
-            cursor.executemany(command, batch)
-        except Exception as e:
-            print(e)
-            sys.exit(1)
+            if batch == []:
+                break
+
+            try:
+                cols = " (" + ", ".join([str_wrap_double(x) for x in
+                       ["transcript_id", "dataset", "count"]]) + ") "
+                command = 'INSERT INTO "abundance"' + cols + "VALUES " + '(?,?,?)'
+                cursor.executemany(command, batch)
+            except Exception as e:
+                print(e)
+                sys.exit(1)
     return 
 
 def check_database_integrity(cursor):
@@ -2193,11 +2225,6 @@ def parallel_talon(read_file, interval, database, run_info, queue):
         exon_annotations = []
         observed_transcripts = []    
 
-        # Open QC file in tmp directory.
-        #qc_dir = run_info.tmp_dir + "QC_logs/"
-        #os.system("mkdir -p %s" % qc_dir)
-        #fname = qc_dir + interval_id + ".QC.log"
-        #with open(fname, 'w') as QC_file:
         with pysam.AlignmentFile(read_file, "rb") as sam:
             for record in sam:  # type: pysam.AlignedSegment
                 # Check whether we should try annotating this read or not
@@ -2205,9 +2232,8 @@ def parallel_talon(read_file, interval, database, run_info, queue):
                 qc_metrics = tutils.check_read_quality(record, run_info)
 
                 passed_qc = qc_metrics[2]
-                qc_msg = ("talon_QC.log", "\t".join([str(x) for x in qc_metrics]))
+                qc_msg = (run_info.outfiles.qc, "\t".join([str(x) for x in qc_metrics]))
                 queue.put(qc_msg)
-                #QC_file.write("\t".join([str(x) for x in qc_metrics]) + "\n")
 
                 if passed_qc:
                     annotation_info = annotate_read(record, cursor, run_info, 
@@ -2224,12 +2250,14 @@ def parallel_talon(read_file, interval, database, run_info, queue):
     # Store or return these things
 
     # Format rows for database entry 
-    abundance_rows = []
+    print(abundance)
     for dataset in abundance.keys():
+        print(abundance[dataset])
         for transcript, count in abundance[dataset].items():
-            curr_row = (transcript, dataset, count)
-            abundance_rows.append(curr_row)
-    print(abundance_rows)
+            curr_row = ",".join([str(transcript), dataset, str(count)])
+            msg = (run_info.outfiles.abundance, curr_row)
+            queue.put(msg)
+
     pr.disable()
     #pr.print_stats(sort='cumtime')
 
@@ -2332,9 +2360,6 @@ def unpack_observed_and_abundance(annotation_info, abundance):
  
     return observed
 
-def write_data_outputs():
-    """ """
-    pass 
 
     # Read and annotate input sam files. Also, write output QC log file.
     #print("Annotating reads...")
@@ -2360,21 +2385,21 @@ def write_data_outputs():
     #pr = cProfile.Profile()
     #pr.enable()
 
-def listener(queue, fnames, timeout = 24):
+def listener(queue, timeout = 24):
     """ During the run, this function listens for messages on the provided
         queue. When a message is received (consisting of a filename and a 
         string), it writes the string to that file. Timeout unit is in hours"""
 
     # Initialize empty files
-    for fname in fnames:
-        open(fname, 'w').close()
+    #for fname in fnames:
+    #    open(fname, 'w').close()
 
     # Set a timeout
     wait_until = datetime.now() + timedelta(hours=timeout)
 
     while True:
         msg = queue.get()
-        #print(msg)
+        print(msg)
         msg_fname = msg[0]
         msg_value = msg[1]
         if datetime.now() > wait_until or msg_value == 'complete':
@@ -2398,6 +2423,7 @@ def main():
 
     # Set globally accessible counters
     run_info = init_run_info(database, build, min_coverage, min_identity)
+    run_info.outfiles = init_outfiles(options.outprefix)
     get_counters(database)
     print("Genes: %d" % gene_counter.value())
     print("Transcripts: %d" % transcript_counter.value())
@@ -2423,8 +2449,7 @@ def main():
 
     with Pool(processes=4) as pool:
         # Start running listener, which will monitor queue for messages
-        fnames = ["talon_QC.log"]
-        pool.apply_async(listener, (queue, fnames)) 
+        pool.apply_async(listener, (queue,)) 
 
         # Now launch the parallel TALON jobs
         jobs = []
@@ -2447,6 +2472,12 @@ def main():
         # Now we are done, kill the listener
         msg_done = (None, 'complete')
         queue.put(msg_done)
+
+        # TODO: create a queue to handle database updates?
+
+    # Update the database
+    batch_size = 10000
+    update_database(database, batch_size, run_info.outfiles)
 
     print("Genes: %d" % gene_counter.value())
     print("Transcripts: %d" % transcript_counter.value())
