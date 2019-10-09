@@ -1815,7 +1815,7 @@ def update_database(database, batch_size, outfiles):
 
         cursor.execute("SELECT * from transcripts")
         for i in cursor.fetchall():
-            print(i[0])
+            print([ x for x in i ])
         #print("Adding novel exons/introns to database...")
         #batch_add_edges(cursor, struct_collection.edge_dict, batch_size)
 
@@ -1964,11 +1964,16 @@ def batch_add_transcripts(cursor, transcript_file, batch_size):
 
     with open(transcript_file, 'r') as f:
         while True:
-            batch = [ tuple(x.strip().split(",")) for x in islice(f, batch_size) ]
+            batch_lines = islice(f, batch_size)
+            batch = []
+            for line in batch_lines:
+                transcript = line.strip().split(",")
+                if transcript[3] == 'None':
+                    transcript[3] = None
+                batch.append(transcript)
 
             if batch == []:
                 break
-
 
             try:
                 cols = " (" + ", ".join([str_wrap_double(x) for x in
