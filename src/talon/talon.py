@@ -21,8 +21,9 @@ from . import query_utils as qutils
 from . import init_refs as init_refs
 import pysam
 #from string import Template
-from multiprocessing import Pool, Process, Value, Lock
+from multiprocessing import Pool, Process, Value, Lock, Manager, Queue
 from itertools import repeat
+import pickle
 
 # TODO: Add a counter that the threads increment
 # TODO: Refine multigene behavior
@@ -2323,6 +2324,10 @@ def unpack_observed_and_abundance(annotation_info, abundance):
  
     return observed
 
+def write_data_outputs():
+    """ """
+    pass 
+
     # Read and annotate input sam files. Also, write output QC log file.
     #print("Annotating reads...")
     #print("-------------------------------------")
@@ -2381,7 +2386,8 @@ def main():
     read_groups, intervals, header_file = procsams.partition_reads(sam_files, datasets)
     read_files = procsams.write_reads_to_file(read_groups, intervals, header_file)
 
-    with Pool(processes=4) as pool:
+    # Set up a queue specifically for writing to outfiles
+    with Pool(processes=16) as pool:
         pool.starmap(parallel_talon, zip(read_files, intervals, 
                                          repeat(database), 
                                          repeat(run_info)))
@@ -2391,6 +2397,8 @@ def main():
     print("Observed: %d" % observed_counter.value())
     # TODO: Update database and validate. Concatenate outfiles
         #TODO: header for QC log file
+
+
 if __name__ == '__main__':
     main()
     #pr.disable()
