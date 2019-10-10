@@ -1508,6 +1508,9 @@ def init_outfiles(outprefix, tmp_dir = "talon_tmp/"):
     outfiles.v2g = tmp_dir + "vertex_2_gene_tuples.tsv"
     outfiles.location = tmp_dir + "location_tuples.tsv"
     outfiles.observed = tmp_dir + "observed_transcript_tuples.tsv"
+    outfiles.gene_annot = tmp_dir + "gene_annot_tuples.tsv"
+    outfiles.transcript_annot = tmp_dir + "transcript_annot_tuples.tsv"
+    outfiles.exon_annot = tmp_dir + "exon_annot_tuples.tsv"
  
     for fname in outfiles:
         open(outfiles[fname], 'w').close() 
@@ -1838,11 +1841,13 @@ def update_database(database, batch_size, outfiles, datasets):
         print("Updating counters...")
         update_counter(cursor, len(datasets))
 
-        #print("Updating gene, transcript, and exon annotations...")
-        #batch_add_annotations(cursor, gene_annotations, "gene", batch_size)
-        #batch_add_annotations(cursor, transcript_annotations, "transcript", batch_size)
-        #batch_add_annotations(cursor, exon_annotations, "exon", batch_size)
-        cursor.execute("SELECT * from counters")
+        print("Updating gene, transcript, and exon annotations...")
+
+        batch_add_annotations(cursor, outfiles.gene_annot, "gene", batch_size)
+        batch_add_annotations(cursor, outfiles.transcript_annot, "transcript", batch_size)
+        batch_add_annotations(cursor, outfiles.exon_annot, "exon", batch_size)
+
+        cursor.execute("SELECT * from exon_annotations")
         for i in cursor.fetchall():
             print([ x for x in i ])
 
@@ -1989,7 +1994,7 @@ def add_datasets(cursor, datasets):
         sys.exit(1)
     return
 
-def batch_add_annotations(cursor, annotations, annot_type, batch_size):
+def batch_add_annotations(cursor, annot_file, annot_type, batch_size):
     """ Add gene/transcript/exon annotations to the appropriate annotation table
     """
     batch_size = 1
@@ -1997,24 +2002,23 @@ def batch_add_annotations(cursor, annotations, annot_type, batch_size):
         raise ValueError("When running batch annot update, must specify " + \
                          "annot_type as 'gene', 'exon', or 'transcript'.")
 
-    index = 0
-    while index < len(annotations):
-        try:
-            batch = annotations[index:index + batch_size]
-        except:
-            batch = annotations[index:]
-        index += batch_size
+    with open(annot_file, 'r') as f:
+        while True:
+            batch = [ tuple(x.strip().split("\t")) for x in islice(f, batch_size) ]
 
-        try:
-            cols = " (" + ", ".join([str_wrap_double(x) for x in
-                   ["ID", "annot_name", "source", "attribute", "value"]]) + ") "
-            command = 'INSERT OR IGNORE INTO "' + annot_type + '_annotations" ' + cols + \
-                      "VALUES " + '(?,?,?,?,?)'
-            cursor.executemany(command, batch)
+            if batch == []:
+                break
 
-        except Exception as e:
-            print(e)
-            sys.exit(1)
+            try:
+                cols = " (" + ", ".join([str_wrap_double(x) for x in
+                       ["ID", "annot_name", "source", "attribute", "value"]]) + ") "
+                command = 'INSERT OR IGNORE INTO "' + annot_type + \
+                          '_annotations" ' + cols + "VALUES " + '(?,?,?,?,?)'
+                cursor.executemany(command, batch)
+
+            except Exception as e:
+                print(e)
+                sys.exit(1)
     return
 
 def batch_add_observed(cursor, observed_file, batch_size):
@@ -2199,7 +2203,6 @@ def parallel_talon(read_file, interval, database, run_info, queue):
         gene_annotations = []
         transcript_annotations = []
         exon_annotations = []
-        observed_transcripts = []    
 
         with pysam.AlignmentFile(read_file, "rb") as sam:
             for record in sam:  # type: pysam.AlignedSegment
@@ -2268,12 +2271,23 @@ def parallel_talon(read_file, interval, database, run_info, queue):
                    "\t".join([ str(x) for x in (vertex_ID, gene[0])]))
             queue.put(msg)
 
-    # Format rows for database entry 
+    # Format abundance for database entry 
     for dataset in abundance.keys():
         for transcript, count in abundance[dataset].items():
             curr_row = "\t".join([str(transcript), dataset, str(count)])
             msg = (run_info.outfiles.abundance, curr_row)
             queue.put(msg)
+
+    # Output annotations to file
+    for entry in gene_annotations:
+        msg = (run_info.outfiles.gene_annot, "\t".join([str(x) for x in entry]))
+        queue.put(msg)
+    for entry in transcript_annotations:
+        msg = (run_info.outfiles.transcript_annot, "\t".join([str(x) for x in entry]))
+        queue.put(msg)
+    for entry in exon_annotations:
+        msg = (run_info.outfiles.exon_annot, "\t".join([str(x) for x in entry]))
+        queue.put(msg)
 
     pr.disable()
     #pr.print_stats(sort='cumtime')
