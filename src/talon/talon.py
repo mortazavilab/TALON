@@ -720,7 +720,7 @@ def process_FSM(chrom, positions, strand, edge_IDs, vertex_IDs, all_matches, gen
                                                                    locations, run_info)
 
         edge_IDs = [start_exon] + edge_IDs + [end_exon]
-        vertex_IDs = [start_vertex] + vertex_IDs + ["end_vertex"]
+        vertex_IDs = [start_vertex] + vertex_IDs + [end_vertex]
 
     # Package information for output
     start_end_info = {"start_vertex": start_vertex,
@@ -1505,6 +1505,7 @@ def init_outfiles(outprefix, tmp_dir = "talon_tmp/"):
     outfiles.abundance = tmp_dir + "abundance_tuples.tsv"
     outfiles.transcripts = tmp_dir + "transcript_tuples.tsv"  
     outfiles.edges = tmp_dir + "edge_tuples.tsv"
+    outfiles.v2g = tmp_dir + "vertex_2_gene_tuples.tsv"
  
     for fname in outfiles:
         open(outfiles[fname], 'w').close() 
@@ -1817,15 +1818,19 @@ def update_database(database, batch_size, outfiles):
         print("Adding novel exons/introns to database...")
         batch_add_edges(cursor, outfiles.edges, batch_size)
 
-        cursor.execute("SELECT * from edge")
-        for i in cursor.fetchall():
-            print([ x for x in i ])
+        #cursor.execute("SELECT * from edge")
+        #for i in cursor.fetchall():
+        #    print([ x for x in i ])
 
         #print("Adding novel vertices/locations to database...")
         #batch_add_locations(cursor, struct_collection.location_dict, batch_size)
 
-        #print("Updating gene-vertex assignments...")
-        #batch_add_vertex2gene(cursor, struct_collection.vertex_2_gene, batch_size)
+        print("Updating gene-vertex assignments...")
+        batch_add_vertex2gene(cursor, outfiles.v2g, batch_size)
+
+        cursor.execute("SELECT * from vertex")
+        for i in cursor.fetchall():
+            print([ x for x in i ])
 
         #print("Adding %d dataset record(s) to database..." % len(datasets))
         #add_datasets(cursor, datasets)  
@@ -1871,31 +1876,26 @@ def update_counter(cursor, run_info):
 
     return
 
-def batch_add_vertex2gene(cursor, vertex_2_gene, batch_size):
+def batch_add_vertex2gene(cursor, v2g_file, batch_size):
     """ Add new vertex-gene relationships to the vertex table """
-    entries = []
-    for vertex_ID, gene_set in vertex_2_gene.items():
-        for gene in gene_set:
-            entries.append((vertex_ID, gene[0]))
 
-    index = 0
-    while index < len(entries):
-        try:
-            batch = entries[index:index + batch_size]
-        except:
-            batch = entries[index:]
-        index += batch_size
+    with open(v2g_file, 'r') as f:
+        while True:
+            batch = [ tuple(x.strip().split("\t")) for x in islice(f, batch_size) ]
 
-        try:
-            cols = " (" + ", ".join([str_wrap_double(x) for x in
-                   ["vertex_ID", "gene_ID"]]) + ") "
-            command = 'INSERT OR IGNORE INTO "vertex"' + cols + "VALUES " + \
-                      '(?,?)'
-            cursor.executemany(command, batch)
+            if batch == []:
+                break
 
-        except Exception as e:
-            print(e)
-            sys.exit(1)
+            try:
+                cols = " (" + ", ".join([str_wrap_double(x) for x in
+                       ["vertex_ID", "gene_ID"]]) + ") "
+                command = 'INSERT OR IGNORE INTO "vertex"' + cols + "VALUES " + \
+                          '(?,?)'
+                cursor.executemany(command, batch)
+
+            except Exception as e:
+                print(e)
+                sys.exit(1)
     return
 
 def batch_add_locations(cursor, location_dict, batch_size):
@@ -2264,6 +2264,14 @@ def parallel_talon(read_file, interval, database, run_info, queue):
                                                 edge['strand']]] )
             queue.put((run_info.outfiles.edges, entry))
 
+    # Write new vertex-gene combos to file
+    vertex_2_gene = struct_collection.vertex_2_gene
+    for vertex_ID, gene_set in vertex_2_gene.items():
+        for gene in gene_set:
+            msg = (run_info.outfiles.v2g, 
+                   "\t".join([ str(x) for x in (vertex_ID, gene[0])]))
+            queue.put(msg)
+
     # Format rows for database entry 
     for dataset in abundance.keys():
         for transcript, count in abundance[dataset].items():
@@ -2345,7 +2353,7 @@ def annotate_read(sam_record: pysam.AlignedSegment, cursor, run_info,
     annotation_info.strand = strand
     annotation_info.read_length = read_length
     annotation_info.n_exons = n_exons
-    print(annotation_info)
+    #print(annotation_info)
     
     return annotation_info
 
@@ -2411,7 +2419,7 @@ def listener(queue, timeout = 24):
 
     while True:
         msg = queue.get()
-        #print(msg)
+        print(msg)
         msg_fname = msg[0]
         msg_value = msg[1]
         if datetime.now() > wait_until or msg_value == 'complete':
