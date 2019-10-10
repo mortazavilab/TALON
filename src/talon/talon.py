@@ -1506,6 +1506,7 @@ def init_outfiles(outprefix, tmp_dir = "talon_tmp/"):
     outfiles.transcripts = tmp_dir + "transcript_tuples.tsv"  
     outfiles.edges = tmp_dir + "edge_tuples.tsv"
     outfiles.v2g = tmp_dir + "vertex_2_gene_tuples.tsv"
+    outfiles.location = tmp_dir + "location_tuples.tsv"
  
     for fname in outfiles:
         open(outfiles[fname], 'w').close() 
@@ -1802,7 +1803,7 @@ def identify_monoexon_transcript(chrom, positions, strand, cursor, location_dict
 
     return annotations
 
-def update_database(database, batch_size, outfiles):
+def update_database(database, batch_size, outfiles, datasets):
     """ Adds new entries to the database. """
 
     with sqlite3.connect(database) as conn:
@@ -1818,22 +1819,18 @@ def update_database(database, batch_size, outfiles):
         print("Adding novel exons/introns to database...")
         batch_add_edges(cursor, outfiles.edges, batch_size)
 
-        #cursor.execute("SELECT * from edge")
-        #for i in cursor.fetchall():
-        #    print([ x for x in i ])
-
-        #print("Adding novel vertices/locations to database...")
-        #batch_add_locations(cursor, struct_collection.location_dict, batch_size)
+        print("Adding novel vertices/locations to database...")
+        batch_add_locations(cursor, outfiles.location, batch_size)
 
         print("Updating gene-vertex assignments...")
         batch_add_vertex2gene(cursor, outfiles.v2g, batch_size)
 
-        cursor.execute("SELECT * from vertex")
+        print("Adding %d dataset record(s) to database..." % len(datasets))
+        add_datasets(cursor, datasets)  
+
+        cursor.execute("SELECT * from location")
         for i in cursor.fetchall():
             print([ x for x in i ])
-
-        #print("Adding %d dataset record(s) to database..." % len(datasets))
-        #add_datasets(cursor, datasets)  
  
         print("Updating abundance table....")
         batch_add_abundance(cursor, outfiles.abundance, batch_size) 
@@ -1898,35 +1895,26 @@ def batch_add_vertex2gene(cursor, v2g_file, batch_size):
                 sys.exit(1)
     return
 
-def batch_add_locations(cursor, location_dict, batch_size):
+def batch_add_locations(cursor, location_file, batch_size):
     """ Add new locations to database """
-    location_entries = []
-    for chrom_dict in location_dict.values():
-        for loc in list(chrom_dict.values()):
-            if type(loc) is dict:
-                location_entries.append((loc['location_ID'],
-                                         loc['genome_build'],
-                                         loc['chromosome'],
-                                         loc['position']))
 
-    index = 0
-    while index < len(location_entries):
-        try:
-            location_batch = location_entries[index:index + batch_size]
-        except:
-            location_batch = location_entries[index:]
-        index += batch_size
+    with open(location_file, 'r') as f:
+        while True:
+            batch = [ tuple(x.strip().split("\t")) for x in islice(f, batch_size) ]
 
-        try:
-            cols = " (" + ", ".join([str_wrap_double(x) for x in
-                   ["location_ID", "genome_build", "chromosome", "position"]]) + ") "
-            command = 'INSERT INTO "location"' + cols + "VALUES " + \
-                      '(?,?,?,?)'
-            cursor.executemany(command, location_batch)
+            if batch == []:
+                break
 
-        except Exception as e:
-            print(e)
-            sys.exit(1)
+            try:
+                cols = " (" + ", ".join([str_wrap_double(x) for x in
+                       ["location_ID", "genome_build", "chromosome", "position"]]) + ") "
+                command = 'INSERT INTO "location"' + cols + "VALUES " + \
+                          '(?,?,?,?)'
+                cursor.executemany(command, batch)
+
+            except Exception as e:
+                print(e)
+                sys.exit(1)
     return
     
 
@@ -2264,6 +2252,18 @@ def parallel_talon(read_file, interval, database, run_info, queue):
                                                 edge['strand']]] )
             queue.put((run_info.outfiles.edges, entry))
 
+    # Write locations to file
+    location_dict = struct_collection.location_dict
+    for chrom_dict in location_dict.values():
+        for loc in list(chrom_dict.values()):
+            if type(loc) is dict:
+                msg = (run_info.outfiles.location,
+                       "\t".join([ str(x) for x in (loc['location_ID'],
+                                                    loc['genome_build'],
+                                                    loc['chromosome'],
+                                                    loc['position'])]))
+                queue.put(msg)
+
     # Write new vertex-gene combos to file
     vertex_2_gene = struct_collection.vertex_2_gene
     for vertex_ID, gene_set in vertex_2_gene.items():
@@ -2496,7 +2496,7 @@ def main():
 
     # Update the database
     batch_size = 10000
-    update_database(database, batch_size, run_info.outfiles)
+    update_database(database, batch_size, run_info.outfiles, dataset_db_entries)
 
     print("Genes: %d" % gene_counter.value())
     print("Transcripts: %d" % transcript_counter.value())
