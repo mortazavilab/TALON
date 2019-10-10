@@ -1502,8 +1502,9 @@ def init_outfiles(outprefix, tmp_dir = "talon_tmp/"):
     # Now initialize the files
     outfiles = dstruct.Struct()  
     outfiles.qc = outprefix + "_QC.log"
-    outfiles.abundance = tmp_dir + "abundance_tuples.txt"
-    outfiles.transcripts = tmp_dir + "transcript_tuples.txt"  
+    outfiles.abundance = tmp_dir + "abundance_tuples.tsv"
+    outfiles.transcripts = tmp_dir + "transcript_tuples.tsv"  
+    outfiles.edges = tmp_dir + "edge_tuples.tsv"
  
     for fname in outfiles:
         open(outfiles[fname], 'w').close() 
@@ -1813,11 +1814,12 @@ def update_database(database, batch_size, outfiles):
         print("Adding novel transcripts to database...")
         batch_add_transcripts(cursor, outfiles.transcripts, batch_size) 
 
-        cursor.execute("SELECT * from transcripts")
+        print("Adding novel exons/introns to database...")
+        batch_add_edges(cursor, outfiles.edges, batch_size)
+
+        cursor.execute("SELECT * from edge")
         for i in cursor.fetchall():
             print([ x for x in i ])
-        #print("Adding novel exons/introns to database...")
-        #batch_add_edges(cursor, struct_collection.edge_dict, batch_size)
 
         #print("Adding novel vertices/locations to database...")
         #batch_add_locations(cursor, struct_collection.location_dict, batch_size)
@@ -1928,34 +1930,25 @@ def batch_add_locations(cursor, location_dict, batch_size):
     return
     
 
-def batch_add_edges(cursor, edge_dict, batch_size):
+def batch_add_edges(cursor, edge_file, batch_size):
     """ Add new edges to database """
-    edge_entries = []
-    for edge in list(edge_dict.values()):
-        if type(edge) is dict:
-            edge_entries.append((edge['edge_ID'],
-                                 edge['v1'],
-                                 edge['v2'],
-                                 edge['edge_type'],
-                                 edge['strand']))
 
-    index = 0
-    while index < len(edge_entries):
-        try:
-            batch = edge_entries[index:index + batch_size]
-        except:
-            batch = edge_entries[index:]
-        index += batch_size
+    with open(edge_file, 'r') as f:
+        while True:
+            batch = [ tuple(x.strip().split("\t")) for x in islice(f, batch_size) ]
 
-        try:
-            cols = " (" + ", ".join([str_wrap_double(x) for x in
-                   ["edge_ID", "v1", "v2", "edge_type", "strand"]]) + ") "
-            command = 'INSERT INTO "edge"' + cols + "VALUES " + '(?,?,?,?,?)'
-            cursor.executemany(command, batch)
+            if batch == []:
+                break
 
-        except Exception as e:
-            print(e)
-            sys.exit(1)
+            try:
+                cols = " (" + ", ".join([str_wrap_double(x) for x in
+                       ["edge_ID", "v1", "v2", "edge_type", "strand"]]) + ") "
+                command = 'INSERT INTO "edge"' + cols + "VALUES " + '(?,?,?,?,?)'
+                cursor.executemany(command, batch)
+
+            except Exception as e:
+                print(e)
+                sys.exit(1)
 
     return
 
@@ -1967,7 +1960,7 @@ def batch_add_transcripts(cursor, transcript_file, batch_size):
             batch_lines = islice(f, batch_size)
             batch = []
             for line in batch_lines:
-                transcript = line.strip().split(",")
+                transcript = line.strip().split("\t")
                 if transcript[3] == 'None':
                     transcript[3] = None
                 batch.append(transcript)
@@ -2073,7 +2066,7 @@ def batch_add_abundance(cursor, abundance_file, batch_size):
 
     with open(abundance_file, 'r') as f:
         while True:
-            batch = [ tuple(x.strip().split(",")) for x in islice(f, batch_size) ]
+            batch = [ tuple(x.strip().split("\t")) for x in islice(f, batch_size) ]
 
             if batch == []:
                 break
@@ -2246,23 +2239,13 @@ def parallel_talon(read_file, interval, database, run_info, queue):
                     observed_transcripts.append(obs_entry)
 
     # TODO: move these operations to own function
-
+    # ========================================================================
     # Write new transcripts to file
     transcripts = struct_collection.transcript_dict
     for transcript in list(transcripts.values()):
         # Only write novel transcripts to file
         if type(transcript) is dict:
-            #if transcript['jn_path'] == None:
-            #    transcript['jn_path'] = ""
-            print((transcript['transcript_ID'],
-                                       transcript['gene_ID'],
-                                       transcript['start_exon'],
-                                       transcript['jn_path'],
-                                       transcript['end_exon'],
-                                       transcript['start_vertex'],
-                                       transcript['end_vertex'],
-                                       transcript['n_exons']))
-            entry = ",".join([ str(x) for x in ( transcript['transcript_ID'],
+            entry = "\t".join([ str(x) for x in ( transcript['transcript_ID'],
                                                  transcript['gene_ID'],
                                                  transcript['start_exon'],
                                                  transcript['jn_path'],
@@ -2272,10 +2255,19 @@ def parallel_talon(read_file, interval, database, run_info, queue):
                                                  transcript['n_exons'] ) ])
             queue.put((run_info.outfiles.transcripts, entry))
 
+    # Write new edges to file
+    edges = struct_collection.edge_dict
+    for edge in list(edges.values()):
+        if type(edge) is dict:
+            entry = "\t".join([str(x) for x in [edge['edge_ID'], edge['v1'],
+                                                edge['v2'], edge['edge_type'],
+                                                edge['strand']]] )
+            queue.put((run_info.outfiles.edges, entry))
+
     # Format rows for database entry 
     for dataset in abundance.keys():
         for transcript, count in abundance[dataset].items():
-            curr_row = ",".join([str(transcript), dataset, str(count)])
+            curr_row = "\t".join([str(transcript), dataset, str(count)])
             msg = (run_info.outfiles.abundance, curr_row)
             queue.put(msg)
 
@@ -2322,7 +2314,6 @@ def annotate_read(sam_record: pysam.AlignedSegment, cursor, run_info,
     # Flip the positions' order if the read is on the minus strand
     if strand == "-":
         positions = positions[::-1]
-    print(positions)
 
     # Now identify the transcript
     location_dict = struct_collection.location_dict
@@ -2354,8 +2345,8 @@ def annotate_read(sam_record: pysam.AlignedSegment, cursor, run_info,
     annotation_info.strand = strand
     annotation_info.read_length = read_length
     annotation_info.n_exons = n_exons
+    print(annotation_info)
     
-    print(annotation_info) 
     return annotation_info
 
 def unpack_observed_and_abundance(annotation_info, abundance):
@@ -2420,7 +2411,7 @@ def listener(queue, timeout = 24):
 
     while True:
         msg = queue.get()
-        print(msg)
+        #print(msg)
         msg_fname = msg[0]
         msg_value = msg[1]
         if datetime.now() > wait_until or msg_value == 'complete':
@@ -2486,7 +2477,7 @@ def main():
             for val in list(job_dict):
                 if job_dict[val].ready():
                     del job_dict[val]
-                    print(f'Job {val} finished')
+                    #print(f'Job {val} finished')
             time.sleep(1) 
 
         # Now we are done, kill the listener
