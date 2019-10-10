@@ -1507,6 +1507,7 @@ def init_outfiles(outprefix, tmp_dir = "talon_tmp/"):
     outfiles.edges = tmp_dir + "edge_tuples.tsv"
     outfiles.v2g = tmp_dir + "vertex_2_gene_tuples.tsv"
     outfiles.location = tmp_dir + "location_tuples.tsv"
+    outfiles.observed = tmp_dir + "observed_transcript_tuples.tsv"
  
     for fname in outfiles:
         open(outfiles[fname], 'w').close() 
@@ -1828,17 +1829,11 @@ def update_database(database, batch_size, outfiles, datasets):
         print("Adding %d dataset record(s) to database..." % len(datasets))
         add_datasets(cursor, datasets)  
 
-        cursor.execute("SELECT * from location")
-        for i in cursor.fetchall():
-            print([ x for x in i ])
- 
         print("Updating abundance table....")
         batch_add_abundance(cursor, outfiles.abundance, batch_size) 
-        print("committing")
-        conn.commit()
     
-        #print("Adding %d transcript observation(s) to database..." % len(observed_transcripts))
-        #batch_add_observed(cursor, observed_transcripts, batch_size)
+        print("Adding transcript observation(s) to database...")
+        batch_add_observed(cursor, outfiles.observed, batch_size)
 
         #print("Updating counters...")
         #update_counter(cursor, struct_collection.run_info)
@@ -1847,6 +1842,9 @@ def update_database(database, batch_size, outfiles, datasets):
         #batch_add_annotations(cursor, gene_annotations, "gene", batch_size)
         #batch_add_annotations(cursor, transcript_annotations, "transcript", batch_size)
         #batch_add_annotations(cursor, exon_annotations, "exon", batch_size)
+        cursor.execute("SELECT * from observed")
+        for i in cursor.fetchall():
+            print([ x for x in i ])
 
     return
  
@@ -2019,33 +2017,32 @@ def batch_add_annotations(cursor, annotations, annot_type, batch_size):
             sys.exit(1)
     return
 
-def batch_add_observed(cursor, observed, batch_size):
+def batch_add_observed(cursor, observed_file, batch_size):
     """ Adds observed tuples (obs_ID, gene_ID, transcript_ID, read_name,
         dataset, start_vertex_ID, end_vertex_ID, start_exon, end_exon, 
         start_delta, end_delta, read_length) to observed table of database. """
 
-    index = 0
-    while index < len(observed):
-        try:
-            batch = observed[index:index + batch_size]
-        except:
-            batch = observed[index:]
-        index += batch_size
+    with open(observed_file, 'r') as f:
+        while True:
+            batch = [ tuple(x.strip().split("\t")) for x in islice(f, batch_size) ]
 
-        # Add to database
-        try:
-            cols = " (" + ", ".join([str_wrap_double(x) for x in
-                   ["obs_ID", "gene_ID", "transcript_ID", "read_name",
-                    "dataset", "start_vertex", "end_vertex",
-                    "start_exon", "end_exon",
-                    "start_delta", "end_delta", "read_length"]]) + ") "
-            command = 'INSERT INTO "observed"' + cols + \
-                      "VALUES " + '(?,?,?,?,?,?,?,?,?,?,?,?)'
-            cursor.executemany(command, batch)
+            if batch == []:
+                break
 
-        except Exception as e:
-            print(e)
-            sys.exit(1)
+            # Add to database
+            try:
+                cols = " (" + ", ".join([str_wrap_double(x) for x in
+                       ["obs_ID", "gene_ID", "transcript_ID", "read_name",
+                        "dataset", "start_vertex", "end_vertex",
+                        "start_exon", "end_exon",
+                        "start_delta", "end_delta", "read_length"]]) + ") "
+                command = 'INSERT INTO "observed"' + cols + \
+                          "VALUES " + '(?,?,?,?,?,?,?,?,?,?,?,?)'
+                cursor.executemany(command, batch)
+
+            except Exception as e:
+                print(e)
+                sys.exit(1)
     return
 
 def batch_add_abundance(cursor, abundance_file, batch_size):
@@ -2217,14 +2214,13 @@ def parallel_talon(read_file, interval, database, run_info, queue):
                 if passed_qc:
                     annotation_info = annotate_read(record, cursor, run_info, 
                                                     struct_collection)
-                    obs_entry = unpack_observed_and_abundance(annotation_info, 
-                                                              abundance)
+                    unpack_observed_and_abundance(annotation_info, abundance, 
+                                                  queue, run_info.outfiles.observed)
                     
                     # Update annotation records
                     gene_annotations.extend(annotation_info.gene_novelty)
                     transcript_annotations.extend(annotation_info.transcript_novelty)
                     exon_annotations.extend(annotation_info.exon_novelty)
-                    observed_transcripts.append(obs_entry)
 
     # TODO: move these operations to own function
     # ========================================================================
@@ -2357,9 +2353,10 @@ def annotate_read(sam_record: pysam.AlignedSegment, cursor, run_info,
     
     return annotation_info
 
-def unpack_observed_and_abundance(annotation_info, abundance):
+def unpack_observed_and_abundance(annotation_info, abundance, queue, obs_file):
     """ Now that transcript has been annotated, unpack values and
-        create an observed entry and abundance record """
+        create an observed entry and abundance record. Send the observed 
+        entry to the queue for output to obs_file."""
 
     obs_ID = observed_counter.increment()
     observed = (obs_ID, annotation_info.gene_ID, annotation_info.transcript_ID, 
@@ -2368,7 +2365,9 @@ def unpack_observed_and_abundance(annotation_info, abundance):
                 annotation_info.start_exon, annotation_info.end_exon,
                 annotation_info.start_delta, annotation_info.end_delta, 
                 annotation_info.read_length)
- 
+    msg = (obs_file, "\t".join([str(x) for x in observed]))
+    queue.put(msg)
+
     # Also add transcript to abundance dict
     dataset = annotation_info.dataset
     if dataset not in abundance:
@@ -2378,7 +2377,7 @@ def unpack_observed_and_abundance(annotation_info, abundance):
     except:
         abundance[dataset][annotation_info.transcript_ID] = 1
  
-    return observed
+    return
 
 
     # Read and annotate input sam files. Also, write output QC log file.
