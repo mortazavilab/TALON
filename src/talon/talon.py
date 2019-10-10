@@ -1835,39 +1835,39 @@ def update_database(database, batch_size, outfiles, datasets):
         print("Adding transcript observation(s) to database...")
         batch_add_observed(cursor, outfiles.observed, batch_size)
 
-        #print("Updating counters...")
-        #update_counter(cursor, struct_collection.run_info)
+        print("Updating counters...")
+        update_counter(cursor, len(datasets))
 
         #print("Updating gene, transcript, and exon annotations...")
         #batch_add_annotations(cursor, gene_annotations, "gene", batch_size)
         #batch_add_annotations(cursor, transcript_annotations, "transcript", batch_size)
         #batch_add_annotations(cursor, exon_annotations, "exon", batch_size)
-        cursor.execute("SELECT * from observed")
+        cursor.execute("SELECT * from counters")
         for i in cursor.fetchall():
             print([ x for x in i ])
 
     return
  
-def update_counter(cursor, run_info):
-    # Update the database counter
+def update_counter(cursor, n_datasets):
+    """ Update the database counter usign the global counter variables """
     
     update_g = 'UPDATE "counters" SET "count" = ? WHERE "category" = "genes"'
-    cursor.execute(update_g,[run_info.genes])
+    cursor.execute(update_g,[gene_counter.value()])
     
     update_t = 'UPDATE "counters" SET "count" = ? WHERE "category" = "transcripts"'
-    cursor.execute(update_t,[run_info.transcripts])
+    cursor.execute(update_t,[transcript_counter.value()])
 
     update_e = 'UPDATE "counters" SET "count" = ? WHERE "category" = "edge"'
-    cursor.execute(update_e,[run_info.edge])
+    cursor.execute(update_e,[edge_counter.value()])
 
     update_v = 'UPDATE "counters" SET "count" = ? WHERE "category" = "vertex"'
-    cursor.execute(update_v,[run_info.vertex])
+    cursor.execute(update_v,[vertex_counter.value()])
 
     update_d = 'UPDATE "counters" SET "count" = ? WHERE "category" = "dataset"'
-    cursor.execute(update_d,[run_info.dataset])
+    cursor.execute(update_d,[n_datasets])
 
     update_o = 'UPDATE "counters" SET "count" = ? WHERE "category" = "observed"'
-    cursor.execute(update_o,[run_info.observed])
+    cursor.execute(update_o,[observed_counter.value()])
 
     return
 
