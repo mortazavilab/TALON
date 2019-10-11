@@ -1863,8 +1863,8 @@ def update_database(database, batch_size, outfiles, datasets):
         print("Adding %d dataset record(s) to database..." % len(datasets))
         add_datasets(cursor, datasets)  
 
-        print("Updating abundance table....")
-        batch_add_abundance(cursor, outfiles.abundance, batch_size) 
+        #print("Updating abundance table....")
+        #batch_add_abundance(cursor, outfiles.abundance, batch_size) 
     
         print("Adding transcript observation(s) to database...")
         batch_add_observed(cursor, outfiles.observed, batch_size)
@@ -2130,6 +2130,7 @@ def check_database_integrity(cursor):
     counter_query = "SELECT * FROM counters"
     cursor.execute(counter_query)
     counters = cursor.fetchall()
+    fail = 0
 
     for table_name, curr_counter in counters:
         curr_counter = int(curr_counter)
@@ -2143,11 +2144,16 @@ def check_database_integrity(cursor):
         actual_count = int(cursor.fetchone()[0])
 
         if actual_count != curr_counter:
-            print("table_count: "  + str(actual_count))
-            print("counter_value: " + str(curr_counter))
-            raise ValueError("Database counter for '" + table_name + \
+            fail = 1
+            print("Database counter for '" + table_name + \
                   "' does not match the number of entries in the table." + \
                   " Discarding changes to database and exiting...")
+            print("table_count: "  + str(actual_count))
+            print("counter_value: " + str(curr_counter))
+
+    if fail == 1:
+        raise RuntimeError("Discrepancy found in database. " + \
+                           "Discarding changes to database and exiting...")
 
     return
 
@@ -2337,11 +2343,11 @@ def parallel_talon(read_file, interval, database, run_info, queue):
             queue.put(msg)
 
     # Format abundance for database entry 
-    for dataset in abundance.keys():
-        for transcript, count in abundance[dataset].items():
-            curr_row = "\t".join([str(transcript), dataset, str(count)])
-            msg = (run_info.outfiles.abundance, curr_row)
-            queue.put(msg)
+    #for dataset in abundance.keys():
+    #    for transcript, count in abundance[dataset].items():
+    #        curr_row = "\t".join([str(transcript), dataset, str(count)])
+    #        msg = (run_info.outfiles.abundance, curr_row)
+    #        queue.put(msg)
 
     # Output annotations to file
     for entry in gene_annotations:
@@ -2492,15 +2498,16 @@ def listener(queue, outfiles, timeout = 24):
     # Open all of the outfiles
     open_files = {}
     for fpath in outfiles.values():
-        open_files[fpath] = open(fpath, 'a')
+        open_files[fpath] = open(fpath, 'w')
 
     # Set a timeout
     wait_until = datetime.now() + timedelta(hours=timeout)
 
     while True:
         msg = queue.get()
-        if msg[0] == 'talon_tmp/transcript_tuples.tsv':
-            print(msg)
+        #if msg[0] == 'talon_tmp/gene_tuples.tsv' or \
+        #   msg[0] == 'talon_tmp/observed_transcript_tuples.tsv':
+        #print(msg)
         msg_fname = msg[0]
         msg_value = msg[1]
         if datetime.now() > wait_until or msg_value == 'complete':
@@ -2508,14 +2515,17 @@ def listener(queue, outfiles, timeout = 24):
             for f in open_files.values():
                 f.close()
             break
-        
+       
         open_files[msg_fname].write(msg_value + "\n")
-
+        open_files[msg_fname].flush()
+        print("wrote: " + str(msg))
+        #os.fsync()
 
 def main():
     """ Runs program """
     options = get_args()
     sam_files, dset_metadata = check_inputs(options)
+    print(sam_files)
  
     # Input parameters
     database = options.database
@@ -2574,13 +2584,13 @@ def main():
         # Now we are done, kill the listener
         msg_done = (None, 'complete')
         queue.put(msg_done)
-
-        # TODO: create a queue to handle database updates?
+        pool.close()
+        pool.join()
 
     # Update the database
     batch_size = 10000
     update_database(database, batch_size, run_info.outfiles, dataset_db_entries)
-
+    
     print("Genes: %d" % gene_counter.value())
     print("Transcripts: %d" % transcript_counter.value())
     print("Observed: %d" % observed_counter.value())
