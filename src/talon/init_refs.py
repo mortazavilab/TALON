@@ -14,8 +14,8 @@
 
 from string import Template
 
-def make_temp_novel_gene_table(cursor, build, chrom = None,
-                                          start = None, end = None):
+def make_temp_novel_gene_table(cursor, build, chrom = None, start = None, 
+                               end = None, tmp_tab = "temp_gene"):
     """ Attaches a temporary database with a table that has the following fields:
             - gene_ID
             - chromosome
@@ -26,7 +26,7 @@ def make_temp_novel_gene_table(cursor, build, chrom = None,
         transcripts to them when other forms of gene assignment have failed.
     """
     if any(val == None for val in [chrom, start, end]):
-        command = Template(""" CREATE TEMPORARY TABLE IF NOT EXISTS temp_gene AS
+        command = Template(""" CREATE TEMPORARY TABLE IF NOT EXISTS $tmp_tab AS
                                    SELECT gene_ID,
                                      chromosome,
                                      start,
@@ -43,7 +43,7 @@ def make_temp_novel_gene_table(cursor, build, chrom = None,
                                         WHERE loc.genome_build = '$build'
                                         GROUP BY g.gene_ID); """)
     else:
-        command = Template(""" CREATE TEMPORARY TABLE IF NOT EXISTS temp_gene AS
+        command = Template(""" CREATE TEMPORARY TABLE IF NOT EXISTS $tmp_tab AS
                                    SELECT gene_ID,
                                      chromosome,
                                      start,
@@ -65,13 +65,15 @@ def make_temp_novel_gene_table(cursor, build, chrom = None,
                                           OR (start >= $start AND start <= $end)
                                           OR (end >= $start AND end <= $end)); """)
 
-    command = command.substitute({'build':build, 'chrom':chrom,
+    command = command.substitute({'tmp_tab':tmp_tab, 'build':build, 'chrom':chrom,
                                   'start':start, 'end':end})
     cursor.execute(command)
-    return
+
+    return tmp_tab
 
 def make_temp_monoexonic_transcript_table(cursor, build, chrom = None,
-                                          start = None, end = None):
+                                          start = None, end = None,
+                                          tmp_tab = "temp_monoexon"):
     """ Attaches a temporary database with a table that has the following fields:
             - gene_ID
             - transcript_ID
@@ -83,7 +85,7 @@ def make_temp_monoexonic_transcript_table(cursor, build, chrom = None,
         transcripts. """
 
     if any(val == None for val in [chrom, start, end]):
-        command = Template(""" CREATE TEMPORARY TABLE IF NOT EXISTS temp_monoexon AS
+        command = Template(""" CREATE TEMPORARY TABLE IF NOT EXISTS $tmp_tab AS
                                    SELECT t.gene_ID,
                                       t.transcript_ID,
                                       loc1.chromosome,
@@ -104,7 +106,7 @@ def make_temp_monoexonic_transcript_table(cursor, build, chrom = None,
                                        AND loc1.genome_build = '$build'
                                        AND loc2.genome_build = '$build' """)
     else:
-        command = Template(""" CREATE TEMPORARY TABLE IF NOT EXISTS temp_monoexon AS
+        command = Template(""" CREATE TEMPORARY TABLE IF NOT EXISTS $tmp_tab AS
                                    SELECT t.gene_ID,
                                       t.transcript_ID,
                                       loc1.chromosome,
@@ -133,10 +135,11 @@ def make_temp_monoexonic_transcript_table(cursor, build, chrom = None,
                                        OR (max_pos >= $start AND max_pos <= $end))""")
 
     command = command.substitute({'build':build, 'chrom':chrom,
-                                  'start':start, 'end':end})
+                                  'start':start, 'end':end, 
+                                  'tmp_tab':tmp_tab})
     cursor.execute(command)
 
-    return
+    return tmp_tab
 
 def make_location_dict(genome_build, cursor, chrom = None, start = None, end = None):
     """ Format of dict:
