@@ -2262,10 +2262,10 @@ def parallel_talon(read_file, interval, database, run_info, queue):
         interval_id = "%s_%d_%d" % interval
         
         # Initialize output structures
-        abundance = {}
-        gene_annotations = []
-        transcript_annotations = []
-        exon_annotations = []
+        #abundance = {}
+        #gene_annotations = []
+        #transcript_annotations = []
+        #exon_annotations = []
 
         with pysam.AlignmentFile(read_file, "rb") as sam:
             for record in sam:  # type: pysam.AlignedSegment
@@ -2280,13 +2280,23 @@ def parallel_talon(read_file, interval, database, run_info, queue):
                 if passed_qc:
                     annotation_info = annotate_read(record, cursor, run_info, 
                                                     struct_collection)
-                    unpack_observed_and_abundance(annotation_info, abundance, 
-                                                  queue, run_info.outfiles.observed)
+                    unpack_observed(annotation_info, queue, 
+                                                  run_info.outfiles.observed)
                     
                     # Update annotation records
-                    gene_annotations.extend(annotation_info.gene_novelty)
-                    transcript_annotations.extend(annotation_info.transcript_novelty)
-                    exon_annotations.extend(annotation_info.exon_novelty)
+                    # TODO: there is no need for entry to be a list/tuple
+                    for entry in annotation_info.gene_novelty:
+                        msg = (run_info.outfiles.gene_annot, 
+                               "\t".join([str(x) for x in entry]))
+                        queue.put(msg)
+                    for entry in annotation_info.transcript_novelty:
+                        msg = (run_info.outfiles.transcript_annot,
+                               "\t".join([str(x) for x in entry]))
+                        queue.put(msg)
+                    for entry in annotation_info.exon_novelty:
+                        msg = (run_info.outfiles.exon_annot,
+                               "\t".join([str(x) for x in entry]))
+                        queue.put(msg)
 
         # Write the temp_gene table to file
         cursor.execute("SELECT gene_ID, strand FROM " + struct_collection.tmp_gene)
@@ -2347,17 +2357,6 @@ def parallel_talon(read_file, interval, database, run_info, queue):
     #        curr_row = "\t".join([str(transcript), dataset, str(count)])
     #        msg = (run_info.outfiles.abundance, curr_row)
     #        queue.put(msg)
-
-    # Output annotations to file
-    for entry in gene_annotations:
-        msg = (run_info.outfiles.gene_annot, "\t".join([str(x) for x in entry]))
-        queue.put(msg)
-    for entry in transcript_annotations:
-        msg = (run_info.outfiles.transcript_annot, "\t".join([str(x) for x in entry]))
-        queue.put(msg)
-    for entry in exon_annotations:
-        msg = (run_info.outfiles.exon_annot, "\t".join([str(x) for x in entry]))
-        queue.put(msg)
 
     pr.disable()
     pr.print_stats(sort='cumtime')
@@ -2438,10 +2437,10 @@ def annotate_read(sam_record: pysam.AlignedSegment, cursor, run_info,
     
     return annotation_info
 
-def unpack_observed_and_abundance(annotation_info, abundance, queue, obs_file):
+def unpack_observed(annotation_info, queue, obs_file):
     """ Now that transcript has been annotated, unpack values and
-        create an observed entry and abundance record. Send the observed 
-        entry to the queue for output to obs_file."""
+        create an observed entry. Send the observed entry to the queue 
+        for output to obs_file."""
 
     obs_ID = observed_counter.increment()
     observed = (obs_ID, annotation_info.gene_ID, annotation_info.transcript_ID, 
@@ -2453,15 +2452,6 @@ def unpack_observed_and_abundance(annotation_info, abundance, queue, obs_file):
     msg = (obs_file, "\t".join([str(x) for x in observed]))
     queue.put(msg)
 
-    # Also add transcript to abundance dict
-    dataset = annotation_info.dataset
-    if dataset not in abundance:
-        abundance[dataset] = {}
-    try:
-        abundance[dataset][annotation_info.transcript_ID] += 1
-    except:
-        abundance[dataset][annotation_info.transcript_ID] = 1
- 
     return
 
 
