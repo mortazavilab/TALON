@@ -46,7 +46,7 @@ def partition_reads(sam_files, datasets, tmp_dir = "talon_tmp/", n_threads = 0):
         to extract all reads inside of them from the pysam object.
        
         Returns:
-            - List of lists: sublists contain psam reads from a given interval
+            - List of lists: sublists contain pysam reads from a given interval
             - List of tuple intervals
             - filename of merged bam file (to keep track of the header)
            """
@@ -62,7 +62,7 @@ def partition_reads(sam_files, datasets, tmp_dir = "talon_tmp/", n_threads = 0):
 
     # Must sort the Bedtool object
     sorted_reads = all_reads.sort()
-    intervals = sorted_reads.merge()
+    intervals = sorted_reads.merge(d = 100000000)
 
     # Now open each sam file using pysam and extract the reads
     coords = []

@@ -23,11 +23,10 @@ import pysam
 from string import Template
 import multiprocessing as mp
 import queue
-#from multiprocessing import Pool, Process, Value, Lock, Manager, Queue
 from datetime import datetime, timedelta
 import time
 from itertools import repeat,islice
-#import pickle
+from numba import jit
 
 # TODO: Add a counter that the threads increment
 # TODO: Refine multigene behavior
@@ -1878,9 +1877,9 @@ def update_database(database, batch_size, outfiles, datasets):
         batch_add_annotations(cursor, outfiles.transcript_annot, "transcript", batch_size)
         batch_add_annotations(cursor, outfiles.exon_annot, "exon", batch_size)
 
-        cursor.execute("SELECT * from genes")
-        for i in cursor.fetchall():
-            print([ x for x in i ])
+        #cursor.execute("SELECT * from genes")
+        #for i in cursor.fetchall():
+            #print([ x for x in i ])
 
         check_database_integrity(cursor)
 
@@ -2361,7 +2360,7 @@ def parallel_talon(read_file, interval, database, run_info, queue):
         queue.put(msg)
 
     pr.disable()
-    #pr.print_stats(sort='cumtime')
+    pr.print_stats(sort='cumtime')
 
     return
 
@@ -2518,7 +2517,7 @@ def listener(queue, outfiles, timeout = 24):
        
         open_files[msg_fname].write(msg_value + "\n")
         open_files[msg_fname].flush()
-        print("wrote: " + str(msg))
+        #print("wrote: " + str(msg))
         #os.fsync()
 
 def main():
@@ -2559,7 +2558,7 @@ def main():
     manager = mp.Manager()
     queue = manager.Queue()
 
-    with mp.Pool(processes=4) as pool:
+    with mp.Pool(processes=16) as pool:
         # Start running listener, which will monitor queue for messages
         pool.apply_async(listener, (queue, run_info.outfiles)) 
 
