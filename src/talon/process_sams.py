@@ -21,8 +21,8 @@ def preprocess_sam(sam_files, datasets, tmp_dir = "talon_tmp/", n_threads = 0):
     renamed_sams = []
     for sam, dataset in zip(sam_files, datasets):
         suffix = "." + sam.split(".")[-1]
-        sam_copy = tmp_dir + dataset + suffix
-        os.system("cp %s %s" % (sam, sam_copy))
+        sam_copy = tmp_dir + dataset + ".bam"
+        os.system("samtools sort %s > %s" % (sam, sam_copy))
         renamed_sams.append(sam_copy)
 
     merged_bam = tmp_dir + "merged.bam"
@@ -73,10 +73,6 @@ def partition_reads(sam_files, datasets, tmp_dir = "talon_tmp/", n_threads = 0):
                                           interval.start, interval.end)
             read_groups.append(reads)
             coords.append((interval.chrom, interval.start + 1, interval.end))
-
-    # Keep track of header from the merged bam file
-    #with pysam.AlignmentFile(merged_bam, "rb") as f:
-    #    header = f.header
 
     return read_groups, coords, merged_bam
 
