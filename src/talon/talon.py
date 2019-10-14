@@ -112,7 +112,7 @@ def str_wrap_double(s):
     s = str(s)
     return '"' + s + '"'
 
-def search_for_vertex_at_pos(chromosome, position, location_dict, run_info):
+def search_for_vertex_at_pos(chromosome, position, location_dict):
     """ Given a chromosome and a position (1-based), this function queries the 
         location dict to determine whether a vertex 
         fitting those criteria exists. Returns the row if yes, and __ if no.
@@ -192,8 +192,7 @@ def match_splice_vertices(chromosome, positions, strand, location_dict, run_info
     for curr_index in range(1,len(positions)-1):
         position = positions[curr_index]
 
-        vertex_match = search_for_vertex_at_pos(chromosome, position,
-                                                     location_dict, run_info)
+        vertex_match = search_for_vertex_at_pos(chromosome, position, location_dict)
         if vertex_match == None:
             # If no vertex matches the position, one is created.
             vertex_match = create_vertex(chromosome, position, location_dict, run_info)
@@ -244,8 +243,7 @@ def match_all_transcript_vertices(chromosome, positions, strand, location_dict,
 
         # Remaining mid-transcript positions go through strict matching process
         else:
-            vertex_match = search_for_vertex_at_pos(chromosome, position, 
-                                                     location_dict, run_info)
+            vertex_match = search_for_vertex_at_pos(chromosome, position, location_dict)
         if vertex_match == None:
             # If no vertex matches the position, one is created.
             vertex_match = create_vertex(chromosome, position, location_dict, run_info)
@@ -368,14 +366,14 @@ def permissive_vertex_search(chromosome, position, strand, sj_pos, pos_type,
     for dist in range(1,max_dist):
         curr_pos = position + dist*direction_priority
         if curr_pos > search_window_start and curr_pos < search_window_end: 
-            match = search_for_vertex_at_pos(chromosome, curr_pos, locations, run_info)
+            match = search_for_vertex_at_pos(chromosome, curr_pos, locations)
             if match != None:
                 dist = compute_delta(curr_pos, position, strand)
                 return match['location_ID'], dist
 
         curr_pos = position - dist*direction_priority
         if curr_pos > search_window_start and curr_pos < search_window_end:
-            match = search_for_vertex_at_pos(chromosome, curr_pos, locations, run_info)
+            match = search_for_vertex_at_pos(chromosome, curr_pos, locations)
             if match != None:
                 dist = compute_delta(curr_pos, position, strand)
                 return match['location_ID'], dist
@@ -2180,56 +2178,6 @@ def check_database_integrity(cursor):
 #
 #    return 
 
-#def main():
-#    """ Runs program """
-#
-#    options = get_args()
-#    sam_files, dataset_list = check_inputs(options)
-#
-#    # Fire up the database connection
-#    database = options.database
-#    conn = sqlite3.connect(database)
-#    conn.row_factory = sqlite3.Row
-#    cursor = conn.cursor()
-#
-#    # Input parameters
-#    build = options.build
-#    min_coverage = float(options.min_coverage)
-#    min_identity = float(options.min_identity)
-#    outprefix = options.outprefix
-#
-#    # Set globally accessible counters
-#    gene_counter = get_counters(cursor)
-#
-#    # Prepare data structures from the database content
-#    # TODO: will move to threads
-#    print("Processing annotation...")
-#    struct_collection = prepare_data_structures(cursor, build, min_coverage, 
-#                                                min_identity)
-#
-#    # Read and annotate input sam files. Also, write output QC log file.
-#    print("Processing SAM files...")
-#    print("-------------------------------------")
-#    datasets, observed_transcripts, gene_annotations, transcript_annotations, \
-#    exon_annotations, abundance = process_all_sam_files(sam_files, dataset_list, cursor, 
-#                                      struct_collection, outprefix)
-#    print("-------------------------------------")
-#
-#    # Update database
-#    batch_size = 10000
-#    update_database(cursor, batch_size, datasets, observed_transcripts,
-#                    gene_annotations, transcript_annotations, exon_annotations,
-#                    abundance, struct_collection)
-#
-#    # Validate database
-#    check_database_integrity(cursor) 
-#    conn.commit()
-#
-#    # TODO: output files
-#    # Write a file enumerating how many known/novel genes and transcripts
-#    # were detected in each dataset
-#    #write_counts_log_file(cursor, outprefix)
-#    conn.close()
 
 def parallel_talon(read_file, interval, database, run_info, queue):
     """ Manage TALON processing of a single chunk of the input. Initialize
@@ -2238,7 +2186,7 @@ def parallel_talon(read_file, interval, database, run_info, queue):
         complete, return the data tuples generated so that they can be 
         added to the database, OR alternately, pickle them and write to file
         where they can be accessed later. """
-    #print("---------------------------------------------------")
+    print("---------------------------------------------------")
     pr = cProfile.Profile()
     pr.enable()
     with sqlite3.connect(database) as conn:
@@ -2247,8 +2195,6 @@ def parallel_talon(read_file, interval, database, run_info, queue):
 
         #print("Processing annotation for interval %s:%d-%d..." % interval)
         tmp_id = str(os.getpid())
-        #tmp_gene_tab = "temp_gene_" + tmp_id
-        #tmp_monoexon_tab = "temp_monoexon_" + tmp_id
         struct_collection = prepare_data_structures(cursor, run_info,
                                                     chrom = interval[0], 
                                                     start = interval[1], 
@@ -2260,12 +2206,6 @@ def parallel_talon(read_file, interval, database, run_info, queue):
         #                                            tmp_id = tmp_id))
          
         interval_id = "%s_%d_%d" % interval
-        
-        # Initialize output structures
-        #abundance = {}
-        #gene_annotations = []
-        #transcript_annotations = []
-        #exon_annotations = []
 
         with pysam.AlignmentFile(read_file, "rb") as sam:
             for record in sam:  # type: pysam.AlignedSegment
@@ -2344,8 +2284,7 @@ def parallel_talon(read_file, interval, database, run_info, queue):
                 queue.put(msg)
 
     # Write new vertex-gene combos to file
-    vertex_2_gene = struct_collection.vertex_2_gene
-    for vertex_ID, gene_set in vertex_2_gene.items():
+    for vertex_ID, gene_set in struct_collection.vertex_2_gene.items():
         for gene in gene_set:
             msg = (run_info.outfiles.v2g, 
                    "\t".join([ str(x) for x in (vertex_ID, gene[0])]))
@@ -2360,7 +2299,9 @@ def parallel_talon(read_file, interval, database, run_info, queue):
 
     pr.disable()
     pr.print_stats(sort='cumtime')
-
+    del struct_collection
+    gc.collect()
+ 
     return
 
 def annotate_read(sam_record: pysam.AlignedSegment, cursor, run_info, 
@@ -2454,31 +2395,6 @@ def unpack_observed(annotation_info, queue, obs_file):
 
     return
 
-
-    # Read and annotate input sam files. Also, write output QC log file.
-    #print("Annotating reads...")
-    #print("-------------------------------------")
-    #datasets, observed_transcripts, gene_annotations, transcript_annotations, \
-    #transcript_annotations, exon_annotations, abundance \
-    #                  = process_all_sam_files(sam_files, dataset_list, cursor,
-    #                                          struct_collection, outprefix)
-    #print("-------------------------------------")
-
-    # Update database
-    #batch_size = 10000
-    #update_database(cursor, batch_size, datasets, observed_transcripts,
-    #                gene_annotations, transcript_annotations, exon_annotations,
-    #                abundance, struct_collection)
-    # Validate database
-    #check_database_integrity(cursor)
-    #conn.commit()
-    #conn.close()
-    #gene_counter.increment()
-
-#if __name__ == '__main__':
-    #pr = cProfile.Profile()
-    #pr.enable()
-
 def listener(queue, outfiles, timeout = 24):
     """ During the run, this function listens for messages on the provided
         queue. When a message is received (consisting of a filename and a 
@@ -2541,8 +2457,14 @@ def main():
         dataset_db_entries.append((d_id, d_name, description, platform))
 
     # Partition the reads
+    # TODO: is there a more efficient way to deal with the header?
     read_groups, intervals, header_file = procsams.partition_reads(sam_files, datasets)
     read_files = procsams.write_reads_to_file(read_groups, intervals, header_file)
+
+    # Create job tuples to submit
+    #jobs = []
+    #for read_file, interval in zip(read_files, intervals):
+    #    jobs.append((read_file, interval, database, run_info, queue))
 
     # Set up a queue specifically for writing to outfiles
     manager = mp.Manager()
@@ -2553,13 +2475,13 @@ def main():
         pool.apply_async(listener, (queue, run_info.outfiles)) 
 
         # Now launch the parallel TALON jobs
-        jobs = []
+        #jobs = []
         job_dict = {}
         ct = 1 # Could use interval ID instead
+        #result = pool.starmap_async(parallel_talon, jobs)
         for read_file, interval in zip(read_files, intervals):
             job = pool.apply_async(parallel_talon, (read_file, interval, 
                                    database, run_info, queue))
-            jobs.append(job)
             job_dict[ct] = job
             ct += 1
 
@@ -2567,7 +2489,7 @@ def main():
             for val in list(job_dict):
                 if job_dict[val].ready():
                     del job_dict[val]
-                    #print(f'Job {val} finished')
+                    print(f'Job {val} finished')
             time.sleep(1) 
 
         # Now we are done, kill the listener

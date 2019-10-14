@@ -1,6 +1,8 @@
 import pytest
 import sqlite3
 from talon import talon
+from talon import init_refs as init_refs
+from .helper_fns import get_db_cursor
 @pytest.mark.dbunit
 
 class TestSearchForVertex(object):
@@ -11,7 +13,7 @@ class TestSearchForVertex(object):
         """
         conn, cursor = get_db_cursor()
         build = "toy_build"
-        location_dict = talon.make_location_dict(build, cursor)
+        location_dict = init_refs.make_location_dict(build, cursor)
 
         chrom = "chr1"
         pos = 0
@@ -27,7 +29,7 @@ class TestSearchForVertex(object):
         """
         conn, cursor = get_db_cursor()
         build = "toy_build"
-        location_dict = talon.make_location_dict(build, cursor)
+        location_dict = init_refs.make_location_dict(build, cursor)
 
         chrom = "chr1"
         pos = 1
@@ -41,9 +43,9 @@ class TestSearchForVertex(object):
         assert match["chromosome"] == "chr1"
         assert match["position"] == 1
 
-def get_db_cursor():
-    conn = sqlite3.connect("scratch/toy.db")
-    conn.row_factory = sqlite3.Row
-    cursor = conn.cursor()
-    return conn, cursor
+#def get_db_cursor():
+#    conn = sqlite3.connect("scratch/toy.db")
+#    conn.row_factory = sqlite3.Row
+#    cursor = conn.cursor()
+#    return conn, cursor
 
