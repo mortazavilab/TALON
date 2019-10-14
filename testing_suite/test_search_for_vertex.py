@@ -43,9 +43,4 @@ class TestSearchForVertex(object):
         assert match["chromosome"] == "chr1"
         assert match["position"] == 1
 
-#def get_db_cursor():
-#    conn = sqlite3.connect("scratch/toy.db")
-#    conn.row_factory = sqlite3.Row
-#    cursor = conn.cursor()
-#    return conn, cursor
 
