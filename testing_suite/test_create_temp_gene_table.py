@@ -1,6 +1,6 @@
 import pytest
 from talon import talon
-
+from talon import init_refs
 from .helper_fns import get_db_cursor
 
 
@@ -17,7 +17,7 @@ class TestMakeTempTable(object):
         build = "toy_build"
 
         # Now run the temp table creation
-        talon.make_temp_novel_gene_table(cursor, build)
+        init_refs.make_temp_novel_gene_table(cursor, build)
         try:
             query = """SELECT * FROM temp_gene"""
             cursor.execute(query)

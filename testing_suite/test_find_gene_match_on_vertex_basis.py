@@ -1,5 +1,6 @@
 import pytest
 from talon import talon
+from talon import init_refs
 from .helper_fns import fetch_correct_ID, get_db_cursor
 @pytest.mark.unit
 
@@ -9,10 +10,11 @@ class TestIdentifyGeneOnVertexBasis(object):
         """ Example where the vertices perfectly match a gene.
         """
         conn, cursor = get_db_cursor()
+        db = "scratch/toy.db"
         build = "toy_build"
-        talon.make_temp_novel_gene_table(cursor, "toy_build")
-        run_info = talon.init_run_info(cursor, build)
-        vertex2gene = talon.make_vertex_2_gene_dict(cursor)
+        init_refs.make_temp_novel_gene_table(cursor, "toy_build")
+        run_info = talon.init_run_info(db, build)
+        vertex2gene = init_refs.make_vertex_2_gene_dict(cursor)
 
         vertex_IDs = (1, 2, 3, 4, 5, 6)
         strand = "+"
@@ -27,10 +29,11 @@ class TestIdentifyGeneOnVertexBasis(object):
         """ Example where some vertices match a gene, while others don't.
         """
         conn, cursor = get_db_cursor()
+        db = "scratch/toy.db"
         build = "toy_build"
-        talon.make_temp_novel_gene_table(cursor, "toy_build")
-        run_info = talon.init_run_info(cursor, build)
-        vertex2gene = talon.make_vertex_2_gene_dict(cursor)
+        init_refs.make_temp_novel_gene_table(cursor, "toy_build")
+        run_info = talon.init_run_info(db, build)
+        vertex2gene = init_refs.make_vertex_2_gene_dict(cursor)
 
         vertex_IDs = (1, 200, 3, 4, 5, 6)
         strand = "+"
@@ -44,10 +47,11 @@ class TestIdentifyGeneOnVertexBasis(object):
     def test_no_match(self):
         """ Example where no match exists """
         conn, cursor = get_db_cursor()
+        db = "scratch/toy.db"
         build = "toy_build"
-        talon.make_temp_novel_gene_table(cursor, "toy_build")
-        run_info = talon.init_run_info(cursor, build)
-        vertex2gene = talon.make_vertex_2_gene_dict(cursor)
+        init_refs.make_temp_novel_gene_table(cursor, "toy_build")
+        run_info = talon.init_run_info(db, build)
+        vertex2gene = init_refs.make_vertex_2_gene_dict(cursor)
 
         vertex_IDs = (1000, 2000, 3000, 4000)
         strand = "+"
