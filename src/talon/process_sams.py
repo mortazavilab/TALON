@@ -8,6 +8,20 @@ import pybedtools
 import pysam
 import os
 
+def convert_to_bam(sam, bam):
+    """ Convert provided sam file to bam file (provided name).  """
+    
+    try:
+        infile = pysam.AlignmentFile(sam, "r")
+        outfile = pysam.AlignmentFile(bam, "wb", template=infile)
+        for s in infile:
+            outfile.write(s)
+
+    except Exception as e:
+        print(e)
+        raise RuntimeError("Problem converting sam file '%s' to bam." % (sam))
+             
+
 def preprocess_sam(sam_files, datasets, tmp_dir = "talon_tmp/", n_threads = 0):
     """ Copy and rename the provided SAM/BAM file(s), merge them, and index.
         This is necessary in order to use Pybedtools commands on the reads.
@@ -21,14 +35,17 @@ def preprocess_sam(sam_files, datasets, tmp_dir = "talon_tmp/", n_threads = 0):
     renamed_sams = []
     for sam, dataset in zip(sam_files, datasets):
         suffix = "." + sam.split(".")[-1]
-        sam_copy = tmp_dir + dataset + ".bam"
-        os.system("samtools sort %s > %s" % (sam, sam_copy))
-        renamed_sams.append(sam_copy)
+        if suffix == ".sam":
+            bam_copy = tmp_dir + dataset + "_unsorted.bam"
+            convert_to_bam(sam, bam_copy)
+            sam = bam_copy
+        sorted_bam = tmp_dir + dataset + ".bam"
+        pysam.sort("-@", str(n_threads), "-o", sorted_bam, sam)
+        renamed_sams.append(sorted_bam)
 
     merged_bam = tmp_dir + "merged.bam"
-    merge_args = [merged_bam] + renamed_sams + ["-f", "-r", "-@",
-                                             str(n_threads)]
-    index_args = [merged_bam] + ["-@", str(n_threads)]
+    merge_args = [merged_bam] + renamed_sams + ["-f", "-r", "-@", str(n_threads)]
+    index_args = [merged_bam, "-@", str(n_threads)]
 
     # Merge datasets and use -r option to include a read group tag
     try:
