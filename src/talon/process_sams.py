@@ -53,7 +53,7 @@ def preprocess_sam(sam_files, datasets, tmp_dir = "talon_tmp/", n_threads = 0):
         pysam.merge(*merge_args)
         pysam.index(*index_args)
         ts = time.strftime("%Y-%m-%d %H:%M:%S", time.gmtime())
-        print("[ %s ] Merged input SAM/BAM files" % ts))
+        print("[ %s ] Merged input SAM/BAM files" % (ts))
     except:
         raise RuntimeError(("Problem merging and indexing SAM/BAM files. "
                             "Check your file paths and make sure that all "
@@ -93,6 +93,9 @@ def partition_reads(sam_files, datasets, tmp_dir = "talon_tmp/", n_threads = 0):
                                           interval.start, interval.end)
             read_groups.append(reads)
             coords.append((interval.chrom, interval.start + 1, interval.end))
+
+    ts = time.strftime("%Y-%m-%d %H:%M:%S", time.gmtime())
+    print("[ %s ] Split reads into %d intervals" % (ts, len(read_groups)))
 
     return read_groups, coords, merged_bam
 
