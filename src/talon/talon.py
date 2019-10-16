@@ -1837,48 +1837,43 @@ def identify_monoexon_transcript(chrom, positions, strand, cursor, location_dict
 def update_database(database, batch_size, outfiles, datasets):
     """ Adds new entries to the database. """
 
-    with sqlite3.connect(database) as conn:
-        conn.row_factory = sqlite3.Row
-        cursor = conn.cursor()
+    conn = sqlite3.connect(database)
+    conn.row_factory = sqlite3.Row
+    cursor = conn.cursor()
 
-        print("Adding novel genes to database...")
-        batch_add_genes(cursor, outfiles.genes, batch_size)
+    print("Adding novel genes to database...")
+    batch_add_genes(cursor, outfiles.genes, batch_size)
 
-        print("Adding novel transcripts to database...")
-        batch_add_transcripts(cursor, outfiles.transcripts, batch_size) 
+    print("Adding novel transcripts to database...")
+    batch_add_transcripts(cursor, outfiles.transcripts, batch_size) 
 
-        print("Adding novel exons/introns to database...")
-        batch_add_edges(cursor, outfiles.edges, batch_size)
+    print("Adding novel exons/introns to database...")
+    batch_add_edges(cursor, outfiles.edges, batch_size)
 
-        print("Adding novel vertices/locations to database...")
-        batch_add_locations(cursor, outfiles.location, batch_size)
+    print("Adding novel vertices/locations to database...")
+    batch_add_locations(cursor, outfiles.location, batch_size)
 
-        print("Updating gene-vertex assignments...")
-        batch_add_vertex2gene(cursor, outfiles.v2g, batch_size)
+    print("Updating gene-vertex assignments...")
+    batch_add_vertex2gene(cursor, outfiles.v2g, batch_size)
 
-        print("Adding %d dataset record(s) to database..." % len(datasets))
-        add_datasets(cursor, datasets)  
+    print("Adding %d dataset record(s) to database..." % len(datasets))
+    add_datasets(cursor, datasets)  
 
-        #print("Updating abundance table....")
-        #batch_add_abundance(cursor, outfiles.abundance, batch_size) 
-    
-        print("Adding transcript observation(s) to database...")
-        batch_add_observed(cursor, outfiles.observed, batch_size)
+    print("Adding transcript observation(s) to database...")
+    batch_add_observed(cursor, outfiles.observed, batch_size)
 
-        print("Updating counters...")
-        update_counter(cursor, len(datasets))
+    print("Updating counters...")
+    update_counter(cursor, len(datasets))
 
-        print("Updating gene, transcript, and exon annotations...")
+    print("Updating gene, transcript, and exon annotations...")
 
-        batch_add_annotations(cursor, outfiles.gene_annot, "gene", batch_size)
-        batch_add_annotations(cursor, outfiles.transcript_annot, "transcript", batch_size)
-        batch_add_annotations(cursor, outfiles.exon_annot, "exon", batch_size)
+    batch_add_annotations(cursor, outfiles.gene_annot, "gene", batch_size)
+    batch_add_annotations(cursor, outfiles.transcript_annot, "transcript", batch_size)
+    batch_add_annotations(cursor, outfiles.exon_annot, "exon", batch_size)
 
-        #cursor.execute("SELECT * from genes")
-        #for i in cursor.fetchall():
-            #print([ x for x in i ])
-
-        check_database_integrity(cursor)
+    check_database_integrity(cursor)
+    conn.commit()
+    conn.close()
 
     return
  
