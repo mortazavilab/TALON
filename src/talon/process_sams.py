@@ -94,9 +94,6 @@ def partition_reads(sam_files, datasets, tmp_dir = "talon_tmp/", n_threads = 0):
             read_groups.append(reads)
             coords.append((interval.chrom, interval.start + 1, interval.end))
 
-    ts = time.strftime("%Y-%m-%d %H:%M:%S", time.gmtime())
-    print("[ %s ] Split reads into %d intervals" % (ts, len(read_groups)))
-
     return read_groups, coords, merged_bam
 
 def write_reads_to_file(read_groups, intervals, header_template, tmp_dir = "talon_tmp/"):

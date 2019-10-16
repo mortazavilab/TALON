@@ -2074,9 +2074,23 @@ def batch_add_observed(cursor, observed_file, batch_size):
         dataset, start_vertex_ID, end_vertex_ID, start_exon, end_exon, 
         start_delta, end_delta, read_length) to observed table of database. """
 
+    abundance = {}
     with open(observed_file, 'r') as f:
         while True:
-            batch = [ tuple(x.strip().split("\t")) for x in islice(f, batch_size) ]
+            batch = []
+            for observed in islice(f, batch_size):
+                batch.append(tuple(observed.strip().split("\t")))
+
+                # Add record to abundance dict
+                dataset = observed[4]
+                transcript_ID = observed[2]
+                if dataset not in abundance:
+                    abundance[dataset] = {}                
+
+                try:
+                    abundance[dataset][transcript_ID] += 1
+                except:
+                    abundance[dataset][transcript_ID] = 1
 
             if batch == []:
                 break
@@ -2095,27 +2109,36 @@ def batch_add_observed(cursor, observed_file, batch_size):
             except Exception as e:
                 print(e)
                 sys.exit(1)
+
+    # Now create abundance tuples and add to DB
+    abundance_tuples = []
+    for dataset in abundance.keys():
+        for transcript, count in abundance[dataset].items():
+            abundance_tuples.append((transcript, dataset, count))
+
+    batch_add_abundance(cursor, abundance_tuples, batch_size)
     return
 
-def batch_add_abundance(cursor, abundance_file, batch_size):
-    """ Reads abundance tuples (transcript_ID, dataset, count) from file and 
+def batch_add_abundance(cursor, entries, batch_size):
+    """ Reads abundance tuples (transcript_ID, dataset, count) and 
         adds to the abundance table of the database """
 
-    with open(abundance_file, 'r') as f:
-        while True:
-            batch = [ tuple(x.strip().split("\t")) for x in islice(f, batch_size) ]
+    index = 0
+    while index < len(entries):
+        try:
+            batch = entries[index:index + batch_size]
+        except:
+            batch = entries[index:]
+        index += batch_size
 
-            if batch == []:
-                break
-
-            try:
-                cols = " (" + ", ".join([str_wrap_double(x) for x in
-                       ["transcript_id", "dataset", "count"]]) + ") "
-                command = 'INSERT INTO "abundance"' + cols + "VALUES " + '(?,?,?)'
-                cursor.executemany(command, batch)
-            except Exception as e:
-                print(e)
-                sys.exit(1)
+        try:
+            cols = " (" + ", ".join([str_wrap_double(x) for x in
+                   ["transcript_id", "dataset", "count"]]) + ") "
+            command = 'INSERT INTO "abundance"' + cols + "VALUES " + '(?,?,?)'
+            cursor.executemany(command, batch)
+        except Exception as e:
+            print(e)
+            sys.exit(1)
     return 
 
 def check_database_integrity(cursor):
@@ -2185,9 +2208,11 @@ def parallel_talon(read_file, interval, database, run_info, queue):
         complete, return the data tuples generated so that they can be 
         added to the database, OR alternately, pickle them and write to file
         where they can be accessed later. """
-    print("---------------------------------------------------")
-    pr = cProfile.Profile()
-    pr.enable()
+
+    ts = time.strftime("%Y-%m-%d %H:%M:%S", time.gmtime())
+    print("[ %s ] Annotating reads in interval %s:%d-%d..." % \
+          (ts, interval[0], interval[1], interval[2]))
+
     with sqlite3.connect(database) as conn:
         conn.row_factory = sqlite3.Row
         cursor = conn.cursor()
@@ -2296,10 +2321,9 @@ def parallel_talon(read_file, interval, database, run_info, queue):
     #        msg = (run_info.outfiles.abundance, curr_row)
     #        queue.put(msg)
 
-    pr.disable()
-    pr.print_stats(sort='cumtime')
-    del struct_collection
-    gc.collect()
+    #pr.disable()
+    #pr.print_stats(sort='cumtime')
+    struct_collection = None
  
     return
 
@@ -2441,64 +2465,49 @@ def main():
     outprefix = options.outprefix
 
     # Set globally accessible counters
-    run_info = init_run_info(database, build, min_coverage, min_identity)
-    run_info.outfiles = init_outfiles(options.outprefix)
     get_counters(database)
     print("Genes: %d" % gene_counter.value())
     print("Transcripts: %d" % transcript_counter.value())
     print("Observed: %d" % observed_counter.value())
 
-    # Create annotation entry for each dataset
-    datasets = []
-    dataset_db_entries = []
-    for d_name, description, platform in dset_metadata:
-        run_info['dataset'] += 1
-        d_id = run_info['dataset']
-        datasets.append(d_name)
-        dataset_db_entries.append((d_id, d_name, description, platform))
-
-    # Partition the reads
-    # TODO: is there a more efficient way to deal with the header?
-    read_groups, intervals, header_file = procsams.partition_reads(sam_files, datasets)
-    read_files = procsams.write_reads_to_file(read_groups, intervals, header_file)
-    ts = time.strftime("%Y-%m-%d %H:%M:%S", time.gmtime())
-    print("[ %s ] Split reads into %d intervals" % (ts, len(read_groups)))
-
-    # Create job tuples to submit
-    #jobs = []
-    #for read_file, interval in zip(read_files, intervals):
-    #    jobs.append((read_file, interval, database, run_info, queue))
-
-    # Set up a queue specifically for writing to outfiles
-    manager = mp.Manager()
-    queue = manager.Queue()
-
+    # Initialize worker pool TODO: don't hardcode
     with mp.Pool(processes=16) as pool:
+        run_info = init_run_info(database, build, min_coverage, min_identity)
+        run_info.outfiles = init_outfiles(options.outprefix)
+
+        # Create annotation entry for each dataset
+        datasets = []
+        dataset_db_entries = []
+        for d_name, description, platform in dset_metadata:
+            run_info['dataset'] += 1
+            d_id = run_info['dataset']
+            datasets.append(d_name)
+            dataset_db_entries.append((d_id, d_name, description, platform))
+
+        # Partition the reads
+        # TODO: is there a more efficient way to deal with the header?
+        read_groups, intervals, header_file = procsams.partition_reads(sam_files, datasets)
+        read_files = procsams.write_reads_to_file(read_groups, intervals, header_file)
+        ts = time.strftime("%Y-%m-%d %H:%M:%S", time.gmtime())
+        print("[ %s ] Split reads into %d intervals" % (ts, len(read_groups)))
+
+        # Set up a queue specifically for writing to outfiles
+        manager = mp.Manager()
+        queue = manager.Queue()
+
+        # Create job tuples to submit
+        jobs = []
+        for read_file, interval in zip(read_files, intervals):
+            jobs.append((read_file, interval, database, run_info, queue))
+
+        ts = time.strftime("%Y-%m-%d %H:%M:%S", time.gmtime())
+        print("[ %s ] Launching parallel annotation jobs" % (ts))
+
         # Start running listener, which will monitor queue for messages
         pool.apply_async(listener, (queue, run_info.outfiles)) 
 
         # Now launch the parallel TALON jobs
-        #jobs = []
-        job_dict = {}
-        ct = 1 # Could use interval ID instead
-        #result = pool.starmap_async(parallel_talon, jobs)
-        for read_file, interval in zip(read_files, intervals):
-            job = pool.apply_async(parallel_talon, (read_file, interval, 
-                                   database, run_info, queue))
-            ts = time.strftime("%Y-%m-%d %H:%M:%S", time.gmtime())
-            print("[ %s ] Launched job %d (interval: %s:%d-%d)" % \
-                  (ts, ct, interval[0], interval[1], interval[2]))
-            job_dict[ct] = job
-            ct += 1
-          
-
-        while job_dict:
-            for val in list(job_dict):
-                if job_dict[val].ready():
-                    del job_dict[val]
-                    ts = time.strftime("%Y-%m-%d %H:%M:%S", time.gmtime())
-                    print("[ %s ] Job %d finished" % (ts, val))
-            time.sleep(1) 
+        pool.starmap(parallel_talon, jobs)
 
         # Now we are done, kill the listener
         msg_done = (None, 'complete')
