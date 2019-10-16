@@ -26,7 +26,6 @@ import queue
 from datetime import datetime, timedelta
 import time
 from itertools import repeat,islice
-from numba import jit
 
 # TODO: Add a counter that the threads increment
 # TODO: Refine multigene behavior
@@ -2428,9 +2427,11 @@ def listener(queue, outfiles, timeout = 24):
 
 def main():
     """ Runs program """
+    ts = time.strftime("%Y-%m-%d %H:%M:%S", time.gmtime())
+    print("[ %s ] Started TALON run" % (ts))
+
     options = get_args()
     sam_files, dset_metadata = check_inputs(options)
-    print(sam_files)
  
     # Input parameters
     database = options.database
@@ -2460,6 +2461,8 @@ def main():
     # TODO: is there a more efficient way to deal with the header?
     read_groups, intervals, header_file = procsams.partition_reads(sam_files, datasets)
     read_files = procsams.write_reads_to_file(read_groups, intervals, header_file)
+    ts = time.strftime("%Y-%m-%d %H:%M:%S", time.gmtime())
+    print("[ %s ] Split reads into %d intervals" % (ts, len(read_groups)))
 
     # Create job tuples to submit
     #jobs = []
@@ -2482,14 +2485,19 @@ def main():
         for read_file, interval in zip(read_files, intervals):
             job = pool.apply_async(parallel_talon, (read_file, interval, 
                                    database, run_info, queue))
+            ts = time.strftime("%Y-%m-%d %H:%M:%S", time.gmtime())
+            print("[ %s ] Launched job %d (interval: %s:%d-%d)" % \
+                  (ts, ct, interval[0], interval[1], interval[2]))
             job_dict[ct] = job
             ct += 1
+          
 
         while job_dict:
             for val in list(job_dict):
                 if job_dict[val].ready():
                     del job_dict[val]
-                    print(f'Job {val} finished')
+                    ts = time.strftime("%Y-%m-%d %H:%M:%S", time.gmtime())
+                    print("[ %s ] Job %d finished" % (ts, val))
             time.sleep(1) 
 
         # Now we are done, kill the listener
@@ -2498,9 +2506,15 @@ def main():
         pool.close()
         pool.join()
 
+    ts = time.strftime("%Y-%m-%d %H:%M:%S", time.gmtime())
+    print("[ %s ] All jobs complete. Starting database update." % (ts))
+
     # Update the database
     batch_size = 10000
     update_database(database, batch_size, run_info.outfiles, dataset_db_entries)
+    ts = time.strftime("%Y-%m-%d %H:%M:%S", time.gmtime())
+    print("[ %s ] Database update complete." % (ts))
+
     
     print("Genes: %d" % gene_counter.value())
     print("Transcripts: %d" % transcript_counter.value())
