@@ -1,5 +1,5 @@
 import pytest
-from talon import talon
+from talon import talon,init_refs
 from .helper_fns import fetch_correct_ID, get_db_cursor
 @pytest.mark.dbunit
 
@@ -11,7 +11,7 @@ class TestSearchForISM(object):
         """
         conn, cursor = get_db_cursor()
         build = "toy_build"
-        transcript_dict = talon.make_transcript_dict(cursor, build)
+        transcript_dict = init_refs.make_transcript_dict(cursor, build)
         conn.close()
 
         edges = ( 100, 200, 300)
@@ -26,7 +26,7 @@ class TestSearchForISM(object):
         """
         conn, cursor = get_db_cursor()
         build = "toy_build"
-        transcript_dict = talon.make_transcript_dict(cursor, build)
+        transcript_dict = init_refs.make_transcript_dict(cursor, build)
 
         edges = ( 2, 3 )
         matches = talon.search_for_ISM(edges, transcript_dict)
@@ -42,7 +42,7 @@ class TestSearchForISM(object):
         """
         conn, cursor = get_db_cursor()
         build = "toy_build"
-        transcript_dict = talon.make_transcript_dict(cursor, build)
+        transcript_dict = init_refs.make_transcript_dict(cursor, build)
 
         edges = ( 14, )
         matches = talon.search_for_ISM(edges, transcript_dict)
