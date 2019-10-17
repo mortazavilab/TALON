@@ -2074,11 +2074,20 @@ def batch_add_observed(cursor, observed_file, batch_size):
         while True:
             batch = []
             for observed in islice(f, batch_size):
-                batch.append(tuple(observed.strip().split("\t")))
+                observed = observed.strip().split("\t")
+                  
+                # Start and end delta values may be None
+                if observed[9] == "None":
+                    observed[9] = None
+                if observed[10] == "None":
+                    observed[10] = None
+
+                batch.append(tuple(observed))
 
                 # Add record to abundance dict
                 dataset = observed[4]
                 transcript_ID = observed[2]
+
                 if dataset not in abundance:
                     abundance[dataset] = {}                
 
@@ -2519,14 +2528,9 @@ def main():
     ts = time.strftime("%Y-%m-%d %H:%M:%S", time.gmtime())
     print("[ %s ] Database update complete." % (ts))
 
-    
     print("Genes: %d" % gene_counter.value())
     print("Transcripts: %d" % transcript_counter.value())
     print("Observed: %d" % observed_counter.value())
-    # TODO: Update database and validate. Concatenate outfiles
-        #TODO: header for QC log file
-    #Validate database
-    #check_database_integrity(cursor)
 
 if __name__ == '__main__':
     main()
