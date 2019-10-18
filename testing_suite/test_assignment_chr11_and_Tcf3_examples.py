@@ -24,7 +24,7 @@ class TestAssignments(object):
 
         correct_gene_ID = fetch_correct_ID("Canx", "gene", cursor)
         assert assignment['gene_ID'] == correct_gene_ID
-        assert assignment['transcript_ID'] == 8451
+        assert assignment['transcript_ID'] == 8461
         assert assignment['start_delta'] == -4
         assert assignment['end_delta'] == 50
 
@@ -33,7 +33,7 @@ class TestAssignments(object):
 
         assert annot_dict["ISM_transcript"] == "TRUE"
         assert annot_dict["transcript_status"] == "NOVEL"
-        assert annot_dict["ISM_to_IDs"] == "1743,1744"
+        assert annot_dict["ISM_to_IDs"] == "1743,1744,8460"
         conn.close()
 
     def test_prefix_ISM_of_Canx(self):
@@ -54,7 +54,7 @@ class TestAssignments(object):
 
         correct_gene_ID = fetch_correct_ID("Canx", "gene", cursor)
         assert assignment['gene_ID'] == correct_gene_ID
-        assert assignment['transcript_ID'] == 8452
+        assert assignment['transcript_ID'] == 8462
         assert assignment['start_delta'] == 64
         assert assignment['end_delta'] == -290 
 
@@ -104,7 +104,7 @@ class TestAssignments(object):
 
         correct_gene_ID = fetch_correct_ID("Tcf3", "gene", cursor)
         assert assignment['gene_ID'] == correct_gene_ID
-        assert assignment['transcript_ID'] == 8454
+        assert assignment['transcript_ID'] == 8452
         assert assignment['start_delta'] == 77
         assert assignment['end_delta'] == 8
 
@@ -136,12 +136,12 @@ class TestAssignments(object):
         correct_gene_ID = fetch_correct_ID("Drg1", "gene", cursor)
         for assignment in cursor.fetchall():
             assert assignment['gene_ID'] == correct_gene_ID
-            assert assignment['transcript_ID'] == 8455
+            assert assignment['transcript_ID'] == 8453
             assert assignment['start_delta'] == 2
             assert assignment['end_delta'] == -15
 
         # Now make sure that the novel transcript was annotated correctly
-        annot_dict = make_annot_dict(cursor, 8455)
+        annot_dict = make_annot_dict(cursor, 8453)
         assert annot_dict["NIC_transcript"] == "TRUE"
         assert annot_dict["transcript_status"] == "NOVEL"
         conn.close()
@@ -167,12 +167,7 @@ class TestAssignments(object):
         assert assignment['start_vertex'] == 153
         assert assignment['end_vertex'] == 139
 
-        # Now make sure that the novel transcript was annotated correctly
-        # TODO: in the future, I would like this transcript to prioritize
-        # the known transcript ID 28. Just a thought
         annot_dict = make_annot_dict(cursor, assignment['transcript_ID'])
-        #assert annot_dict["FSM_transcript"] == "TRUE"
-        #assert annot_dict["FSM_to_IDs"] == "28"
         assert annot_dict["transcript_status"] == "KNOWN"
         conn.close()
 
