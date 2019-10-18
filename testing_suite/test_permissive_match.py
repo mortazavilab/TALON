@@ -1,5 +1,5 @@
 import pytest
-from talon import talon
+from talon import talon, init_refs
 from .helper_fns import fetch_correct_vertex_ID, get_db_cursor
 @pytest.mark.dbunit
 
@@ -10,8 +10,9 @@ class TestPermissiveMatch(object):
         """
         conn, cursor = get_db_cursor()
         build = "toy_build"
-        location_dict = talon.make_location_dict(build, cursor)
-        run_info = talon.init_run_info(cursor, build)
+        database = "scratch/toy.db"
+        location_dict = init_refs.make_location_dict(build, cursor)
+        run_info = talon.init_run_info(database, build)
 
         chrom = "chr1"
         pos = [1, 1, 500, 600]
@@ -35,8 +36,9 @@ class TestPermissiveMatch(object):
         
         conn, cursor = get_db_cursor()
         build = "toy_build"
-        location_dict = talon.make_location_dict(build, cursor)
-        run_info = talon.init_run_info(cursor, build)
+        database = "scratch/toy.db"
+        location_dict = init_refs.make_location_dict(build, cursor)
+        run_info = talon.init_run_info(database, build)
 
         chrom = "chr1"
         pos = [1750, 1500, 1000, 900]
@@ -61,8 +63,9 @@ class TestPermissiveMatch(object):
 
         conn, cursor = get_db_cursor()
         build = "toy_build"
-        location_dict = talon.make_location_dict(build, cursor)
-        run_info = talon.init_run_info(cursor, build)
+        database = "scratch/toy.db"
+        location_dict = init_refs.make_location_dict(build, cursor)
+        run_info = talon.init_run_info(database, build)
         conn.close()
 
         chrom = "chr1"
@@ -86,8 +89,9 @@ class TestPermissiveMatch(object):
 
         conn, cursor = get_db_cursor()
         build = "toy_build"
-        location_dict = talon.make_location_dict(build, cursor)
-        run_info = talon.init_run_info(cursor, build)
+        database = "scratch/toy.db"
+        location_dict = init_refs.make_location_dict(build, cursor)
+        run_info = talon.init_run_info(database, build)
 
         chrom = "chr2"
         pos = [920, 970]
@@ -122,8 +126,9 @@ class TestPermissiveMatch(object):
      
         conn, cursor = get_db_cursor()
         build = "toy_build"
-        location_dict = talon.make_location_dict(build, cursor)
-        run_info = talon.init_run_info(cursor, build)
+        database = "scratch/toy.db"
+        location_dict = init_refs.make_location_dict(build, cursor)
+        run_info = talon.init_run_info(database, build)
 
         chrom = "chr1"
         pos = [550, 610]
