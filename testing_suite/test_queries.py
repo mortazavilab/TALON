@@ -33,7 +33,7 @@ class TestQueries(object):
         # Check each dataset in chr11_and_Tcf3 example set
         dataset = "PB65_B017"
         known_genes = qutils.fetch_all_known_genes_detected(cursor, dataset)
-        assert known_genes == [ 723, 2987, 5 ]
+        assert sorted(known_genes) == [ 5, 723, 2987 ]
         assert qutils.count_known_genes_detected(cursor, dataset) == 3
 
         dataset = "PB65_B018"
@@ -173,6 +173,8 @@ class TestQueries(object):
 
     def test_count_suffix_ISM_transcripts(self):
         """ """
+        # TODO: resolve why this test is failing. I believe it has to do with 
+        # parallel transcript order switches
         conn = sqlite3.connect("scratch/chr11_and_Tcf3.db")
         conn.row_factory = sqlite3.Row
         cursor = conn.cursor()
