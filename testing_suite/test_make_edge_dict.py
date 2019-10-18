@@ -1,5 +1,6 @@
 import pytest
-from talon import talon
+from talon import talon, init_refs
+from .helper_fns import get_db_cursor
 import sqlite3
 @pytest.mark.unit
 
@@ -10,7 +11,7 @@ class TestEdgeDict(object):
         conn, cursor = get_db_cursor()
         build = "toy_build"
 
-        e_dict = talon.make_edge_dict(cursor, build)
+        e_dict = init_refs.make_edge_dict(cursor, build)
      
         conn.close()
         assert len(e_dict.keys()) == 31
@@ -21,7 +22,7 @@ class TestEdgeDict(object):
         conn, cursor = get_db_cursor()
         build = "toy_build"
 
-        e_dict = talon.make_edge_dict(cursor, build, chrom = "chr1",
+        e_dict = init_refs.make_edge_dict(cursor, build, chrom = "chr1",
                                           start = 1, end = 1000)
 
         conn.close()
@@ -34,8 +35,3 @@ class TestEdgeDict(object):
                                           (6, 5, 'exon')])
 
 
-def get_db_cursor():
-    conn = sqlite3.connect("scratch/toy.db")
-    conn.row_factory = sqlite3.Row
-    cursor = conn.cursor()
-    return conn, cursor 
