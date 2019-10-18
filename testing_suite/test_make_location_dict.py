@@ -1,6 +1,8 @@
 import pytest
-from talon import talon
+from .helper_fns import get_db_cursor
+from talon import talon, init_refs
 import sqlite3
+
 @pytest.mark.unit
 
 class TestLocationDict(object):
@@ -10,7 +12,7 @@ class TestLocationDict(object):
         conn, cursor = get_db_cursor()
         build = "toy_build"
 
-        l_dict = talon.make_location_dict(build, cursor)
+        l_dict = init_refs.make_location_dict(build, cursor)
      
         conn.close()
 
@@ -32,7 +34,7 @@ class TestLocationDict(object):
         conn, cursor = get_db_cursor()
         build = "toy_build"
 
-        l_dict = talon.make_location_dict(build, cursor, chrom = "chr1",
+        l_dict = init_refs.make_location_dict(build, cursor, chrom = "chr1",
                                           start = 1, end = 1000)
 
         conn.close()
@@ -46,8 +48,3 @@ class TestLocationDict(object):
         assert set(chroms) == set(["chr1"])
         assert set(pos) == set([1, 100, 500, 600, 900, 1000])
 
-def get_db_cursor():
-    conn = sqlite3.connect("scratch/toy.db")
-    conn.row_factory = sqlite3.Row
-    cursor = conn.cursor()
-    return conn, cursor 
