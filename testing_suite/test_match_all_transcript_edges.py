@@ -1,5 +1,5 @@
 import pytest
-from talon import talon
+from talon import talon, init_refs
 from .helper_fns import get_db_cursor
 @pytest.mark.dbunit
 
@@ -11,8 +11,10 @@ class TestMatchAllEdges(object):
         """
         conn, cursor = get_db_cursor()
         build = "toy_build"
-        edge_dict = talon.make_edge_dict(cursor)
-        run_info = talon.init_run_info(cursor, build)
+        database = "scratch/toy.db"
+        talon.get_counters(database)
+        edge_dict = init_refs.make_edge_dict(cursor)
+        run_info = talon.init_run_info(database, build)
         conn.close()
 
         chrom = "chr1"
@@ -30,8 +32,10 @@ class TestMatchAllEdges(object):
         
         conn, cursor = get_db_cursor()
         build = "toy_build"
-        edge_dict = talon.make_edge_dict(cursor)
-        run_info = talon.init_run_info(cursor, build)
+        database = "scratch/toy.db"
+        talon.get_counters(database)
+        edge_dict = init_refs.make_edge_dict(cursor)
+        run_info = talon.init_run_info(database, build)
         orig_n_edges = len(edge_dict)
         conn.close()
 
