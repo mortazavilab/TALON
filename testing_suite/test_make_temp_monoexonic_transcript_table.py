@@ -1,5 +1,5 @@
 import pytest
-from talon import talon
+from talon import talon, init_refs
 import sqlite3
 from .helper_fns import get_db_cursor
 @pytest.mark.unit
@@ -11,7 +11,7 @@ class TestTempMonoexonTab(object):
         conn, cursor = get_db_cursor()
         build = "toy_build"
 
-        talon.make_temp_monoexonic_transcript_table(cursor, build)
+        init_refs.make_temp_monoexonic_transcript_table(cursor, build)
 
         # Count number of entries
         cursor.execute(""" SELECT transcript_ID FROM temp_monoexon """)
@@ -25,7 +25,7 @@ class TestTempMonoexonTab(object):
         conn, cursor = get_db_cursor()
         build = "toy_build"
 
-        talon.make_temp_monoexonic_transcript_table(cursor, build, chrom = "chr1",
+        init_refs.make_temp_monoexonic_transcript_table(cursor, build, chrom = "chr1",
                                                     start = 1, end = 1000)
          # Count number of entries
         cursor.execute(""" SELECT transcript_ID FROM temp_monoexon """)
@@ -38,7 +38,7 @@ class TestTempMonoexonTab(object):
         conn, cursor = get_db_cursor()
         build = "toy_build"
 
-        talon.make_temp_monoexonic_transcript_table(cursor, build, chrom = "chr4",
+        init_refs.make_temp_monoexonic_transcript_table(cursor, build, chrom = "chr4",
                                                     start = 2000, end = 3000)
          # Count number of entries
         cursor.execute(""" SELECT transcript_ID FROM temp_monoexon """)
