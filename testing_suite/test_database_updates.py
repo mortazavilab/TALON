@@ -12,8 +12,6 @@ class TestDatabaseUpdates(object):
         """
         conn, cursor = get_db_cursor()
         build = "toy_build"
-        #edge_dict = init_refs.make_edge_dict(cursor)
-        #run_info = talon.init_run_info(cursor, build)
 
         abundance = [ ( 1, "test", 5),
                       ( 2, "test", 1),
