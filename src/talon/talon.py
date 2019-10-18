@@ -4,8 +4,6 @@
 # This program takes transcripts from one or more samples (SAM format) and
 # assigns them transcript and gene identifiers based on a GTF annotation.
 # Novel transcripts are assigned new identifiers.
-
-import cProfile
 import argparse
 from functools import reduce
 import sqlite3
@@ -27,7 +25,6 @@ from datetime import datetime, timedelta
 import time
 from itertools import repeat,islice
 
-# TODO: Add a counter that the threads increment
 # TODO: Refine multigene behavior
 
 class Counter(object):
@@ -94,6 +91,9 @@ def get_args():
         help='TALON database. Created using build_talon_annotation.py')
     parser.add_argument('--build', dest = 'build', metavar='STRING,', type = str,
         help='Genome build (i.e. hg38) to use. Must be in the database.')
+    parser.add_argument("--threads", "-t", dest = "threads",
+        help = "Number of threads to run program with.",
+        type = str, default = 2)
     parser.add_argument("--cov", "-c", dest = "min_coverage",
         help = "Minimum alignment coverage in order to use a SAM entry. Default = 0.9",
         type = str, default = 0.9)
@@ -1439,7 +1439,9 @@ def check_inputs(options):
                     if not curr_sam.endswith(".sam"):
                         raise ValueError('Last field in config file must be a .sam file')
                     sam_files.append(curr_sam)      
-
+    if sam_files == []:
+        raise RuntimeError(("All of the provided dataset names are already in "
+                            "the database. Please check your config file."))
     return sam_files, dataset_metadata
 
 
@@ -1841,34 +1843,17 @@ def update_database(database, batch_size, outfiles, datasets):
     conn.row_factory = sqlite3.Row
     cursor = conn.cursor()
 
-    print("Adding novel genes to database...")
     batch_add_genes(cursor, outfiles.genes, batch_size)
-
-    print("Adding novel transcripts to database...")
     batch_add_transcripts(cursor, outfiles.transcripts, batch_size) 
-
-    print("Adding novel exons/introns to database...")
     batch_add_edges(cursor, outfiles.edges, batch_size)
-
-    print("Adding novel vertices/locations to database...")
     batch_add_locations(cursor, outfiles.location, batch_size)
-
-    print("Updating gene-vertex assignments...")
     batch_add_vertex2gene(cursor, outfiles.v2g, batch_size)
-
-    print("Adding %d dataset record(s) to database..." % len(datasets))
     add_datasets(cursor, datasets)  
-
-    print("Adding transcript observation(s) to database...")
     batch_add_observed(cursor, outfiles.observed, batch_size)
-
-    print("Updating counters...")
     update_counter(cursor, len(datasets))
-
-    print("Updating gene, transcript, and exon annotations...")
-
     batch_add_annotations(cursor, outfiles.gene_annot, "gene", batch_size)
-    batch_add_annotations(cursor, outfiles.transcript_annot, "transcript", batch_size)
+    batch_add_annotations(cursor, outfiles.transcript_annot, "transcript",
+                          batch_size)
     batch_add_annotations(cursor, outfiles.exon_annot, "exon", batch_size)
 
     check_database_integrity(cursor)
@@ -2148,7 +2133,9 @@ def batch_add_abundance(cursor, entries, batch_size):
 def check_database_integrity(cursor):
     """ Perform some checks on the database. Run before committing changes"""
 
-    print("Validating database........")
+    ts = time.strftime("%Y-%m-%d %H:%M:%S", time.gmtime())
+    print("[ %s ] Validating database........" % (ts))
+
     # For each category, check that the number of table entries matches the counter
     counter_query = "SELECT * FROM counters"
     cursor.execute(counter_query)
@@ -2270,7 +2257,6 @@ def parallel_talon(read_file, interval, database, run_info, queue):
         cursor.execute("SELECT gene_ID, strand FROM " + struct_collection.tmp_gene)
         for row in cursor.fetchall():
             msg = ((run_info.outfiles.genes, str(row['gene_ID'])+"\t"+ row['strand']))
-            #print(msg)
             queue.put(msg)
 
     # TODO: move these operations to own function
@@ -2318,15 +2304,6 @@ def parallel_talon(read_file, interval, database, run_info, queue):
                    "\t".join([ str(x) for x in (vertex_ID, gene[0])]))
             queue.put(msg)
 
-    # Format abundance for database entry 
-    #for dataset in abundance.keys():
-    #    for transcript, count in abundance[dataset].items():
-    #        curr_row = "\t".join([str(transcript), dataset, str(count)])
-    #        msg = (run_info.outfiles.abundance, curr_row)
-    #        queue.put(msg)
-
-    #pr.disable()
-    #pr.print_stats(sort='cumtime')
     struct_collection = None
  
     return
@@ -2422,7 +2399,7 @@ def unpack_observed(annotation_info, queue, obs_file):
 
     return
 
-def listener(queue, outfiles, timeout = 24):
+def listener(queue, outfiles, timeout = 72):
     """ During the run, this function listens for messages on the provided
         queue. When a message is received (consisting of a filename and a 
         string), it writes the string to that file. Timeout unit is in hours"""
@@ -2437,21 +2414,17 @@ def listener(queue, outfiles, timeout = 24):
 
     while True:
         msg = queue.get()
-        #if msg[0] == 'talon_tmp/gene_tuples.tsv' or \
-        #   msg[0] == 'talon_tmp/observed_transcript_tuples.tsv':
-        #print(msg)
         msg_fname = msg[0]
         msg_value = msg[1]
         if datetime.now() > wait_until or msg_value == 'complete':
-            print("Shutting down message queue...")
+            ts = time.strftime("%Y-%m-%d %H:%M:%S", time.gmtime())
+            print("[ %s ] Shutting down message queue..." % (ts))
             for f in open_files.values():
                 f.close()
             break
        
         open_files[msg_fname].write(msg_value + "\n")
         open_files[msg_fname].flush()
-        #print("wrote: " + str(msg))
-        #os.fsync()
 
 def main():
     """ Runs program """
@@ -2460,6 +2433,8 @@ def main():
 
     options = get_args()
     sam_files, dset_metadata = check_inputs(options)
+    threads = int(options.threads)
+    if threads < 2: threads = 2 # Value of 1 will not work
  
     # Input parameters
     database = options.database
@@ -2474,8 +2449,8 @@ def main():
     print("Transcripts: %d" % transcript_counter.value())
     print("Observed: %d" % observed_counter.value())
 
-    # Initialize worker pool TODO: don't hardcode
-    with mp.Pool(processes=16) as pool:
+    # Initialize worker pool
+    with mp.Pool(processes=threads) as pool:
         run_info = init_run_info(database, build, min_coverage, min_identity)
         run_info.outfiles = init_outfiles(options.outprefix)
 
@@ -2489,7 +2464,6 @@ def main():
             dataset_db_entries.append((d_id, d_name, description, platform))
 
         # Partition the reads
-        # TODO: is there a more efficient way to deal with the header?
         read_groups, intervals, header_file = procsams.partition_reads(sam_files, datasets)
         read_files = procsams.write_reads_to_file(read_groups, intervals, header_file)
         ts = time.strftime("%Y-%m-%d %H:%M:%S", time.gmtime())
