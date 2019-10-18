@@ -2301,9 +2301,10 @@ def annotate_read(sam_record: pysam.AlignedSegment, cursor, run_info,
     strand = "-" if sam_record.is_reverse else "+"
     read_length = sam_record.query_length
     sam_start = sam_record.reference_start + mode # Bam is zero-indexed
-    sam_end = sam_record.reference_end - mode
+    sam_end = sam_record.reference_end
     cigar = sam_record.cigarstring
 
+    print("%s: %d-%d length %d" % (read_ID, sam_start, sam_end, read_length))
     intron_list = tutils.get_introns(sam_record, sam_start, cigar)
 
     # Adjust intron positions by 1 to get splice sites in exon terms
