@@ -17,6 +17,7 @@ from . import process_sams as procsams
 from . import transcript_utils as tutils
 from . import query_utils as qutils
 from . import init_refs as init_refs
+from talon.post import get_read_annotations
 import pysam
 from string import Template
 import multiprocessing as mp
@@ -2002,11 +2003,6 @@ def batch_add_genes(cursor, gene_file, batch_size):
                 sys.exit(1)
     return
 
-
-    #query = "INSERT or IGNORE INTO genes SELECT gene_ID, strand FROM temp_gene;"
-    #cursor.execute(query)
-    #return
-
 def add_datasets(cursor, datasets):
     """ Add dataset records to database """
 
@@ -2167,30 +2163,6 @@ def check_database_integrity(cursor):
 
     return
 
-#def write_counts_log_file(cursor, outprefix):
-#    """ Create a log file with the following columns:
-#            - dataset name
-#            - Number of reads annotated
-#            - Number of known genes detected (total)
-#            - Number of novel genes detected (total)
-#            - Number of known transcripts detected (total)
-#            - Number of novel transcripts detected (total)
-#            Breakdowns by category
-#            - Number of antisense genes detected
-#            - Number of intergenic genes detected
-#            - Number of known transcripts
-#            - Number of FSM transcripts detected (perfect + with novelty)
-#            - Number of total ISM transcripts detected
-#            - Number of suffix ISMs detected
-#            - Number of antisense transcripts detected
-#            - Number of genomic transcripts detected
-#    """
-#
-#    # Run utility
-#    summarize_datasets.write_counts_file(cursor, outprefix)
-#
-#    return 
-
 
 def parallel_talon(read_file, interval, database, run_info, queue):
     """ Manage TALON processing of a single chunk of the input. Initialize
@@ -2215,10 +2187,6 @@ def parallel_talon(read_file, interval, database, run_info, queue):
                                                     start = interval[1], 
                                                     end = interval[2], 
                                                     tmp_id = tmp_id)
-        #prepare_tmp_tables(cursor, run_info, chrom = interval[0],
-        #                                            start = interval[1],
-        #                                            end = interval[2],
-        #                                            tmp_id = tmp_id))
          
         interval_id = "%s_%d_%d" % interval
 
@@ -2333,7 +2301,7 @@ def annotate_read(sam_record: pysam.AlignedSegment, cursor, run_info,
     strand = "-" if sam_record.is_reverse else "+"
     read_length = sam_record.query_length
     sam_start = sam_record.reference_start + mode # Bam is zero-indexed
-    sam_end = sam_record.reference_end
+    sam_end = sam_record.reference_end - mode
     cigar = sam_record.cigarstring
 
     intron_list = tutils.get_introns(sam_record, sam_start, cigar)
@@ -2501,6 +2469,11 @@ def main():
     update_database(database, batch_size, run_info.outfiles, dataset_db_entries)
     ts = time.strftime("%Y-%m-%d %H:%M:%S", time.gmtime())
     print("[ %s ] Database update complete." % (ts))
+
+    # Write output reads file
+    annot_name = "toy_annot"
+    get_read_annotations.make_read_annot_file(database, build, annot_name, 
+                                              outprefix, datasets = datasets)
 
     print("Genes: %d" % gene_counter.value())
     print("Transcripts: %d" % transcript_counter.value())

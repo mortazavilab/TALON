@@ -16,6 +16,17 @@ except Exception as e:
     sys.exit("Database initialization failed on toy artificial annotation")
 
 try:
+   subprocess.check_output(
+       ["talon_initialize_database",
+        "--f", "input_files/toy_transcript/toy_annot.gtf",
+        "--a",  "toy_annot",
+        "--l", "0",
+        "--g",  "toy_build", "--o", "scratch/toy_mod"])
+except Exception as e:
+    print(e)
+    sys.exit("Database initialization failed on toy artificial annotation")
+
+try:
     subprocess.check_output(
        ["talon_initialize_database",
         "--f", "input_files/Canx_example/Canx.gtf",
@@ -64,6 +75,20 @@ try:
 except Exception as e:
     print(e)
     sys.exit("Database initialization failed on chr22 annotation")
+
+# Actually perform the toy_mod run
+try:
+    subprocess.check_output(
+       ["talon",
+        "--f", "input_files/toy_transcript/mod_config.csv",
+        "--db", "scratch/toy_mod.db",
+        "--build", "toy_build",
+        "--cov", "0",
+        "--identity", "0",
+        "--o", "scratch/toy_mod" ])
+except Exception as e:
+    print(e)
+    sys.exit("TALON run failed on toy_mod transcripts")
 
 # Actually perform the chr22 TALON run
 try:
