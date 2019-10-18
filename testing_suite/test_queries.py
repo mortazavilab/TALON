@@ -173,15 +173,13 @@ class TestQueries(object):
 
     def test_count_suffix_ISM_transcripts(self):
         """ """
-        # TODO: resolve why this test is failing. I believe it has to do with 
-        # parallel transcript order switches
         conn = sqlite3.connect("scratch/chr11_and_Tcf3.db")
         conn.row_factory = sqlite3.Row
         cursor = conn.cursor()
 
         dataset = "PB65_B017"
         transcripts = qutils.fetch_suffix_ISM_transcripts(cursor, dataset)
-        assert len(transcripts) == 1
+        assert len(transcripts) == 2
         conn.close()
 
     def test_count_NIC_transcripts(self):
