@@ -1,6 +1,7 @@
 import pytest
-from talon import talon
+from talon import talon, init_refs
 import sqlite3
+from .helper_fns import get_db_cursor
 @pytest.mark.unit
 
 class TestGeneStartEnd(object):
@@ -10,7 +11,7 @@ class TestGeneStartEnd(object):
         conn, cursor = get_db_cursor()
         build = "toy_build"
 
-        starts, ends = talon.make_gene_start_and_end_dict(cursor, build)
+        starts, ends = init_refs.make_gene_start_and_end_dict(cursor, build)
      
         conn.close()
 
@@ -36,7 +37,7 @@ class TestGeneStartEnd(object):
         conn, cursor = get_db_cursor()
         build = "toy_build"
 
-        starts, ends = talon.make_gene_start_and_end_dict(cursor, build,
+        starts, ends = init_refs.make_gene_start_and_end_dict(cursor, build,
                                                           chrom = "chr1",
                                                           start = 1,
                                                           end = 1000)
@@ -49,8 +50,3 @@ class TestGeneStartEnd(object):
         assert ends == {1: {1000: 6},
                         2: {900: 5}}
 
-def get_db_cursor():
-    conn = sqlite3.connect("scratch/toy.db")
-    conn.row_factory = sqlite3.Row
-    cursor = conn.cursor()
-    return conn, cursor 
