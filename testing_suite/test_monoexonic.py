@@ -1,5 +1,5 @@
 import pytest
-from talon import talon
+from talon import talon, init_refs
 from .helper_fns import fetch_correct_ID, get_db_cursor
 @pytest.mark.integration
 
@@ -10,14 +10,16 @@ class TestIdentifyMonoexonic(object):
         """
         conn, cursor = get_db_cursor()
         build = "toy_build"
-        talon.make_temp_novel_gene_table(cursor, build)
-        talon.make_temp_monoexonic_transcript_table(cursor, build)
-        edge_dict = talon.make_edge_dict(cursor)
-        location_dict = talon.make_location_dict(build, cursor)
-        run_info = talon.init_run_info(cursor, build)
-        transcript_dict = talon.make_transcript_dict(cursor, build)
-        vertex_2_gene = talon.make_vertex_2_gene_dict(cursor)
-        gene_starts, gene_ends = talon.make_gene_start_and_end_dict(cursor, build)
+        database = "scratch/toy.db"
+        talon.get_counters(database)
+        init_refs.make_temp_novel_gene_table(cursor, build)
+        init_refs.make_temp_monoexonic_transcript_table(cursor, build)
+        edge_dict = init_refs.make_edge_dict(cursor)
+        location_dict = init_refs.make_location_dict(build, cursor)
+        run_info = talon.init_run_info(database, build)
+        transcript_dict = init_refs.make_transcript_dict(cursor, build)
+        vertex_2_gene = init_refs.make_vertex_2_gene_dict(cursor)
+        gene_starts, gene_ends = init_refs.make_gene_start_and_end_dict(cursor, build)
 
         chrom = "chr4"
         strand = "-"
@@ -27,7 +29,8 @@ class TestIdentifyMonoexonic(object):
                                                strand, cursor,
                                                location_dict, edge_dict,
                                                transcript_dict, vertex_2_gene,
-                                               gene_starts, gene_ends, run_info)
+                                               gene_starts, gene_ends, run_info,
+                                               'temp_gene', 'temp_monoexon')
 
         correct_gene_ID = fetch_correct_ID("TG6", "gene", cursor)
         correct_transcript_ID = fetch_correct_ID("TG6-001", "transcript", cursor)
@@ -45,14 +48,16 @@ class TestIdentifyMonoexonic(object):
 
         conn, cursor = get_db_cursor()
         build = "toy_build"
-        talon.make_temp_novel_gene_table(cursor, build)
-        talon.make_temp_monoexonic_transcript_table(cursor, build)
-        edge_dict = talon.make_edge_dict(cursor)
-        location_dict = talon.make_location_dict(build, cursor)
-        run_info = talon.init_run_info(cursor, build)
-        transcript_dict = talon.make_transcript_dict(cursor, build)
-        vertex_2_gene = talon.make_vertex_2_gene_dict(cursor)
-        gene_starts, gene_ends = talon.make_gene_start_and_end_dict(cursor, build)
+        database = "scratch/toy.db"
+        talon.get_counters(database)
+        init_refs.make_temp_novel_gene_table(cursor, build)
+        init_refs.make_temp_monoexonic_transcript_table(cursor, build)
+        edge_dict = init_refs.make_edge_dict(cursor)
+        location_dict = init_refs.make_location_dict(build, cursor)
+        run_info = talon.init_run_info(database, build)
+        transcript_dict = init_refs.make_transcript_dict(cursor, build)
+        vertex_2_gene = init_refs.make_vertex_2_gene_dict(cursor)
+        gene_starts, gene_ends = init_refs.make_gene_start_and_end_dict(cursor, build)
 
         chrom = "chr4"
         strand = "-"
@@ -62,7 +67,8 @@ class TestIdentifyMonoexonic(object):
                                                strand, cursor,
                                                location_dict, edge_dict,
                                                transcript_dict, vertex_2_gene,
-                                               gene_starts, gene_ends, run_info)
+                                               gene_starts, gene_ends, run_info,
+                                               'temp_gene', 'temp_monoexon')
 
         correct_gene_ID = fetch_correct_ID("TG6", "gene", cursor)
         assert annotation['gene_ID'] == correct_gene_ID
@@ -79,14 +85,16 @@ class TestIdentifyMonoexonic(object):
 
         conn, cursor = get_db_cursor()
         build = "toy_build"
-        talon.make_temp_novel_gene_table(cursor, build)
-        talon.make_temp_monoexonic_transcript_table(cursor, build)
-        edge_dict = talon.make_edge_dict(cursor)
-        location_dict = talon.make_location_dict(build, cursor)
-        run_info = talon.init_run_info(cursor, build)
-        transcript_dict = talon.make_transcript_dict(cursor, build)
-        vertex_2_gene = talon.make_vertex_2_gene_dict(cursor)
-        gene_starts, gene_ends = talon.make_gene_start_and_end_dict(cursor, build)
+        database = "scratch/toy.db"
+        talon.get_counters(database)
+        init_refs.make_temp_novel_gene_table(cursor, build)
+        init_refs.make_temp_monoexonic_transcript_table(cursor, build)
+        edge_dict = init_refs.make_edge_dict(cursor)
+        location_dict = init_refs.make_location_dict(build, cursor)
+        run_info = talon.init_run_info(database, build)
+        transcript_dict = init_refs.make_transcript_dict(cursor, build)
+        vertex_2_gene = init_refs.make_vertex_2_gene_dict(cursor)
+        gene_starts, gene_ends = init_refs.make_gene_start_and_end_dict(cursor, build)
 
         chrom = "chr4"
         strand = "-"
@@ -96,7 +104,8 @@ class TestIdentifyMonoexonic(object):
                                                strand, cursor,
                                                location_dict, edge_dict,
                                                transcript_dict, vertex_2_gene,
-                                               gene_starts, gene_ends, run_info)
+                                               gene_starts, gene_ends, run_info,
+                                               'temp_gene', 'temp_monoexon')
 
         correct_gene_ID = fetch_correct_ID("TG6", "gene", cursor)
         assert annotation['gene_ID'] == correct_gene_ID
@@ -113,14 +122,16 @@ class TestIdentifyMonoexonic(object):
 
         conn, cursor = get_db_cursor()
         build = "toy_build"
-        talon.make_temp_novel_gene_table(cursor, build)
-        talon.make_temp_monoexonic_transcript_table(cursor, build)
-        edge_dict = talon.make_edge_dict(cursor)
-        location_dict = talon.make_location_dict(build, cursor)
-        run_info = talon.init_run_info(cursor, build)
-        transcript_dict = talon.make_transcript_dict(cursor, build)
-        vertex_2_gene = talon.make_vertex_2_gene_dict(cursor)
-        gene_starts, gene_ends = talon.make_gene_start_and_end_dict(cursor, build)
+        database = "scratch/toy.db"
+        talon.get_counters(database)
+        init_refs.make_temp_novel_gene_table(cursor, build)
+        init_refs.make_temp_monoexonic_transcript_table(cursor, build)
+        edge_dict = init_refs.make_edge_dict(cursor)
+        location_dict = init_refs.make_location_dict(build, cursor)
+        run_info = talon.init_run_info(database, build)
+        transcript_dict = init_refs.make_transcript_dict(cursor, build)
+        vertex_2_gene = init_refs.make_vertex_2_gene_dict(cursor)
+        gene_starts, gene_ends = init_refs.make_gene_start_and_end_dict(cursor, build)
         tot_vertices = len(vertex_2_gene)
         query = """ SELECT COUNT(*) FROM temp_monoexon """
         tot_monoexonic = cursor.execute(query).fetchone()[0]
@@ -133,7 +144,8 @@ class TestIdentifyMonoexonic(object):
                                                strand, cursor,
                                                location_dict, edge_dict,
                                                transcript_dict, vertex_2_gene,
-                                               gene_starts, gene_ends, run_info)
+                                               gene_starts, gene_ends, run_info,
+                                               'temp_gene', 'temp_monoexon')
 
         correct_gene_ID = fetch_correct_ID("TG6", "gene", cursor)
         print(annotation['start_vertex'])
@@ -153,14 +165,16 @@ class TestIdentifyMonoexonic(object):
 
         conn, cursor = get_db_cursor()
         build = "toy_build"
-        talon.make_temp_novel_gene_table(cursor, build)
-        talon.make_temp_monoexonic_transcript_table(cursor, build)
-        edge_dict = talon.make_edge_dict(cursor)
-        location_dict = talon.make_location_dict(build, cursor)
-        run_info = talon.init_run_info(cursor, build)
-        transcript_dict = talon.make_transcript_dict(cursor, build)
-        vertex_2_gene = talon.make_vertex_2_gene_dict(cursor)
-        gene_starts, gene_ends = talon.make_gene_start_and_end_dict(cursor, build)
+        database = "scratch/toy.db"
+        talon.get_counters(database)
+        init_refs.make_temp_novel_gene_table(cursor, build)
+        init_refs.make_temp_monoexonic_transcript_table(cursor, build)
+        edge_dict = init_refs.make_edge_dict(cursor)
+        location_dict = init_refs.make_location_dict(build, cursor)
+        run_info = talon.init_run_info(database, build)
+        transcript_dict = init_refs.make_transcript_dict(cursor, build)
+        vertex_2_gene = init_refs.make_vertex_2_gene_dict(cursor)
+        gene_starts, gene_ends = init_refs.make_gene_start_and_end_dict(cursor, build)
 
         chrom = "chr4"
         strand = "+"
@@ -170,7 +184,8 @@ class TestIdentifyMonoexonic(object):
                                                strand, cursor,
                                                location_dict, edge_dict,
                                                transcript_dict, vertex_2_gene,
-                                               gene_starts, gene_ends, run_info)
+                                               gene_starts, gene_ends, run_info,
+                                               'temp_gene', 'temp_monoexon')
 
         anti_gene_ID = fetch_correct_ID("TG6", "gene", cursor)
         gene_novelty_types = [ x[-2] for x in annotation['gene_novelty']]
