@@ -1,6 +1,5 @@
 import pytest
-from talon import talon
-from talon import init_refs
+from talon import talon, init_refs
 from .helper_fns import fetch_correct_ID, get_db_cursor, fetch_counter
 @pytest.mark.integration
 
