@@ -1,5 +1,5 @@
 import pytest
-from talon import talon
+from talon import talon, init_refs
 import sqlite3
 from .helper_fns import get_db_cursor
 @pytest.mark.unit
@@ -11,7 +11,7 @@ class TestTempNovelGeneTab(object):
         conn, cursor = get_db_cursor()
         build = "toy_build"
 
-        talon.make_temp_novel_gene_table(cursor, build)
+        init_refs.make_temp_novel_gene_table(cursor, build)
 
         # Count number of entries
         cursor.execute(""" SELECT gene_ID FROM temp_gene """)
@@ -25,7 +25,7 @@ class TestTempNovelGeneTab(object):
         conn, cursor = get_db_cursor()
         build = "toy_build"
 
-        talon.make_temp_novel_gene_table(cursor, build, chrom = "chr1",
+        init_refs.make_temp_novel_gene_table(cursor, build, chrom = "chr1",
                                                     start = 10000, end = 20000)
          # Count number of entries
         cursor.execute(""" SELECT gene_ID FROM temp_gene """)
@@ -38,7 +38,7 @@ class TestTempNovelGeneTab(object):
         conn, cursor = get_db_cursor()
         build = "toy_build"
 
-        talon.make_temp_novel_gene_table(cursor, build, chrom = "chr1",
+        init_refs.make_temp_novel_gene_table(cursor, build, chrom = "chr1",
                                                     start = 500, end = 1500)
         cursor.execute(""" SELECT gene_ID FROM temp_gene """)
         results = [ x[0]  for x in cursor.fetchall()]
