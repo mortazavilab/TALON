@@ -2299,12 +2299,11 @@ def annotate_read(sam_record: pysam.AlignedSegment, cursor, run_info,
     dataset = sam_record.get_tag("RG")
     chrom = sam_record.reference_name
     strand = "-" if sam_record.is_reverse else "+"
-    sam_start = reference_start + mode 
-    sam_end = reference_end
+    sam_start = sam_record.reference_start + mode 
+    sam_end = sam_record.reference_end
     read_length = sam_record.query_alignment_length 
     cigar = sam_record.cigarstring
 
-    print("%s: %d-%d length %d" % (read_ID, sam_start, sam_end, read_length))
     intron_list = tutils.get_introns(sam_record, sam_start, cigar)
 
     # Adjust intron positions by 1 to get splice sites in exon terms
