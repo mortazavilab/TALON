@@ -2299,9 +2299,10 @@ def annotate_read(sam_record: pysam.AlignedSegment, cursor, run_info,
     dataset = sam_record.get_tag("RG")
     chrom = sam_record.reference_name
     strand = "-" if sam_record.is_reverse else "+"
-    read_length = sam_record.query_alignment_length
-    sam_start = sam_record.query_alignment_start + mode # Bam is zero-indexed
-    sam_end = sam_record.query_alignment_end
+    aligned = sam_record.get_reference_positions()
+    sam_start = aligned[0] + mode
+    sam_end = aligned[-1] + mode
+    read_length = len(aligned)
     cigar = sam_record.cigarstring
 
     print("%s: %d-%d length %d" % (read_ID, sam_start, sam_end, read_length))
