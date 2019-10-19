@@ -18,9 +18,11 @@ class TestMergeReads(object):
 
         with pysam.AlignmentFile(merged_bam) as bam:
             for entry in bam:
-                if entry.query_name == "read1":
+                if entry.query_name == "read_1":
                     assert entry.get_tag("RG") == "dataset1"
-                elif entry.query_name == "read2":
+                elif entry.query_name == "read_2":
+                    assert entry.get_tag("RG") == "dataset1"
+                elif entry.query_name == "read_3":
                     assert entry.get_tag("RG") == "dataset2"
                 else:
                     pytest.fail("Unexpected read encountered")   
