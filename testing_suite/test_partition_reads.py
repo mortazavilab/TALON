@@ -12,8 +12,9 @@ class TestPartitionReads(object):
             - read_3 (interval chr2:1-100)
         """
 
-        sams = ["input_files/toy_transcript/toy_reads_for_partition_test.sam"]
-        datasets = ["dataset1"]
+        sams = ["input_files/preprocess_sam/read1.sam",
+                "input_files/preprocess_sam/read2.sam"]
+        datasets = ["dataset1", "dataset2"]
         tmp_dir = "scratch/test_read_partition/"
 
         read_groups, intervals, merged_bam = procsam.partition_reads(sams, datasets, tmp_dir = tmp_dir)
@@ -25,5 +26,5 @@ class TestPartitionReads(object):
         assert [ entry.query_name for entry in read_groups[1] ] == ["read_3"]
         
         # Check the intervals 
-        assert intervals[0] == ("chr1", 1, 1000)
+        assert intervals[0] == ("chr1", 1, 1004)
         assert intervals[1] == ("chr2", 1, 100)
