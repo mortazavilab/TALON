@@ -364,7 +364,7 @@ def make_read_annot_file(database, build, outprefix, datasets = "all"):
         for read_entry in f:
             read_name, dataset, genome_build, gene_ID, \
             transcript_ID, chrom, read_start, read_end, \
-            strand, n_exons, read_length = read_entry.split("\t")
+            strand, n_exons, read_length = read_entry.strip().split("\t")
 
             gene_ID = int(gene_ID)
             transcript_ID = int(transcript_ID)
