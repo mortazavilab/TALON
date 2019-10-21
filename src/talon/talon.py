@@ -2471,8 +2471,9 @@ def main():
     print("[ %s ] Database update complete." % (ts))
 
     # Write output reads file
-    annot_name = "toy_annot"
-    get_read_annotations.make_read_annot_file(database, build, annot_name, 
+    ts = time.strftime("%Y-%m-%d %H:%M:%S", time.gmtime())
+    print("[ %s ] Creating read-wise annotation file." % (ts))
+    get_read_annotations.make_read_annot_file(database, build,  
                                               outprefix, datasets = datasets)
 
     print("Genes: %d" % gene_counter.value())

@@ -25,21 +25,21 @@ def get_args():
     parser.add_argument('--datasets', dest = 'datasets', metavar='STRING,', type = str,
         help=('Optional: Comma-delimited list of datasets to include. Default '
               'behavior is to include all datasets in the database.'),
-        default = "all")
+        default = None)
     parser.add_argument("--o", dest = "outprefix", help = "Prefix for output files",
         type = str)
 
     args = parser.parse_args()
     return args
 
-def fetch_reads(database, build, tmp_file = None, datasets = "all"):
+def fetch_reads(database, build, tmp_file = None, datasets = None):
     """ Performs database query to fetch location and gene/transcript assignment
         info for each long read in the specified datasets. 
         If tmp_file is set to None (default), then the function will return
         the query results in a list of lists. If an alternate value is provided, 
         then the results will be written to a tmp file of that name."""
 
-    if datasets != "all":
+    if datasets != None:
         # Format as a string for query
         dataset_str = qutils.format_for_IN(datasets)
         dataset_str = " AND dataset IN " + dataset_str
@@ -431,7 +431,7 @@ def main():
     if not Path(database).exists():
         raise ValueError("Database file '%s' does not exist!" % database)
 
-    if datasets != "all":
+    if datasets != None:
         datasets = datasets.split(",")   
    
     make_read_annot_file(database, build, outprefix, datasets = datasets)
