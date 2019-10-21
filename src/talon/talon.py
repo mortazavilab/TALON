@@ -1589,58 +1589,6 @@ def prepare_data_structures(cursor, run_info, chrom = None, start = None,
 
     return struct_collection
 
-def process_all_sam_files(sam_files, dataset_list, cursor, struct_collection, 
-                          outprefix):
-    """ Iterates over the provided sam files. """
-
-    novel_datasets = []
-    all_observed_transcripts = []
-    all_gene_annotations = []
-    all_transcript_annotations = []
-    all_exon_annotations = []
-    all_abundance = []
-
-    # Initialize QC output file
-    qc_file = outprefix + "_talon_QC.log"
-
-    with open(qc_file, 'w') as o:  # closes the file if any error occurs within the block
-        o.write("# TALON run filtering settings:\n")
-        o.write("# Fraction read aligned: " + \
-                str(struct_collection.run_info.min_coverage) + "\n")
-        o.write("# Min read identity to reference: " + \
-                str(struct_collection.run_info.min_identity) + "\n")
-        o.write("# Min transcript length: " + \
-                str(struct_collection.run_info.min_length) + "\n")
-        o.write("-------------------------------------------\n")
-        o.write("\t".join(["dataset", "read_ID", "passed_QC", "primary_mapped",
-                           "read_length", "fraction_aligned", "identity"]) + "\n")
-
-
-        for sam, d_metadata in zip(sam_files, dataset_list):
-            print("Working with dataset %s..." % d_metadata[0])
-
-            # Create annotation entry for this dataset
-            struct_collection.run_info['dataset'] += 1
-            d_id = struct_collection.run_info['dataset']
-            d_name = d_metadata[0]
-            novel_datasets += [(d_id, d_name, d_metadata[1], d_metadata[2])]
-
-            # Now process the current sam file
-            observed_transcripts, gene_annotations, transcript_annotations, \
-            exon_annotations, abundance = annotate_sam_transcripts(sam, d_name, cursor, struct_collection, o)
-
-            # Consolidate the outputs
-            all_observed_transcripts.extend(observed_transcripts)
-            all_gene_annotations.extend(gene_annotations)
-            all_transcript_annotations.extend(transcript_annotations)
-            all_exon_annotations.extend(exon_annotations)
-            all_abundance.extend(abundance)
-
-
-    return novel_datasets, all_observed_transcripts, all_gene_annotations, \
-           all_transcript_annotations, all_exon_annotations, all_abundance
-
-
 def compute_delta(orig_pos, new_pos, strand):
     """ Given a starting position and a new position, compute the distance
         between them. The sign indicates whether the second point is 
@@ -2367,7 +2315,7 @@ def unpack_observed(annotation_info, queue, obs_file):
 
     return
 
-def listener(queue, outfiles, timeout = 72):
+def listener(queue, outfiles, QC_header, timeout = 72):
     """ During the run, this function listens for messages on the provided
         queue. When a message is received (consisting of a filename and a 
         string), it writes the string to that file. Timeout unit is in hours"""
@@ -2376,6 +2324,10 @@ def listener(queue, outfiles, timeout = 72):
     open_files = {}
     for fpath in outfiles.values():
         open_files[fpath] = open(fpath, 'w')
+
+    # Add a header to the QC file
+    QC_file = open_files[outfiles.qc]
+    QC_file.write(QC_header + "\n")
 
     # Set a timeout
     wait_until = datetime.now() + timedelta(hours=timeout)
@@ -2393,6 +2345,20 @@ def listener(queue, outfiles, timeout = 72):
        
         open_files[msg_fname].write(msg_value + "\n")
         open_files[msg_fname].flush()
+
+def make_QC_header(coverage, identity, length):
+    """ Create a header for the read QC file """
+   
+    cols = "\t".join(["dataset", "read_ID", "passed_QC", "primary_mapped",
+                      "read_length", "fraction_aligned", "identity"])
+    header = "\n".join(["# TALON run filtering settings:",
+                        "# Min fraction read aligned: %d " % coverage,
+                        "# Min read identity to reference: %d" % identity,
+                        "# Min transcript length: %d" % length,
+                        "# -------------------------------------------",
+                        cols])
+                      
+    return header
 
 def main():
     """ Runs program """
@@ -2450,7 +2416,9 @@ def main():
         print("[ %s ] Launching parallel annotation jobs" % (ts))
 
         # Start running listener, which will monitor queue for messages
-        pool.apply_async(listener, (queue, run_info.outfiles)) 
+        QC_header = make_QC_header(run_info.min_coverage, run_info.min_identity, 
+                                   run_info.min_length)
+        pool.apply_async(listener, (queue, run_info.outfiles, QC_header)) 
 
         # Now launch the parallel TALON jobs
         pool.starmap(parallel_talon, jobs)
@@ -2479,6 +2447,9 @@ def main():
     print("Genes: %d" % gene_counter.value())
     print("Transcripts: %d" % transcript_counter.value())
     print("Observed: %d" % observed_counter.value())
+
+    ts = time.strftime("%Y-%m-%d %H:%M:%S", time.gmtime())
+    print("[ %s ] DONE" % (ts))
 
 if __name__ == '__main__':
     main()
