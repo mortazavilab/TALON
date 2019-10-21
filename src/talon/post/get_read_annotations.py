@@ -7,6 +7,7 @@
 import argparse
 import sqlite3
 import os
+from pathlib import Path
 from .. import query_utils as qutils
 from string import Template
 
