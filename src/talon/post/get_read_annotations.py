@@ -108,6 +108,143 @@ def fetch_reads(database, build, tmp_file = None, datasets = "all"):
     else:
         return reads
 
+def get_gene_novelty(database):
+    """ Given a database, get the novelty status of each gene. """
+
+    gene_novelty = {}
+    with sqlite3.connect(database) as conn:
+        conn.row_factory = sqlite3.Row
+        cursor = conn.cursor()
+
+        # Fetch known genes
+        cursor.execute("""SELECT ID FROM gene_annotations
+                              WHERE attribute = "gene_status"
+                              AND value = "KNOWN";""")
+        for entry in cursor:
+            gene_novelty[entry[0]] = "Known"
+
+        # Fetch antisense genes
+        cursor.execute("""SELECT ID FROM gene_annotations
+                              WHERE attribute = "antisense_gene"
+                              AND value = "TRUE";""")
+        for entry in cursor:
+            gene_novelty[entry[0]] = "Antisense"
+
+        # Fetch intergenic genes
+        cursor.execute("""SELECT ID FROM gene_annotations
+                              WHERE attribute = "intergenic_novel"
+                              AND value = "TRUE";""")
+        for entry in cursor:
+            gene_novelty[entry[0]] = "Intergenic"
+
+    return gene_novelty
+
+def get_transcript_novelty(database):
+    """ Given a database, get the novelty status of each transcript. """
+  
+    transcript_novelty = {}
+    with sqlite3.connect(database) as conn:
+        conn.row_factory = sqlite3.Row
+        cursor = conn.cursor()
+
+        # Fetch known transcripts
+        cursor.execute("""SELECT ID FROM transcript_annotations
+                              WHERE attribute = "transcript_status"
+                              AND value = "KNOWN""";)
+        for entry in cursor:
+            transcript_novelty[entry[0]] = "Known"
+    
+        # Fetch ISM transcripts
+        cursor.execute("""SELECT ID FROM transcript_annotations
+                              WHERE attribute = "ISM_transcript"
+                              AND value = "TRUE";""")
+        for entry in cursor:
+            transcript_novelty[entry[0]] = "ISM"
+    
+        # Fetch NIC transcripts
+        cursor.execute("""SELECT ID FROM transcript_annotations
+                              WHERE attribute = "NIC_transcript"
+                              AND value = "TRUE";""")
+        for entry in cursor:
+            transcript_novelty[entry[0]] = "NIC"
+    
+        # Fetch NNC transcripts
+        cursor.execute("""SELECT ID FROM transcript_annotations
+                              WHERE attribute = "NNC_transcript"
+                              AND value = "TRUE";""")
+        for entry in cursor:
+            transcript_novelty[entry[0]] = "NNC"
+    
+        # Fetch antisense transcripts
+        cursor.execute("""SELECT ID FROM transcript_annotations
+                              WHERE attribute = "antisense_transcript"
+                              AND value = "TRUE";""")
+        for entry in cursor:
+            transcript_novelty[entry[0]] = "Antisense"
+    
+        # Fetch intergenic transcripts
+        cursor.execute("""SELECT ID FROM transcript_annotations
+                              WHERE attribute = "intergenic_transcript"
+                              AND value = "TRUE";""")
+        for entry in cursor:
+            transcript_novelty[entry[0]] = "Intergenic"
+    
+        # Fetch genomic transcripts
+        cursor.execute("""SELECT ID FROM transcript_annotations
+                              WHERE attribute = "genomic_transcript"
+                              AND value = "TRUE";""")
+        for entry in cursor:
+            transcript_novelty[entry[0]] = "Genomic"
+    
+    return transcript_novelty
+
+def get_ISM_novelty(database):
+    """ Given a database, get the ISM subtype of each ISM transcript. """
+    
+    all_ISMs = set()
+    prefix_ISMs = set()
+    suffix_ISMs = set()
+    ISM_novelty = {}
+    
+    with sqlite3.connect(database) as conn:
+        conn.row_factory = sqlite3.Row
+        cursor = conn.cursor()
+
+        # Fetch ISM transcripts
+        cursor.execute("""SELECT ID FROM transcript_annotations
+                              WHERE attribute = "ISM_transcript"
+                              AND value = "TRUE";""")
+        for entry in cursor:
+            all_ISMs.add(entry([0])
+
+        # Fetch Prefix ISMs
+        cursor.execute("""SELECT ID FROM transcript_annotations
+                              WHERE attribute = "ISM-prefix_transcript"
+                              AND value = "TRUE";""")
+        for entry in cursor:
+            prefix_ISMs.add(entry([0])
+
+        # Fetch Suffix ISMs
+        cursor.execute("""SELECT ID FROM transcript_annotations
+                              WHERE attribute = "ISM-suffix_transcript"
+                              AND value = "TRUE";""")
+        for entry in cursor:
+            suffix_ISMs.add(entry([0])
+
+    # Look for ISM subtype
+    for transcript_ID in all_ISMs:
+    if transcript_ID in prefix_ISMs and transcript_ID in suffix_ISMs:
+        ISM_novelty[transcript_ID] = "Both"
+    elif transcript_ID in prefix_ISMs:
+        ISM_novelty[transcript_ID] = "Prefix"
+    elif transcript_ID in suffix_ISMs:
+        ISM_novelty[transcript_ID] = "Suffix"
+    else:
+        ISM_novelty[transcript_ID] = "None"
+
+    return ISM_novelty
+
+
 def make_read_annot_file(database, build, annot_name, outprefix, datasets = "all"):
     """ Creates an output file with the following columns:
             1. 
