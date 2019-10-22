@@ -33,6 +33,7 @@ talon_summarize \
        --v \
        --o example
 ```
+You may notice at this point that there are a lot of novel transcripts. This is because no filtering has been performed. We highly recommend processing biological replicates together and then filtering transcript models for reproducibility (as described later in this tutorial).
 
 To create an abundance matrix without filtering (for use computing gene expression), we run the following:
 ```
