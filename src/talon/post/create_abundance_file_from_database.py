@@ -6,12 +6,15 @@
 # filtering option.
 
 import sqlite3
+import itertools
+import operator
 from optparse import OptionParser
 from pathlib import Path
 
 from . import filter_talon_transcripts as filt
 from .. import dstruct as dstruct
 from .. import length_utils as lu
+from . import post_utils as putils
 from .. import query_utils as qutils
 from .. import talon as talon
 
@@ -28,23 +31,25 @@ def getOptions():
                   relative to. Note: must be in the TALON database.""",
         type = "string")
 
+    parser.add_option("--whitelist", dest = "whitelist",
+                      help = "Whitelist file of transcripts to include in the \
+                              output. First column should be TALON gene ID, \
+                              second column should be TALON transcript ID",
+                      metavar = "FILE", type = "string", default = None)
+
+    parser.add_option("--observed", dest ="observed", action='store_true',
+                      help = "If this option is set, the GTF file will only  \
+                      include transcripts that were observed in at least one \
+                      dataset (redundant if dataset file provided).")  
+
     parser.add_option("--build", "-b", dest = "build",
         help = "Genome build to use. Note: must be in the TALON database.",
-        type = "string")
-
-    parser.add_option("--filter", dest ="filtering", action='store_true',
-                      help = "If this option is set, the transcripts in the  \
-                      database will be filtered prior to GTF creation \
-                      (for more information, see filter_talon_transcripts.py)")
-
-    parser.add_option("--pairings", "-p",  dest = "pairings_file",
-        help = """Optional (only relevant if filter = true): A file indicating
-                  which datasets should be considered together when filtering
-                  novel transcripts (i.e. biological replicates).
-                  Format: Each line of the file constitutes a group, with
-                  member datasets separated by commas.
-                  If no file is provided, then novel transcripts appearing in
-                  any two datasets will be accepted.""",
+        type = "string") 
+ 
+    parser.add_option("--datasets", "-d",  dest = "datasets_file",
+        help = """Optional: A file indicating which datasets should be 
+                  included (one dataset name per line). Default is to include
+                  all datasets.""",
         metavar = "FILE", type = "string", default = None)
 
     parser.add_option("--o", dest = "outprefix", help = "Prefix for output file",
@@ -54,71 +59,27 @@ def getOptions():
     (options, args) = parser.parse_args()
     return options
 
-def handle_filtering(options):
-    """ Determines which transcripts to allow in the abundance file. This can be done
-        in two different ways. If filtering is turned off, then all of the
-        transcripts in the database go on the whitelist. 
-        If filtering is turned on, known transcripts and novel
-        transcripts appearing in any two datasets will be accepted. This can be
-        tuned further by providing a dataset pairing file, but this is optional.
-    """
-
-    database = options.database
-    annot = options.annot
-    pairings = options.pairings_file
-
-    # If filtering is turned on, run filtering step to get whitelisted transcripts
-    if options.filtering == True:
-        print("--------------------------------------")
-        print("Running transcript filtering process:")
-        if pairings != None:
-            pairings_list = []
-            with open(pairings, 'r') as f:
-                for pairing in f:
-                    pairings_list.append(pairing.strip().split(","))
-
-            whitelist = filt.filter_talon_transcripts(database, annot,
-                                  dataset_pairings = pairings_list)
-        else:
-            whitelist = filt.filter_talon_transcripts(database, annot)
-        print("--------------------------------------")
-
-    # Otherwise, the whitelist will be every transcript ID in the database
-    else:
-
-        conn = sqlite3.connect(database)
-        cursor = conn.cursor()
-
-        cursor.execute("SELECT gene_ID,transcript_ID FROM transcripts")
-        whitelist = sorted(cursor.fetchall())
-
-        conn.close()
-
-    # Sort the whitelist transcript IDs
-    whitelist = [str(x[1]) for x in whitelist]
-    sorted_whitelist = sorted(whitelist)
-
-    return sorted_whitelist
-
 def create_outname(options):
     """ Creates filename for the output GTF that reflects the input options that
         were used. """
 
     outname = options.outprefix + "_talon_abundance"
-    if options.filtering == True:
+    if options.whitelist == True:
         outname = "_".join([ outname, "filtered" ])
 
     outname += ".tsv"
     return outname
 
-def fetch_dataset_list(database):
+def fetch_dataset_list(dataset_file, database):
     """ Gets a list of all datasets in the database """
 
     conn = sqlite3.connect(database)
     cursor = conn.cursor()
 
-    cursor.execute("SELECT dataset_name FROM dataset")
-    datasets = [str(x[0]) for x in cursor.fetchall()]
+    if dataset_file != None:
+        datasets = qutils.parse_datasets(dataset_file, cursor)
+    else:
+        datasets = qutils.fetch_all_datasets(cursor)
    
     conn.close()
     return datasets
@@ -166,7 +127,7 @@ def fetch_abundances(database, datasets, annot, whitelist):
         Returns a list of tuples (one tuple per transcript)
     """
 
-    datasets = fetch_dataset_list(database)
+    # datasets = fetch_dataset_list(database)
     abundance = create_abundance_dict(database, datasets)
 
     col_query = """SELECT
@@ -204,7 +165,7 @@ def fetch_abundances(database, datasets, annot, whitelist):
 
     try:
         abundance_tuples = (cursor.execute(full_query)).fetchall()
-        colnames = list(abundance_tuples[0].keys()) + datasets
+        colnames = list(abundance_tuples[0].keys()) + list(datasets)
     except Exception as e:
         print(e)
         raise RuntimeError("Something went wrong with the database query")
@@ -442,27 +403,39 @@ def main():
     database = options.database
     annot = options.annot
     build = options.build
+    observed = options.observed
+    whitelist_file = options.whitelist
+    dataset_file = options.datasets_file
     outfile = create_outname(options)
 
     check_annot_validity(annot, database)
 
-    if build == None:
-        raise ValueError("Please provide a valid genome build name")
-
+    if annot == None:
+        raise ValueError("Please provide a valid annotation name")
     check_annot_validity(annot, database)
 
     # Make sure that the input database exists!
     if not Path(database).exists():
         raise ValueError("Database file '%s' does not exist!" % database)
 
-    # Determine which transcripts to include
-    transcript_whitelist = handle_filtering(options)
+    # Determine which transcripts to include    
+    whitelist = putils.handle_filtering(database, 
+                                        annot, 
+                                        observed, 
+                                        whitelist_file, 
+                                        dataset_file)
+
+    # create transcript whitelist
+    transcript_whitelist = []
+    for key,group in itertools.groupby(whitelist,operator.itemgetter(0)):
+        for id_tuple in list(group):
+            transcript_whitelist.append(str(id_tuple[1]))
 
     # Get transcript length dict
     transcript_lengths = get_transcript_lengths(database, build)
 
     # Create the abundance file
-    datasets = datasets = fetch_dataset_list(database)
+    datasets = datasets = fetch_dataset_list(dataset_file, database)
     novelty_type = make_novelty_type_struct(database, datasets)
     abundances, colnames = fetch_abundances(database, datasets, annot, transcript_whitelist)
     prefix = fetch_naming_prefix(database)
