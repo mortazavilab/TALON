@@ -1738,10 +1738,13 @@ def identify_monoexon_transcript(chrom, positions, strand, cursor, location_dict
         
         # Add the novel transcript to the temporary monoexon table
         new_mono = ( gene_ID, transcript_ID, chrom, start, end, strand, 
-                     vertex_IDs[0], vertex_IDs[-1], edge_IDs[0] )
+                     vertex_IDs[0], vertex_IDs[-1], edge_IDs[0],
+                     min(start, end), max(start, end) )
         cols = '("gene_ID", "transcript_ID", "chromosome", "start", "end",' + \
-                 '"strand", "start_vertex", "end_vertex", "exon_ID")'
-        command = 'INSERT INTO ' + tmp_monoexon + ' ' + cols + ' VALUES ' + '(?,?,?,?,?,?,?,?,?)'
+                 '"strand", "start_vertex", "end_vertex", "exon_ID", "min_pos",
+                  "max_pos")'
+        command = 'INSERT INTO ' + tmp_monoexon + ' ' + cols + ' VALUES ' + \
+                  '(?,?,?,?,?,?,?,?,?,?,?)'
         cursor.execute(command, new_mono)
 
     # Package annotation information
@@ -2354,9 +2357,6 @@ def main():
 
     # Set globally accessible counters
     get_counters(database)
-    print("Genes: %d" % gene_counter.value())
-    print("Transcripts: %d" % transcript_counter.value())
-    print("Observed: %d" % observed_counter.value())
 
     # Initialize worker pool
     with mp.Pool(processes=threads) as pool:
@@ -2419,9 +2419,10 @@ def main():
     get_read_annotations.make_read_annot_file(database, build,  
                                               outprefix, datasets = datasets)
 
-    print("Genes: %d" % gene_counter.value())
-    print("Transcripts: %d" % transcript_counter.value())
-    print("Observed: %d" % observed_counter.value())
+    ## For debugging
+    #print("Genes: %d" % gene_counter.value())
+    #print("Transcripts: %d" % transcript_counter.value())
+    #print("Observed: %d" % observed_counter.value())
 
     ts = time.strftime("%Y-%m-%d %H:%M:%S", time.gmtime())
     print("[ %s ] DONE" % (ts))
