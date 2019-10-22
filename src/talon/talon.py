@@ -26,8 +26,6 @@ from datetime import datetime, timedelta
 import time
 from itertools import repeat,islice
 
-# TODO: Refine multigene behavior
-
 class Counter(object):
     def __init__(self, initval=0):
         self.val = mp.Value('i', initval)
@@ -76,8 +74,6 @@ def get_counters(database):
 
 def get_args():
     """ Fetches the arguments for the program """
-
-    # TODO: add option so that database gets copied instead of modified in-place
 
     program_desc = """TALON takes transcripts from one or more long read
                       datasets (SAM format) and assigns them transcript and gene 
@@ -1595,8 +1591,6 @@ def identify_monoexon_transcript(chrom, positions, strand, cursor, location_dict
                                  edge_dict, transcript_dict, vertex_2_gene,
                                  gene_starts, gene_ends, run_info, tmp_gene,
                                  tmp_monoexon):
-    # TODO: change genomic behavior
-    # TODO: clean up
     gene_novelty = []
     transcript_novelty = []
     exon_novelty = []
@@ -2156,7 +2150,7 @@ def parallel_talon(read_file, interval, database, run_info, queue):
             msg = ((run_info.outfiles.genes, str(row['gene_ID'])+"\t"+ row['strand']))
             queue.put(msg)
 
-    # TODO: move these operations to own function
+    # Pass messages to output files
     # ========================================================================
     # Write new transcripts to file
     transcripts = struct_collection.transcript_dict
