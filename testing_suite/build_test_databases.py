@@ -27,6 +27,19 @@ except Exception as e:
     sys.exit("Database initialization failed on toy artificial annotation")
 
 try:
+   subprocess.check_output(
+       ["talon_initialize_database",
+        "--f", "input_files/monoexonic_handling/monoexon.gtf",
+        "--a",  "monoexon",
+        "--5p", "99",
+        "--3p", "99",
+        "--l", "0",
+        "--g",  "monoexon", "--o", "scratch/monoexon"])
+except Exception as e:
+    print(e)
+    sys.exit("Database initialization failed on monoexon artificial annotation")
+
+try:
     subprocess.check_output(
        ["talon_initialize_database",
         "--f", "input_files/Canx_example/Canx.gtf",
@@ -89,6 +102,21 @@ try:
 except Exception as e:
     print(e)
     sys.exit("TALON run failed on toy_mod transcripts")
+
+# Actually perform the monoexon run
+try:
+    subprocess.check_output(
+       ["talon",
+        "--f", "input_files/monoexonic_handling/config.csv",
+        "--db", "scratch/monoexon.db",
+        "--build", "monoexon",
+        "--cov", "0",
+        "--identity", "0",
+        "--o", "scratch/monoexon" ])
+
+except Exception as e:
+    print(e)
+    sys.exit("TALON run failed on monoexon transcripts")
 
 # Actually perform the chr22 TALON run
 try:
