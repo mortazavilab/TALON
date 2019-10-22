@@ -1741,8 +1741,8 @@ def identify_monoexon_transcript(chrom, positions, strand, cursor, location_dict
                      vertex_IDs[0], vertex_IDs[-1], edge_IDs[0],
                      min(start, end), max(start, end) )
         cols = '("gene_ID", "transcript_ID", "chromosome", "start", "end",' + \
-                 '"strand", "start_vertex", "end_vertex", "exon_ID", "min_pos",
-                  "max_pos")'
+                 '"strand", "start_vertex", "end_vertex", "exon_ID", "min_pos",' + \
+                  '"max_pos")'
         command = 'INSERT INTO ' + tmp_monoexon + ' ' + cols + ' VALUES ' + \
                   '(?,?,?,?,?,?,?,?,?,?,?)'
         cursor.execute(command, new_mono)
