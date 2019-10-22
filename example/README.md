@@ -43,14 +43,21 @@ talon_abundance \
        --o example
 ```
 
-We can also generate a filtered abundance matrix where we require transcripts to be either a) known, or b) detected in both replicates (for transcript-level expression):
+We can also generate a filtered abundance matrix where we require transcripts to be either a) known, or b) detected in both replicates (for transcript-level expression). First, we run the TALON filtering script as follows:
+```
+talon_filter_transcripts \
+       --db example_talon.db \
+       -a gencode_v29 \
+       -p pairings.csv \
+       --o filtered_transcripts.csv
+```
+Then, we can run the abundance script, using the filtered transcript list as input.
 ```
 talon_abundance \
        --db example_talon.db \
        -a gencode_v29 \
-       --filter \
-       -p pairings.csv \
        --build hg38 \
+       --whitelist filtered_transcripts.csv \
        --o example
 ```
 
