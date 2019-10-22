@@ -15,3 +15,9 @@ Long read:                      =======================
 Ideally, we would not want this read to be assigned as an miRNA transcript
 
 ## Cases in monoexon.gtf:
+Monoexonic gene from chr1:1000-2000(+)
+Monoexonic gene from chr1:1500-1550(+)
+
+## Cases in monoexon_reads.sam
+Monoexonic transcript from chr1:1010-1909(+). This transcript overlaps both genes and has a 5' end diff of 10 bp and a 3' end diff of -91. If we run TALON with allowable 5' and 3' end differences of 99 bp at each end, then this transcript will be annotated as known.
+Monoexonic transcript from chr1:1100-1599(+). This means that it overlaps both genes, but has a 100 bp 5' end difference and a -401 bp difference at the 3' end from the larger gene. Using the same threshold as for the first transcript, the edge case behovior would be to call this transcript as genomic. 
