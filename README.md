@@ -95,7 +95,7 @@ The columns in the resulting output file are:
 
 
 ### Obtaining an abundance matrix from your TALON database
-If you would like to extract an abundance matrix for your TALON-processed datasets, use the tool *talon_create_abundance_file_from_database*.
+If you would like to extract an abundance matrix for your TALON-processed datasets, use the tool *talon_create_abundance_file_from_database*. You can provide the filtered transcript list you obtained from talon_filter_transcripts if you would like to restrict the abundance file to those transcripts.
 
 ```
 talon_abundance --h
@@ -112,20 +112,10 @@ Options:
   -b BUILD, --build=BUILD
                         Genome build to use. Note: must be in the TALON
                         database.
-  --filter              If this option is set, the transcripts in the
-                        database will be filtered prior to GTF creation
-                        (for more information, see
-                        talon_filter_transcripts)
-  -p FILE, --pairings=FILE
-                        Optional (only relevant if filter = true): A file
-                        indicating which datasets should be
-                        considered together when filtering
-                        novel transcripts (i.e. biological replicates).
-                        Format: Each line of the file constitutes a group,
-                        with member datasets separated by
-                        commas. If no file is provided, then
-                        novel transcripts appearing in any
-                        two datasets will be accepted.
+  --whitelist=FILE      Whitelist file of transcripts to include in the
+                        output. First column should be TALON gene ID,
+                        second column should be TALON transcript ID.
+                        Other columns are ignored.
   --o=FILE              Prefix for output file
 ```
 The columns in the abundance file are as follows:
