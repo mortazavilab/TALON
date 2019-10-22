@@ -7,7 +7,7 @@ works from mapped SAM files, allowing data from different sequencing platforms
 To learn more, please see our preprint in BioRxiv: https://www.biorxiv.org/content/10.1101/672931v1
 
 # Installation
-Newer version of TALON (v4.0+) are designed to be run with Python 3.7 (tested specifically with Python 3.7.2). 
+Newer version of TALON (v4.0+) are designed to be run with Python 3.6+. 
 
 To install TALON, simply download the files using Github's "Download ZIP" button, then unzip them in the directory where you would like to store the program. Alternately, you can download a specific version of the program from the Releases tab.
 
