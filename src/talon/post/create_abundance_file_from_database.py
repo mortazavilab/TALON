@@ -37,11 +37,6 @@ def getOptions():
                               second column should be TALON transcript ID",
                       metavar = "FILE", type = "string", default = None)
 
-    parser.add_option("--observed", dest ="observed", action='store_true',
-                      help = "If this option is set, the GTF file will only  \
-                      include transcripts that were observed in at least one \
-                      dataset (redundant if dataset file provided).")  
-
     parser.add_option("--build", "-b", dest = "build",
         help = "Genome build to use. Note: must be in the TALON database.",
         type = "string") 
