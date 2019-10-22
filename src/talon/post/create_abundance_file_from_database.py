@@ -328,6 +328,30 @@ def check_annot_validity(annot, database):
 
     return
 
+def check_build_validity(build, database):
+    """ Make sure that the user has entered a correct build name """
+
+    conn = sqlite3.connect(database)
+    cursor = conn.cursor()
+
+    cursor.execute("SELECT name FROM genome_build")
+    builds = [str(x[0]) for x in cursor.fetchall()]
+    conn.close()
+
+    if build == None:
+        message = "Please provide a valid genome build name. " + \
+                  "In this database, your options are: " + \
+                  ", ".join(builds)
+        raise ValueError(message)
+
+    if build not in builds:
+        message = "Build name '" + build + \
+                  "' not found in this database. Try one of the following: " + \
+                  ", ".join(builds)
+        raise ValueError(message)
+
+    return
+
 def make_novelty_type_struct(database, datasets):
     """ Create a data structure where it is possible to look up whether a gene
         or transcript belongs to a particular category of novelty"""
@@ -409,10 +433,7 @@ def main():
     outfile = create_outname(options)
 
     check_annot_validity(annot, database)
-
-    if annot == None:
-        raise ValueError("Please provide a valid annotation name")
-    check_annot_validity(annot, database)
+    check_build_validity(build, database)
 
     # Make sure that the input database exists!
     if not Path(database).exists():

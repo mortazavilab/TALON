@@ -1,6 +1,5 @@
 import pytest
 import subprocess
-
 from talon import query_utils as qutils
 
 @pytest.mark.integration
@@ -17,11 +16,7 @@ class TestPostTalonUtils(object):
 
         # Gene IDs
         assert set([x[0] for x in whitelist]) == set([5, 723, 2987]) 
-        assert set([x[1] for x in whitelist]) == set([28, 1744, 8455, 8437])
-
-    def test_GTF_integrity(self):
-        """ Try running a Bedtools command on the GTF """
-        pass
+        assert set([x[1] for x in whitelist]) == set([28, 1744, 8437, 8453])
 
     def test_validate_GTF(self):
         """ Check whether Bedtools sort runs on the GTF without crashing """

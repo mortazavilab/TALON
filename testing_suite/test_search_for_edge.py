@@ -1,8 +1,8 @@
 import pytest
 import sqlite3
-from talon import talon
+from talon import talon, init_refs
+from .helper_fns import get_db_cursor
 @pytest.mark.dbunit
-@pytest.mark.incremental
 
 class TestSearchForEdge(object):
 
@@ -14,8 +14,8 @@ class TestSearchForEdge(object):
        
         # Create a location dict and then fetch vertices for two psotions
         build = "toy_build"
-        location_dict = talon.make_location_dict(build, cursor)
-        edge_dict = talon.make_edge_dict(cursor)
+        location_dict = init_refs.make_location_dict(build, cursor)
+        edge_dict = init_refs.make_edge_dict(cursor)
         conn.close()
 
         chrom = "chr1"
@@ -35,9 +35,4 @@ class TestSearchForEdge(object):
         edge_match = talon.search_for_edge(v2, v1, "exon", edge_dict)
         assert edge_match["edge_ID"] ==  3
 
-def get_db_cursor():
-    conn = sqlite3.connect("scratch/toy.db")
-    conn.row_factory = sqlite3.Row
-    cursor = conn.cursor()
-    return conn, cursor
 

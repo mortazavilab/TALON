@@ -30,3 +30,11 @@ def get_db_cursor():
     conn.row_factory = sqlite3.Row
     cursor = conn.cursor()
     return conn, cursor
+
+def fetch_counter(cursor, category):
+    """ Get the coutner value for the provided category from the database counter
+        table """
+    
+    cursor.execute("SELECT * FROM counters WHERE category == '%s'" % (category))   
+    counter = cursor.fetchone()['count']
+    return counter

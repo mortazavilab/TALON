@@ -1,6 +1,6 @@
 import pytest
-from talon import talon
-from .helper_fns import fetch_correct_ID, get_db_cursor
+from talon import talon, init_refs
+from .helper_fns import fetch_correct_ID, get_db_cursor, fetch_counter
 @pytest.mark.integration
 
 class TestIdentifyFSM(object):
@@ -10,11 +10,13 @@ class TestIdentifyFSM(object):
         """
         conn, cursor = get_db_cursor()
         build = "toy_build"
-        edge_dict = talon.make_edge_dict(cursor)
-        location_dict = talon.make_location_dict(build, cursor)
-        run_info = talon.init_run_info(cursor, build)        
-        transcript_dict = talon.make_transcript_dict(cursor, build)
-        gene_starts, gene_ends = talon.make_gene_start_and_end_dict(cursor, build)
+        db = "scratch/toy.db"
+        talon.get_counters(db)
+        edge_dict = init_refs.make_edge_dict(cursor)
+        location_dict = init_refs.make_location_dict(build, cursor)
+        run_info = talon.init_run_info(db, build)        
+        transcript_dict = init_refs.make_transcript_dict(cursor, build)
+        gene_starts, gene_ends = init_refs.make_gene_start_and_end_dict(cursor, build)
 
         chrom = "chr1"
         positions = [1, 100, 500, 600, 900, 1010]
@@ -48,15 +50,18 @@ class TestIdentifyFSM(object):
         """
         conn, cursor = get_db_cursor()
         build = "toy_build"
-        edge_dict = talon.make_edge_dict(cursor)
-        location_dict = talon.make_location_dict(build, cursor)
-        run_info = talon.init_run_info(cursor, build)
-        transcript_dict = talon.make_transcript_dict(cursor, build)
-        orig_vertices = run_info['vertex']
-        gene_starts, gene_ends = talon.make_gene_start_and_end_dict(cursor, build)
+        db = "scratch/toy.db"
+        talon.get_counters(db)
+
+        orig_vertices = talon.vertex_counter.value()
+        edge_dict = init_refs.make_edge_dict(cursor)
+        location_dict = init_refs.make_location_dict(build, cursor)
+        run_info = talon.init_run_info(db, build)
+        transcript_dict = init_refs.make_transcript_dict(cursor, build)
+        gene_starts, gene_ends = init_refs.make_gene_start_and_end_dict(cursor, build)
 
         chrom = "chr2"
-        positions = [1, 100, 500, 600, 900, 1301] #Last postion is > 300bp away
+        positions = [1, 100, 500, 600, 900, 1301] #Last position is > 300bp away
         strand = "+"
         edge_IDs = [13, 14, 15]
         vertex_IDs = [14, 15, 16, 17] 
@@ -84,12 +89,15 @@ class TestIdentifyFSM(object):
         """
         conn, cursor = get_db_cursor()
         build = "toy_build"
-        edge_dict = talon.make_edge_dict(cursor)
-        location_dict = talon.make_location_dict(build, cursor)
-        run_info = talon.init_run_info(cursor, build)
-        transcript_dict = talon.make_transcript_dict(cursor, build)
-        orig_vertices = run_info['vertex']
-        gene_starts, gene_ends = talon.make_gene_start_and_end_dict(cursor, build)
+        db = "scratch/toy.db"
+        talon.get_counters(db)
+
+        edge_dict = init_refs.make_edge_dict(cursor)
+        location_dict = init_refs.make_location_dict(build, cursor)
+        run_info = talon.init_run_info(db, build)
+        transcript_dict = init_refs.make_transcript_dict(cursor, build)
+        orig_vertices = talon.vertex_counter.value()
+        gene_starts, gene_ends = init_refs.make_gene_start_and_end_dict(cursor, build)
 
         chrom = "chr1"
         positions = [2501, 1500, 1000, 900] #First postion is > 500bp away
@@ -120,11 +128,14 @@ class TestIdentifyFSM(object):
 
         conn, cursor = get_db_cursor()
         build = "toy_build"
-        edge_dict = talon.make_edge_dict(cursor)
-        location_dict = talon.make_location_dict(build, cursor)
-        run_info = talon.init_run_info(cursor, build)
-        transcript_dict = talon.make_transcript_dict(cursor, build)
-        gene_starts, gene_ends = talon.make_gene_start_and_end_dict(cursor, build)
+        db = "scratch/toy.db"
+        talon.get_counters(db)
+
+        edge_dict = init_refs.make_edge_dict(cursor)
+        location_dict = init_refs.make_location_dict(build, cursor)
+        run_info = talon.init_run_info(db, build)
+        transcript_dict = init_refs.make_transcript_dict(cursor, build)
+        gene_starts, gene_ends = init_refs.make_gene_start_and_end_dict(cursor, build)
 
         chrom = "chr1"
         positions = [1, 100, 500, 600] 

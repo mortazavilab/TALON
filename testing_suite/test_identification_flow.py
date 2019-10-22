@@ -1,6 +1,6 @@
 import pytest
 import sqlite3
-from talon import talon
+from talon import talon, init_refs
 from .helper_fns import fetch_correct_ID, get_db_cursor
 @pytest.mark.integration
 
@@ -11,13 +11,15 @@ class TestIdentifyFSM(object):
         """
         conn, cursor = get_db_cursor()
         build = "toy_build"
-        talon.make_temp_novel_gene_table(cursor, build)
-        edge_dict = talon.make_edge_dict(cursor)
-        location_dict = talon.make_location_dict(build, cursor)
-        run_info = talon.init_run_info(cursor, build)        
-        transcript_dict = talon.make_transcript_dict(cursor, build)
-        vertex_2_gene = talon.make_vertex_2_gene_dict(cursor)
-        gene_starts, gene_ends = talon.make_gene_start_and_end_dict(cursor, build)
+        database = "scratch/toy.db"
+        talon.get_counters(database)
+        init_refs.make_temp_novel_gene_table(cursor, build)
+        edge_dict = init_refs.make_edge_dict(cursor)
+        location_dict = init_refs.make_location_dict(build, cursor)
+        run_info = talon.init_run_info(database, build)        
+        transcript_dict = init_refs.make_transcript_dict(cursor, build)
+        vertex_2_gene = init_refs.make_vertex_2_gene_dict(cursor)
+        gene_starts, gene_ends = init_refs.make_gene_start_and_end_dict(cursor, build)
 
         chrom = "chr1"
         strand = "+"
@@ -27,7 +29,8 @@ class TestIdentifyFSM(object):
         annotation = talon.identify_transcript(chrom, positions, strand, cursor, 
                                                location_dict, edge_dict, 
                                                transcript_dict, vertex_2_gene, 
-                                               gene_starts, gene_ends, run_info)
+                                               gene_starts, gene_ends, run_info,
+                                               "temp_gene")
 
         correct_gene_ID = fetch_correct_ID("TG1", "gene", cursor) 
         correct_transcript_ID = fetch_correct_ID("TG1-001", "transcript", cursor)
@@ -42,13 +45,16 @@ class TestIdentifyFSM(object):
         """
         conn, cursor = get_db_cursor()
         build = "toy_build"
-        talon.make_temp_novel_gene_table(cursor, build)
-        edge_dict = talon.make_edge_dict(cursor)
-        location_dict = talon.make_location_dict(build, cursor)
-        run_info = talon.init_run_info(cursor, build)
-        transcript_dict = talon.make_transcript_dict(cursor, build)
-        vertex_2_gene = talon.make_vertex_2_gene_dict(cursor)
-        gene_starts, gene_ends = talon.make_gene_start_and_end_dict(cursor, build)
+        database = "scratch/toy.db"
+        talon.get_counters(database)
+
+        init_refs.make_temp_novel_gene_table(cursor, build)
+        edge_dict = init_refs.make_edge_dict(cursor)
+        location_dict = init_refs.make_location_dict(build, cursor)
+        run_info = talon.init_run_info(database, build)
+        transcript_dict = init_refs.make_transcript_dict(cursor, build)
+        vertex_2_gene = init_refs.make_vertex_2_gene_dict(cursor)
+        gene_starts, gene_ends = init_refs.make_gene_start_and_end_dict(cursor, build)
 
         chrom = "chr2"
         strand = "+"
@@ -58,7 +64,8 @@ class TestIdentifyFSM(object):
         annotation = talon.identify_transcript(chrom, positions, strand, cursor,
                                                location_dict, edge_dict,
                                                transcript_dict, vertex_2_gene,
-                                               gene_starts, gene_ends, run_info)
+                                               gene_starts, gene_ends, run_info,
+                                               "temp_gene")
 
         correct_gene_ID = fetch_correct_ID("TG2", "gene", cursor)
         novelty_types = [ x[-2] for x in annotation['transcript_novelty']]
@@ -71,13 +78,16 @@ class TestIdentifyFSM(object):
             account of having known starts and ends """
         conn, cursor = get_db_cursor()
         build = "toy_build"
-        talon.make_temp_novel_gene_table(cursor, build)
-        edge_dict = talon.make_edge_dict(cursor)
-        location_dict = talon.make_location_dict(build, cursor)
-        run_info = talon.init_run_info(cursor, build)
-        transcript_dict = talon.make_transcript_dict(cursor, build)
-        vertex_2_gene = talon.make_vertex_2_gene_dict(cursor)
-        gene_starts, gene_ends = talon.make_gene_start_and_end_dict(cursor, build)
+        database = "scratch/toy.db"
+        talon.get_counters(database)
+
+        init_refs.make_temp_novel_gene_table(cursor, build)
+        edge_dict = init_refs.make_edge_dict(cursor)
+        location_dict = init_refs.make_location_dict(build, cursor)
+        run_info = talon.init_run_info(database, build)
+        transcript_dict = init_refs.make_transcript_dict(cursor, build)
+        vertex_2_gene = init_refs.make_vertex_2_gene_dict(cursor)
+        gene_starts, gene_ends = init_refs.make_gene_start_and_end_dict(cursor, build)
 
         chrom = "chr3"
         strand = "+"
@@ -86,7 +96,8 @@ class TestIdentifyFSM(object):
         annotation = talon.identify_transcript(chrom, positions, strand, cursor,
                                                location_dict, edge_dict,
                                                transcript_dict, vertex_2_gene,
-                                               gene_starts, gene_ends, run_info) 
+                                               gene_starts, gene_ends, run_info,
+                                               "tmp_gene") 
 
         correct_gene_ID = fetch_correct_ID("TG5", "gene", cursor)
         novelty_types = [ x[-2] for x in annotation['transcript_novelty']]
@@ -99,13 +110,16 @@ class TestIdentifyFSM(object):
         """
         conn, cursor = get_db_cursor()
         build = "toy_build"
-        talon.make_temp_novel_gene_table(cursor, build)
-        edge_dict = talon.make_edge_dict(cursor)
-        location_dict = talon.make_location_dict(build, cursor)
-        run_info = talon.init_run_info(cursor, build)
-        transcript_dict = talon.make_transcript_dict(cursor, build)
-        vertex_2_gene = talon.make_vertex_2_gene_dict(cursor)
-        gene_starts, gene_ends = talon.make_gene_start_and_end_dict(cursor, build)
+        database = "scratch/toy.db"
+        talon.get_counters(database)
+
+        init_refs.make_temp_novel_gene_table(cursor, build)
+        edge_dict = init_refs.make_edge_dict(cursor)
+        location_dict = init_refs.make_location_dict(build, cursor)
+        run_info = talon.init_run_info(database, build)
+        transcript_dict = init_refs.make_transcript_dict(cursor, build)
+        vertex_2_gene = init_refs.make_vertex_2_gene_dict(cursor)
+        gene_starts, gene_ends = init_refs.make_gene_start_and_end_dict(cursor, build)
 
         chrom = "chr1"
         strand = "+"
@@ -114,7 +128,8 @@ class TestIdentifyFSM(object):
         annotation = talon.identify_transcript(chrom, positions, strand, cursor,
                                                location_dict, edge_dict,
                                                transcript_dict, vertex_2_gene,
-                                               gene_starts, gene_ends, run_info)
+                                               gene_starts, gene_ends, run_info,
+                                               "temp_gene")
 
         correct_gene_ID = fetch_correct_ID("TG1", "gene", cursor)
         novelty_types = [ x[-2] for x in annotation['transcript_novelty']]
@@ -129,13 +144,16 @@ class TestIdentifyFSM(object):
         """
         conn, cursor = get_db_cursor()
         build = "toy_build"
-        talon.make_temp_novel_gene_table(cursor, build)
-        edge_dict = talon.make_edge_dict(cursor)
-        location_dict = talon.make_location_dict(build, cursor)
-        run_info = talon.init_run_info(cursor, build)
-        transcript_dict = talon.make_transcript_dict(cursor, build)
-        vertex_2_gene = talon.make_vertex_2_gene_dict(cursor)
-        gene_starts, gene_ends = talon.make_gene_start_and_end_dict(cursor, build)
+        database = "scratch/toy.db"
+        talon.get_counters(database)
+
+        init_refs.make_temp_novel_gene_table(cursor, build)
+        edge_dict = init_refs.make_edge_dict(cursor)
+        location_dict = init_refs.make_location_dict(build, cursor)
+        run_info = talon.init_run_info(database, build)
+        transcript_dict = init_refs.make_transcript_dict(cursor, build)
+        vertex_2_gene = init_refs.make_vertex_2_gene_dict(cursor)
+        gene_starts, gene_ends = init_refs.make_gene_start_and_end_dict(cursor, build)
 
         chrom = "chr1"
         strand = "+"
@@ -144,7 +162,7 @@ class TestIdentifyFSM(object):
         annotation = talon.identify_transcript(chrom, positions, strand, cursor,
                                                location_dict, edge_dict,
                                                transcript_dict, vertex_2_gene,
-                                               gene_starts, gene_ends, run_info)
+                                               gene_starts, gene_ends, run_info, "temp_gene")
 
         correct_gene_ID = fetch_correct_ID("TG1", "gene", cursor)
         novelty_types = [ x[-2] for x in annotation['transcript_novelty']]
@@ -159,14 +177,17 @@ class TestIdentifyFSM(object):
         """
         conn, cursor = get_db_cursor()
         build = "toy_build"
-        talon.make_temp_novel_gene_table(cursor, build)
-        talon.make_temp_monoexonic_transcript_table(cursor, build)
-        edge_dict = talon.make_edge_dict(cursor)
-        location_dict = talon.make_location_dict(build, cursor)
-        run_info = talon.init_run_info(cursor, build)
-        transcript_dict = talon.make_transcript_dict(cursor, build)
-        vertex_2_gene = talon.make_vertex_2_gene_dict(cursor)
-        gene_starts, gene_ends = talon.make_gene_start_and_end_dict(cursor,build)
+        database = "scratch/toy.db"
+        talon.get_counters(database)
+
+        init_refs.make_temp_novel_gene_table(cursor, build)
+        init_refs.make_temp_monoexonic_transcript_table(cursor, build)
+        edge_dict = init_refs.make_edge_dict(cursor)
+        location_dict = init_refs.make_location_dict(build, cursor)
+        run_info = talon.init_run_info(database, build)
+        transcript_dict = init_refs.make_transcript_dict(cursor, build)
+        vertex_2_gene = init_refs.make_vertex_2_gene_dict(cursor)
+        gene_starts, gene_ends = init_refs.make_gene_start_and_end_dict(cursor,build)
 
         chrom = "chr1"
         strand = "+"
@@ -175,7 +196,7 @@ class TestIdentifyFSM(object):
         annotation = talon.identify_monoexon_transcript(chrom, positions, strand, cursor,
                                                location_dict, edge_dict,
                                                transcript_dict, vertex_2_gene,
-                                               gene_starts, gene_ends, run_info)
+                                               gene_starts, gene_ends, run_info, "temp_gene", "temp_monoexon")
 
         correct_gene_ID = fetch_correct_ID("TG1", "gene", cursor)
         novelty_types = [ x[-2] for x in annotation['transcript_novelty']]
@@ -189,13 +210,16 @@ class TestIdentifyFSM(object):
         """
         conn, cursor = get_db_cursor()
         build = "toy_build"
-        talon.make_temp_novel_gene_table(cursor, build)
-        edge_dict = talon.make_edge_dict(cursor)
-        location_dict = talon.make_location_dict(build, cursor)
-        run_info = talon.init_run_info(cursor, build)
-        transcript_dict = talon.make_transcript_dict(cursor, build)
-        vertex_2_gene = talon.make_vertex_2_gene_dict(cursor)
-        gene_starts, gene_ends = talon.make_gene_start_and_end_dict(cursor, build)
+        database = "scratch/toy.db"
+        talon.get_counters(database)
+
+        init_refs.make_temp_novel_gene_table(cursor, build)
+        edge_dict = init_refs.make_edge_dict(cursor)
+        location_dict = init_refs.make_location_dict(build, cursor)
+        run_info = talon.init_run_info(database, build)
+        transcript_dict = init_refs.make_transcript_dict(cursor, build)
+        vertex_2_gene = init_refs.make_vertex_2_gene_dict(cursor)
+        gene_starts, gene_ends = init_refs.make_gene_start_and_end_dict(cursor, build)
 
         chrom = "chr1"
         strand = "+"
@@ -204,7 +228,7 @@ class TestIdentifyFSM(object):
         annotation = talon.identify_transcript(chrom, positions, strand, cursor,
                                                location_dict, edge_dict,
                                                transcript_dict, vertex_2_gene,
-                                               gene_starts, gene_ends, run_info)
+                                               gene_starts, gene_ends, run_info, "temp_gene")
 
         correct_gene_ID = fetch_correct_ID("TG1", "gene", cursor)
         novelty_types = [ x[-2] for x in annotation['transcript_novelty']]
@@ -219,13 +243,16 @@ class TestIdentifyFSM(object):
         """
         conn, cursor = get_db_cursor()
         build = "toy_build"
-        talon.make_temp_novel_gene_table(cursor, build)
-        edge_dict = talon.make_edge_dict(cursor)
-        location_dict = talon.make_location_dict(build, cursor)
-        run_info = talon.init_run_info(cursor, build)
-        transcript_dict = talon.make_transcript_dict(cursor, build)
-        vertex_2_gene = talon.make_vertex_2_gene_dict(cursor)
-        gene_starts, gene_ends = talon.make_gene_start_and_end_dict(cursor, build)
+        database = "scratch/toy.db"
+        talon.get_counters(database) 
+
+        init_refs.make_temp_novel_gene_table(cursor, build)
+        edge_dict = init_refs.make_edge_dict(cursor)
+        location_dict = init_refs.make_location_dict(build, cursor)
+        run_info = talon.init_run_info(database, build)
+        transcript_dict = init_refs.make_transcript_dict(cursor, build)
+        vertex_2_gene = init_refs.make_vertex_2_gene_dict(cursor)
+        gene_starts, gene_ends = init_refs.make_gene_start_and_end_dict(cursor, build)
 
         chrom = "chr1"
         strand = "+"
@@ -234,7 +261,7 @@ class TestIdentifyFSM(object):
         annotation = talon.identify_transcript(chrom, positions, strand, cursor,
                                                location_dict, edge_dict,
                                                transcript_dict, vertex_2_gene,
-                                               gene_starts, gene_ends, run_info)
+                                               gene_starts, gene_ends, run_info, "temp_gene")
 
         correct_gene_ID = fetch_correct_ID("TG1", "gene", cursor)
         novelty_types = [ x[-2] for x in annotation['transcript_novelty']]
@@ -248,13 +275,16 @@ class TestIdentifyFSM(object):
         """
         conn, cursor = get_db_cursor()
         build = "toy_build"
-        talon.make_temp_novel_gene_table(cursor, build)
-        edge_dict = talon.make_edge_dict(cursor)
-        location_dict = talon.make_location_dict(build, cursor)
-        run_info = talon.init_run_info(cursor, build)
-        transcript_dict = talon.make_transcript_dict(cursor, build)
-        vertex_2_gene = talon.make_vertex_2_gene_dict(cursor)
-        gene_starts, gene_ends = talon.make_gene_start_and_end_dict(cursor, build)
+        database = "scratch/toy.db"
+        talon.get_counters(database)
+
+        init_refs.make_temp_novel_gene_table(cursor, build)
+        edge_dict = init_refs.make_edge_dict(cursor)
+        location_dict = init_refs.make_location_dict(build, cursor)
+        run_info = talon.init_run_info(database, build)
+        transcript_dict = init_refs.make_transcript_dict(cursor, build)
+        vertex_2_gene = init_refs.make_vertex_2_gene_dict(cursor)
+        gene_starts, gene_ends = init_refs.make_gene_start_and_end_dict(cursor, build)
 
         chrom = "chr2"
         strand = "-"
@@ -263,7 +293,7 @@ class TestIdentifyFSM(object):
         annotation = talon.identify_transcript(chrom, positions, strand, cursor,
                                                location_dict, edge_dict,
                                                transcript_dict, vertex_2_gene,
-                                               gene_starts, gene_ends, run_info)
+                                               gene_starts, gene_ends, run_info, "temp_gene")
 
         anti_gene_ID = fetch_correct_ID("TG2", "gene", cursor)
         gene_novelty_types = [ x[-2] for x in annotation['gene_novelty']]
@@ -278,14 +308,17 @@ class TestIdentifyFSM(object):
         """ Monoexonic fragment that overlaps gene 1 """
         conn, cursor = get_db_cursor()
         build = "toy_build"
-        talon.make_temp_novel_gene_table(cursor, build)
-        talon.make_temp_monoexonic_transcript_table(cursor, build)
-        edge_dict = talon.make_edge_dict(cursor)
-        location_dict = talon.make_location_dict(build, cursor)
-        run_info = talon.init_run_info(cursor, build)
-        transcript_dict = talon.make_transcript_dict(cursor, build)
-        vertex_2_gene = talon.make_vertex_2_gene_dict(cursor)
-        gene_starts, gene_ends = talon.make_gene_start_and_end_dict(cursor, build)
+        database = "scratch/toy.db"
+        talon.get_counters(database)
+
+        init_refs.make_temp_novel_gene_table(cursor, build)
+        init_refs.make_temp_monoexonic_transcript_table(cursor, build)
+        edge_dict = init_refs.make_edge_dict(cursor)
+        location_dict = init_refs.make_location_dict(build, cursor)
+        run_info = talon.init_run_info(database, build)
+        transcript_dict = init_refs.make_transcript_dict(cursor, build)
+        vertex_2_gene = init_refs.make_vertex_2_gene_dict(cursor)
+        gene_starts, gene_ends = init_refs.make_gene_start_and_end_dict(cursor, build)
 
         chrom = "chr1"
         strand = "+"
@@ -294,7 +327,7 @@ class TestIdentifyFSM(object):
         annotation = talon.identify_monoexon_transcript(chrom, positions, strand, cursor,
                                                location_dict, edge_dict,
                                                transcript_dict, vertex_2_gene,
-                                               gene_starts, gene_ends, run_info)
+                                               gene_starts, gene_ends, run_info, "temp_gene", "temp_monoexon")
 
         correct_gene_ID = fetch_correct_ID("TG1", "gene", cursor)
         novelty_types = [ x[-2] for x in annotation['transcript_novelty']]
@@ -307,17 +340,19 @@ class TestIdentifyFSM(object):
         """ Test case derived from a real mouse Map2k4 read. All of edges are
             known (except 3'), yet the read is NIC not FSM/ISM """
 
-        conn = sqlite3.connect("scratch/Map2k4.db")
+        database = "scratch/Map2k4.db"
+        talon.get_counters(database)
+        conn = sqlite3.connect(database)
         conn.row_factory = sqlite3.Row
         cursor = conn.cursor()        
         build = "mm10"
-        talon.make_temp_novel_gene_table(cursor, build)
-        edge_dict = talon.make_edge_dict(cursor)
-        location_dict = talon.make_location_dict(build, cursor)
-        run_info = talon.init_run_info(cursor, build)
-        transcript_dict = talon.make_transcript_dict(cursor, build)
-        vertex_2_gene = talon.make_vertex_2_gene_dict(cursor)
-        gene_starts, gene_ends = talon.make_gene_start_and_end_dict(cursor, build)
+        init_refs.make_temp_novel_gene_table(cursor, build)
+        edge_dict = init_refs.make_edge_dict(cursor)
+        location_dict = init_refs.make_location_dict(build, cursor)
+        run_info = talon.init_run_info(database, build)
+        transcript_dict = init_refs.make_transcript_dict(cursor, build)
+        vertex_2_gene = init_refs.make_vertex_2_gene_dict(cursor)
+        gene_starts, gene_ends = init_refs.make_gene_start_and_end_dict(cursor, build)
 
         chrom = "chr11"
         strand = "-"
@@ -326,7 +361,7 @@ class TestIdentifyFSM(object):
         annotation = talon.identify_transcript(chrom, positions, strand, cursor,
                                                location_dict, edge_dict,
                                                transcript_dict, vertex_2_gene,
-                                               gene_starts, gene_ends, run_info)
+                                               gene_starts, gene_ends, run_info, "temp_gene")
 
         assert annotation['gene_ID'] == 1
         assert annotation['transcript_ID'] == 8
@@ -334,12 +369,4 @@ class TestIdentifyFSM(object):
         assert "NIC_transcript" in novelty_types
 
         conn.close()
-
-
-
-
-
-
-
-
 

@@ -1,5 +1,7 @@
 import pytest
+import os
 from talon import talon
+from talon import init_refs
 from .helper_fns import get_db_cursor
 @pytest.mark.dbunit
 
@@ -10,8 +12,6 @@ class TestDatabaseUpdates(object):
         """
         conn, cursor = get_db_cursor()
         build = "toy_build"
-        edge_dict = talon.make_edge_dict(cursor)
-        run_info = talon.init_run_info(cursor, build)
 
         abundance = [ ( 1, "test", 5),
                       ( 2, "test", 1),
@@ -29,8 +29,6 @@ class TestDatabaseUpdates(object):
         """ Try to add dataset metadata to database """
         conn, cursor = get_db_cursor()
         build = "toy_build"
-        edge_dict = talon.make_edge_dict(cursor)
-        run_info = talon.init_run_info(cursor, build)
 
         datasets = [ ( 1, "toy", "toy", "toy") ]
         talon.add_datasets(cursor, datasets)
@@ -46,19 +44,33 @@ class TestDatabaseUpdates(object):
         """
         conn, cursor = get_db_cursor()
         build = "toy_build"
-        edge_dict = talon.make_edge_dict(cursor)
-        run_info = talon.init_run_info(cursor, build)
 
         observed = [ ( 1, 1, 1, "read1", "test", 1, 2, 1, 1, 0, 0, 100),
                      ( 2, 1, 1, "read2", "test", 1, 2, 1, 1, 0, 0, 100),
-                     ( 3, 1, 1, "read3", "test", 1, 2, 1, 1, 0, 0, 100) ]
+                     ( 3, 1, 1, "read3", "test", 1, 2, 1, 1, 0, 0, 100),
+                     ( 4, 1, 8, "read4", "test", 35, 36, 32, 32,  None, None, 100) ]
+
+        # Write observed to file
+        os.system("mkdir -p scratch/db_updates/")
+        with open("scratch/db_updates/observed.tsv", 'w') as f:
+            for obs in observed:
+                f.write("\t".join([str(x) for x in obs]) + "\n")
+                
+
         batch_size = 1
-        talon.batch_add_observed(cursor, observed, batch_size)
+        talon.batch_add_observed(cursor, "scratch/db_updates/observed.tsv", batch_size)
 
         # Test if items are there
         query = "SELECT * FROM observed"
         cursor.execute(query)
-        assert len(cursor.fetchall()) == 3
+        results = cursor.fetchall()
+        assert len(results) == 4
+
+        # Test that the 'None' values are properly recorded
+        for transcript in results:
+            if transcript['read_name'] == "read4":
+                assert transcript['start_delta'] == None
+                assert transcript['end_delta'] == None
         conn.close()
 
     def test_gene_annot(self):
@@ -66,13 +78,19 @@ class TestDatabaseUpdates(object):
         """
         conn, cursor = get_db_cursor()
         build = "toy_build"
-        edge_dict = talon.make_edge_dict(cursor)
-        run_info = talon.init_run_info(cursor, build)
 
         annot = [ ( 1, "toy", "TALON", "status", "NOVEL"),
                   ( 2, "toy", "TALON", "status", "NOVEL") ]
+
+        # Write observed to file
+        os.system("mkdir -p scratch/db_updates/")
+        with open("scratch/db_updates/gene_annot.tsv", 'w') as f:
+            for entry in annot:
+                f.write("\t".join([str(x) for x in entry]) + "\n")
+
         batch_size = 1
-        talon.batch_add_annotations(cursor, annot, "gene", batch_size)
+        talon.batch_add_annotations(cursor, "scratch/db_updates/gene_annot.tsv", 
+                                    "gene", batch_size)
 
         # Test if items are there
         query = "SELECT * FROM gene_annotations WHERE value = 'NOVEL'"
@@ -85,13 +103,19 @@ class TestDatabaseUpdates(object):
         """
         conn, cursor = get_db_cursor()
         build = "toy_build"
-        edge_dict = talon.make_edge_dict(cursor)
-        run_info = talon.init_run_info(cursor, build)
 
         annot = [ ( 1, "toy", "TALON", "status", "NOVEL"),
                   ( 2, "toy", "TALON", "status", "NOVEL") ]
+
+        # Write to file
+        os.system("mkdir -p scratch/db_updates/")
+        with open("scratch/db_updates/transcript_annot.tsv", 'w') as f:
+            for entry in annot:
+                f.write("\t".join([str(x) for x in entry]) + "\n")
+
         batch_size = 2
-        talon.batch_add_annotations(cursor, annot, "transcript", batch_size)
+        talon.batch_add_annotations(cursor, "scratch/db_updates/transcript_annot.tsv", 
+                                    "transcript", batch_size)
 
         # Test if items are there
         query = "SELECT * FROM transcript_annotations WHERE value = 'NOVEL'"
@@ -104,13 +128,19 @@ class TestDatabaseUpdates(object):
         """
         conn, cursor = get_db_cursor()
         build = "toy_build"
-        edge_dict = talon.make_edge_dict(cursor)
-        run_info = talon.init_run_info(cursor, build)
 
         annot = [ ( 1, "toy", "TALON", "status", "NOVEL"),
                   ( 2, "toy", "TALON", "status", "NOVEL") ]
+
+        # Write to file
+        os.system("mkdir -p scratch/db_updates/")
+        with open("scratch/db_updates/exon_annot.tsv", 'w') as f:
+            for entry in annot:
+                f.write("\t".join([str(x) for x in entry]) + "\n")
+
         batch_size = 3
-        talon.batch_add_annotations(cursor, annot, "exon", batch_size)
+        talon.batch_add_annotations(cursor, "scratch/db_updates/exon_annot.tsv", 
+                                    "exon", batch_size)
 
         # Test if items are there
         query = "SELECT * FROM exon_annotations WHERE value = 'NOVEL'"
@@ -123,12 +153,21 @@ class TestDatabaseUpdates(object):
         """
         conn, cursor = get_db_cursor()
         build = "toy_build"
-        edge_dict = talon.make_edge_dict(cursor)
-        run_info = talon.init_run_info(cursor, build)
-        talon.make_temp_novel_gene_table(cursor, build)
-        talon.create_gene("chr4", 1, 1000, "+", cursor, run_info)
+        database = "scratch/toy.db"
+        run_info = talon.init_run_info(database, build)
+        talon.get_counters(database)
 
-        talon.add_genes(cursor)
+        init_refs.make_temp_novel_gene_table(cursor, build)
+        talon.create_gene("chr4", 1, 1000, "+", cursor, "temp_gene")
+
+        # Write to file
+        os.system("mkdir -p scratch/db_updates/")
+        with open("scratch/db_updates/genes.tsv", 'w') as f:
+            cursor.execute("SELECT gene_ID, strand FROM temp_gene")
+            for entry in cursor.fetchall():
+                f.write("\t".join([str(x) for x in entry]) + "\n")
+
+        talon.batch_add_genes(cursor, "scratch/db_updates/genes.tsv", 10)
 
         # Test if gene with ID 6 is there, but make sure we didn't add 
         # duplicates of the other genes
@@ -144,35 +183,69 @@ class TestDatabaseUpdates(object):
         """
         conn, cursor = get_db_cursor()
         build = "toy_build"
-        edge_dict = talon.make_edge_dict(cursor)
-        run_info = talon.init_run_info(cursor, build)
-        transcript_dict = talon.make_transcript_dict(cursor, build)
-        talon.create_transcript( "chr1", 1, 1000, 1, (1,2,3), (1,2,3,4), transcript_dict, run_info)
+        transcript_dict = init_refs.make_transcript_dict(cursor, build)
+        database = "scratch/toy.db"
+        talon.get_counters(database)
+        talon.create_transcript("chr1", 1, 1000, 1, (1,), (1,2), transcript_dict)
+
+        # Write to file
+        os.system("mkdir -p scratch/db_updates/")
+        with open("scratch/db_updates/transcripts.tsv", 'w') as f:
+            for transcript in transcript_dict.values():
+                if type(transcript) is dict:
+                    entry = "\t".join([ str(x) for x in ( transcript['transcript_ID'],
+                                                          transcript['gene_ID'],
+                                                          transcript['start_exon'],
+                                                          transcript['jn_path'],
+                                                          transcript['end_exon'],
+                                                          transcript['start_vertex'],
+                                                          transcript['end_vertex'],
+                                                          transcript['n_exons'] ) ])
+                    f.write(entry + "\n")
 
         batch_size = 5
-        talon.batch_add_transcripts(cursor, transcript_dict, batch_size)
+        talon.batch_add_transcripts(cursor, "scratch/db_updates/transcripts.tsv", batch_size)
 
-        # Test if transcript with ID 7 is there, but make sure we didn't add
+        # Test if transcript with ID 8 is there, but make sure we didn't add
         # duplicates of the others
         query = "SELECT * FROM transcripts"
         cursor.execute(query)
-        transcript_IDs = [ x['transcript_ID'] for x in cursor.fetchall()]
+        transcripts = cursor.fetchall()
+        transcript_IDs = [ x['transcript_ID'] for x in transcripts]
         assert 8 in transcript_IDs
         assert len(transcript_IDs) == 8
+
+        # Test if None value was handled correctly
+        for transcript in transcripts:
+            if transcript['transcript_ID'] == 8:
+                assert transcript['jn_path'] == None
+
         conn.close()
 
     def test_edge_update(self):
         """ Try to add novel exons and introns. """
         conn, cursor = get_db_cursor()
         build = "toy_build"
-        edge_dict = talon.make_edge_dict(cursor)
-        run_info = talon.init_run_info(cursor, build)
-        orig_n_edges = run_info.edge
+        database = "scratch/toy.db"
+        talon.get_counters(database)
+        edge_dict = init_refs.make_edge_dict(cursor)
+        run_info = talon.init_run_info(database, build)
+        orig_n_edges = talon.edge_counter.value()
 
-        talon.create_edge(2, 1, "exon", "-", edge_dict, run_info)
+        talon.create_edge(2, 1, "exon", "-", edge_dict)
+
+        # Write to file
+        os.system("mkdir -p scratch/db_updates/")
+        with open("scratch/db_updates/edges.tsv", 'w') as f:
+            for edge in list(edge_dict.values()):
+                if type(edge) is dict:
+                    entry = "\t".join([str(x) for x in [edge['edge_ID'], edge['v1'],
+                                                        edge['v2'], edge['edge_type'],
+                                                        edge['strand']]] )
+                    f.write(entry + "\n")
 
         batch_size = 10
-        talon.batch_add_edges(cursor, edge_dict, batch_size)
+        talon.batch_add_edges(cursor, "scratch/db_updates/edges.tsv", batch_size)
         
         # Test if the edge table has the correct number of edges now
         query = "SELECT * FROM edge"
@@ -186,14 +259,28 @@ class TestDatabaseUpdates(object):
         """ Update locations """
         conn, cursor = get_db_cursor()
         build = "toy_build"
-        location_dict = talon.make_location_dict(build, cursor)
-        run_info = talon.init_run_info(cursor, build)
-        orig_n_pos = run_info.vertex
+        database = "scratch/toy.db"
+        talon.get_counters(database)
+        location_dict = init_refs.make_location_dict(build, cursor)
+        run_info = talon.init_run_info(database, build)
+        orig_n_pos = talon.vertex_counter.value()
 
-        talon.create_vertex("chr4", 2000, run_info, location_dict)
+        talon.create_vertex("chr4", 2000, location_dict, run_info)
+   
+        # Write to file
+        os.system("mkdir -p scratch/db_updates/")
+        with open("scratch/db_updates/loc.tsv", 'w') as f:
+            for chrom_dict in location_dict.values():
+                for loc in list(chrom_dict.values()):
+                    if type(loc) is dict:
+                        entry = ("\t".join([ str(x) for x in (loc['location_ID'],
+                                                            loc['genome_build'],
+                                                            loc['chromosome'],
+                                                            loc['position'])]))
+                        f.write(entry + "\n")
 
         batch_size = 10
-        talon.batch_add_locations(cursor, location_dict, batch_size)
+        talon.batch_add_locations(cursor,"scratch/db_updates/loc.tsv" , batch_size)
 
         # Test if the table has the correct number of locations now
         query = "SELECT * FROM location"
@@ -207,14 +294,21 @@ class TestDatabaseUpdates(object):
         """ Update vertex to gene relationships """
         conn, cursor = get_db_cursor()
         build = "toy_build"
-        vertex_2_gene = talon.make_vertex_2_gene_dict(cursor)
-        # Pretend that vertex 1 and 2 can now belong to gene 2 as well as 1
+        vertex_2_gene = init_refs.make_vertex_2_gene_dict(cursor)
+
         talon.update_vertex_2_gene(2, (1,2), "-", vertex_2_gene) 
-        # Add redundant assignments
         talon.update_vertex_2_gene(1, (1,2,3,4,5,6), "+", vertex_2_gene)
 
+        # Write to file
+        os.system("mkdir -p scratch/db_updates/")
+        with open("scratch/db_updates/v2g.tsv", 'w') as f: 
+            for vertex_ID, gene_set in vertex_2_gene.items():
+                for gene in gene_set:
+                    entry = "\t".join([ str(x) for x in (vertex_ID, gene[0])])
+                    f.write(entry + "\n")
+
         batch_size = 100
-        talon.batch_add_vertex2gene(cursor, vertex_2_gene, batch_size)
+        talon.batch_add_vertex2gene(cursor, "scratch/db_updates/v2g.tsv", batch_size)
 
         # Use queries to check if the insert worked as expected
         query = "SELECT * FROM vertex WHERE vertex_ID = '1'"
@@ -231,26 +325,38 @@ class TestDatabaseUpdates(object):
         """ Update counters """
         conn, cursor = get_db_cursor()
         build = "toy_build"
-        run_info = talon.init_run_info(cursor, build)
+        database = "scratch/toy.db"
+
+        talon.get_counters(database)
 
         # Change the counter values to some arbitrary numbers
-        run_info.genes = 10
-        run_info.transcripts = 20
-        run_info.edge = 2000
-        run_info.vertex = 10000
-        run_info.dataset = 30
-        run_info.observed = 400
+        for i in range(10): talon.gene_counter.increment()
+        for i in range(20): talon.transcript_counter.increment()
+        for i in range(2): talon.edge_counter.increment()
+        for i in range(5): talon.vertex_counter.increment()
+        n_datasets = 30
+        for i in range(6): talon.observed_counter.increment()
 
         # Now try the update
-        talon.update_counter(cursor, run_info)
-        run_info = None
+        talon.update_counter(cursor, n_datasets)
 
         # Check results with queries
-        run_info_2 = talon.init_run_info(cursor, build)
-        assert run_info_2.genes == 10
-        assert run_info_2.transcripts == 20
-        assert run_info_2.edge == 2000
-        assert run_info_2.vertex == 10000
-        assert run_info_2.dataset == 30
-        assert run_info_2.observed == 400
+        cursor.execute("""SELECT * FROM counters""")
+        for category,value in cursor.fetchall():
+            if category == "genes":
+                assert value == 16
+            elif category == "transcripts":
+                assert value == 27
+            elif category == "edge":
+                assert value == 33
+            elif category == "vertex":
+                assert value == 39
+            elif category == "observed":
+                assert value == 6
+            elif category == "dataset":
+                assert value == 30
+            else:
+                if category != "genome_build":
+                    pytest.fail("Unexpected entry in counters table")
 
+        conn.close()

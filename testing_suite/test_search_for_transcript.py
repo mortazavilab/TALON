@@ -1,5 +1,6 @@
 import pytest
 from talon import talon
+from talon import init_refs
 from .helper_fns import fetch_correct_ID, get_db_cursor
 @pytest.mark.dbunit
 
@@ -11,12 +12,11 @@ class TestSearchForTranscript(object):
         """
         conn, cursor = get_db_cursor()
         build = "toy_build"
-        transcript_dict = talon.make_transcript_dict(cursor, build)
+        transcript_dict = init_refs.make_transcript_dict(cursor, build)
         conn.close()
 
         edges = frozenset({ 1, 3, 4, 5 })
-        gene_ID, transcript = talon.search_for_transcript(edges, 
-                                                             transcript_dict)
+        gene_ID, transcript = talon.search_for_transcript(edges, transcript_dict)
 
         # Make sure that no match got returned
         assert gene_ID == None
@@ -28,11 +28,10 @@ class TestSearchForTranscript(object):
         """
         conn, cursor = get_db_cursor()
         build = "toy_build"
-        transcript_dict = talon.make_transcript_dict(cursor, build)
+        transcript_dict = init_refs.make_transcript_dict(cursor, build)
 
         edges = frozenset({ 12, 13, 14, 15, 16 })
-        gene_ID, transcript = talon.search_for_transcript(edges,
-                                                             transcript_dict)
+        gene_ID, transcript = talon.search_for_transcript(edges, transcript_dict)
 
         # Make sure that correct match got returned
         correct_gene_ID = fetch_correct_ID("TG2", "gene", cursor)

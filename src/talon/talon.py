@@ -4,21 +4,73 @@
 # This program takes transcripts from one or more samples (SAM format) and
 # assigns them transcript and gene identifiers based on a GTF annotation.
 # Novel transcripts are assigned new identifiers.
-
-import cProfile
 import argparse
 from functools import reduce
 import sqlite3
 import sys
-from . import dstruct
 import operator
-#import os
+import os
 from pathlib import Path
 import warnings
+from . import dstruct
+from . import process_sams as procsams
 from . import transcript_utils as tutils
 from . import query_utils as qutils
-
+from . import init_refs as init_refs
+from talon.post import get_read_annotations
 import pysam
+from string import Template
+import multiprocessing as mp
+import queue
+from datetime import datetime, timedelta
+import time
+from itertools import repeat,islice
+
+class Counter(object):
+    def __init__(self, initval=0):
+        self.val = mp.Value('i', initval)
+        self.lock = mp.Lock()
+
+    def increment(self):
+        with self.lock:
+            self.val.value += 1
+            return self.val.value
+ 
+    def value(self):
+        with self.lock:
+            return self.val.value
+
+def get_counters(database):
+    """ Fetch counter values from the database and create counter objects 
+        that will be accessible to all of the threads during the parallel run
+    """
+
+    with sqlite3.connect(database) as conn:
+        conn.row_factory = sqlite3.Row
+        cursor = conn.cursor()
+
+        # Fetch counter values
+        cursor.execute("SELECT * FROM counters WHERE category == 'genes'")
+        global gene_counter
+        gene_counter = Counter(initval = cursor.fetchone()['count'])
+
+        cursor.execute("SELECT * FROM counters WHERE category == 'transcripts'")
+        global transcript_counter
+        transcript_counter = Counter(initval = cursor.fetchone()['count'])
+
+        cursor.execute("SELECT * FROM counters WHERE category == 'vertex'")
+        global vertex_counter
+        vertex_counter = Counter(initval = cursor.fetchone()['count'])
+
+        cursor.execute("SELECT * FROM counters WHERE category == 'edge'")
+        global edge_counter
+        edge_counter = Counter(initval = cursor.fetchone()['count'])
+
+        cursor.execute("SELECT * FROM counters WHERE category == 'observed'")
+        global observed_counter
+        observed_counter = Counter(initval = cursor.fetchone()['count'])
+
+    return 
 
 def get_args():
     """ Fetches the arguments for the program """
@@ -36,6 +88,9 @@ def get_args():
         help='TALON database. Created using build_talon_annotation.py')
     parser.add_argument('--build', dest = 'build', metavar='STRING,', type = str,
         help='Genome build (i.e. hg38) to use. Must be in the database.')
+    parser.add_argument("--threads", "-t", dest = "threads",
+        help = "Number of threads to run program with.",
+        type = str, default = 2)
     parser.add_argument("--cov", "-c", dest = "min_coverage",
         help = "Minimum alignment coverage in order to use a SAM entry. Default = 0.9",
         type = str, default = 0.9)
@@ -52,200 +107,6 @@ def str_wrap_double(s):
     """ Adds double quotes around the input string """
     s = str(s)
     return '"' + s + '"'
-
-def make_gene_start_and_end_dict(cursor, build):
-    """ Format of dicts:
-            Key: gene ID from database
-            Value: dict mapping positions to start vertices (or end vertices) of 
-                   KNOWN transcripts from that gene
-    """
-    gene_starts = {}
-    gene_ends = {}
-    query = """SELECT  gene_ID,
-                               start_vertex,
-                               end_vertex,
-                               loc1.position as start,
-                               loc2.position as end
-               FROM transcripts
-               LEFT JOIN transcript_annotations as ta
-                   ON ta.ID = transcripts.transcript_ID
-               LEFT JOIN location as loc1
-                   ON transcripts.start_vertex = loc1.location_ID
-               LEFT JOIN location as loc2
-                   ON transcripts.end_vertex = loc2.location_ID
-               WHERE ta.attribute = 'transcript_status'
-                     AND ta.value = 'KNOWN'
-                     AND loc1.genome_build = '%s'
-                     AND loc2.genome_build = '%s'
-              """
-    cursor.execute(query % (build, build))
-    for entry in cursor.fetchall():
-        gene_ID = entry['gene_ID']
-        start_vertex = entry['start_vertex']
-        end_vertex = entry['end_vertex']
-        start_pos = entry['start']
-        end_pos = entry['end']
-        try:
-            gene_starts[gene_ID][start_pos] = start_vertex
-        except:
-            gene_starts[gene_ID] = {}
-            gene_starts[gene_ID][start_pos] = start_vertex
-
-        try:
-            gene_ends[gene_ID][end_pos] = end_vertex
-        except:
-            gene_ends[gene_ID] = {}
-            gene_ends[gene_ID][end_pos] = end_vertex
-
-    return gene_starts, gene_ends
-           
-
-def make_transcript_dict(cursor, build):
-    """ Format of dict:
-            Key: tuple consisting of edges in transcript path
-            Value: SQLite3 row from transcript table
-    """
-    transcript_dict = {}
-    query = """SELECT t.*,
-    	         loc1.chromosome as chromosome,
-                 loc1.position as start_pos,
-                 loc2.position as end_pos	
-    	       FROM transcripts AS t
-    	       LEFT JOIN location as loc1 ON t.start_vertex = loc1.location_ID 
-    	       LEFT JOIN location as loc2 ON t.end_vertex = loc2.location_ID
-    	       WHERE loc1.genome_build = ? AND loc2.genome_build = ?;
-           """
-
-    cursor.execute(query, [build, build])
-    for transcript in cursor.fetchall():
-        transcript_path = transcript["jn_path"]
-        if transcript_path != None:
-            transcript_path = transcript_path.split(",") + \
-                              [transcript["start_exon"], transcript["end_exon"]]
-            transcript_path = frozenset([ int(x) for x in transcript_path])
-        else:
-            transcript_path = frozenset([transcript["start_exon"]])
-        transcript_dict[transcript_path] = transcript
-
-    return transcript_dict
-
-def make_location_dict(genome_build, cursor):
-    """ Format of dict:
-        chromosome -> dict(position -> SQLite3 row from location table)
-
-        old:
-            Key: chromosome, pos
-            Value: SQLite3 row from location table
-    """
-    location_dict = {}
-    query = """SELECT * FROM location WHERE genome_build = ? """
-    cursor.execute(query, [genome_build])
-    for location in cursor.fetchall():
-        chromosome = location["chromosome"]
-        position = location["position"]
-        try:
-            location_dict[chromosome][position] = location
-        except:
-            location_dict[chromosome] = {position: location} 
-
-    return location_dict
-    
-def make_edge_dict(cursor):
-    """ Format of dict:
-            Key: vertex1_vertex2_type
-            Value: SQLite3 row from edge table
-    """
-    edge_dict = {}
-    query = """SELECT * FROM edge"""
-    cursor.execute(query)
-    for edge in cursor.fetchall():
-        vertex_1 = edge["v1"]
-        vertex_2 = edge["v2"]
-        edge_type = edge["edge_type"]
-        key = (vertex_1, vertex_2, edge_type)
-        edge_dict[key] = edge
-
-    return edge_dict
-
-def make_vertex_2_gene_dict(cursor):
-    """ Create a dictionary that maps vertices to the genes that they belong to.
-    """
-    vertex_2_gene = {}
-    query = """SELECT * FROM vertex LEFT JOIN genes ON vertex.gene_ID = genes.gene_ID"""
-    cursor.execute(query)
-    for vertex_line in cursor.fetchall():
-        vertex = vertex_line["vertex_ID"]
-        gene = vertex_line["gene_ID"]
-        strand = vertex_line["strand"]
-
-        if vertex in vertex_2_gene:
-            vertex_2_gene[vertex].add((gene, strand))
-        else:
-            vertex_2_gene[vertex] = set()
-            vertex_2_gene[vertex].add((gene, strand))
-
-    return vertex_2_gene
-
-def make_temp_monoexonic_transcript_table(cursor, build):
-    """ Attaches a temporary database with a table that has the following fields:
-            - gene_ID
-            - transcript_ID
-            - chromosome
-            - start (min position)
-            - end (max position)
-            - strand
-        The purpose is to allow location-based matching for monoexonic query
-        transcripts. """
-
-    command = """ CREATE TEMPORARY TABLE IF NOT EXISTS temp_monoexon AS
-                  SELECT t.gene_ID, 
-                         t.transcript_ID, 
-			 loc1.chromosome, 
-			 loc1.position as start,
-                         loc2.position as end,
-			 genes.strand,
-                         t.start_vertex,
-                         t.end_vertex,
-                         t.start_exon as exon_ID
-                  FROM transcripts as t
-	          LEFT JOIN location as loc1 ON loc1.location_ID = t.start_vertex
-	          LEFT JOIN location as loc2 ON loc2.location_ID = t.end_vertex
-	          LEFT JOIN genes ON genes.gene_ID = t.gene_ID
-                  WHERE n_exons = 1 AND loc1.genome_build = '%s' 
-	          AND loc2.genome_build = '%s' """
-    cursor.execute(command % (build, build))
-    
-    return
-
-def make_temp_novel_gene_table(cursor, build):
-    """ Attaches a temporary database with a table that has the following fields:
-            - gene_ID
-            - chromosome
-            - start
-            - end
-            - strand
-        The purpose is to track novel genes from this run in order to match
-        transcripts to them when other forms of gene assignment have failed.
-    """
-    command = """ CREATE TEMPORARY TABLE IF NOT EXISTS temp_gene AS 
-                  SELECT gene_ID,
-                    chromosome,
-                    start,
-                    end,
-                    strand
-                   FROM (SELECT g.gene_ID,
-                             loc.chromosome,
-                             MIN(loc.position) as start,
-                             MAX(loc.position) as end,
-                             g.strand
-                       FROM genes as g
-                       LEFT JOIN vertex as v ON g.gene_ID = v.gene_ID
-                       LEFT JOIN location as loc ON loc.location_ID = v.vertex_ID
-                       WHERE loc.genome_build = '%s'
-                       GROUP BY g.gene_ID); """
-
-    cursor.execute(command % (build))
-    return
 
 def search_for_vertex_at_pos(chromosome, position, location_dict):
     """ Given a chromosome and a position (1-based), this function queries the 
@@ -266,7 +127,7 @@ def search_for_edge(vertex_1, vertex_2, edge_type, edge_dict):
         return None
 
 def match_monoexon_vertices(chromosome, positions, strand, location_dict,
-                                  run_info):
+                            run_info):
     """ Given the start and end of a single-exon transcript, this function looks 
         for a matching vertex for each position. Also returns a list where each 
         index indicates whether that vertex is novel to the data structure 
@@ -302,8 +163,7 @@ def match_monoexon_vertices(chromosome, positions, strand, location_dict,
 
         if vertex_match == None:
             # If no vertex matches the position, one is created.
-            vertex_match = create_vertex(chromosome, position, run_info,
-                                         location_dict)["location_ID"]
+            vertex_match = create_vertex(chromosome, position, location_dict, run_info)["location_ID"]
             novelty.append(1)
         else:
             novelty.append(0)
@@ -313,8 +173,7 @@ def match_monoexon_vertices(chromosome, positions, strand, location_dict,
 
     return tuple(vertex_matches), tuple(novelty), diff_5p, diff_3p
 
-def match_splice_vertices(chromosome, positions, strand, location_dict,
-                                  run_info):
+def match_splice_vertices(chromosome, positions, strand, location_dict, run_info):
     """ Given a chromosome and a list of positions from the transcript in 5' to
         3' end order, this function looks for a matching vertex for each splice
         junction position (so it ignores the ends). Also returns a list where 
@@ -329,12 +188,10 @@ def match_splice_vertices(chromosome, positions, strand, location_dict,
     for curr_index in range(1,len(positions)-1):
         position = positions[curr_index]
 
-        vertex_match = search_for_vertex_at_pos(chromosome, position,
-                                                     location_dict)
+        vertex_match = search_for_vertex_at_pos(chromosome, position, location_dict)
         if vertex_match == None:
             # If no vertex matches the position, one is created.
-            vertex_match = create_vertex(chromosome, position, run_info,
-                                         location_dict)
+            vertex_match = create_vertex(chromosome, position, location_dict, run_info)
             novelty.append(1)
         else:
             novelty.append(0)
@@ -382,12 +239,10 @@ def match_all_transcript_vertices(chromosome, positions, strand, location_dict,
 
         # Remaining mid-transcript positions go through strict matching process
         else:
-            vertex_match = search_for_vertex_at_pos(chromosome, position, 
-                                                     location_dict)
+            vertex_match = search_for_vertex_at_pos(chromosome, position, location_dict)
         if vertex_match == None:
             # If no vertex matches the position, one is created.
-            vertex_match = create_vertex(chromosome, position, run_info, 
-                                         location_dict)
+            vertex_match = create_vertex(chromosome, position, location_dict, run_info)
             novelty.append(1)
         else:
             novelty.append(0)
@@ -521,10 +376,9 @@ def permissive_vertex_search(chromosome, position, strand, sj_pos, pos_type,
 
     return None, None       
             
-def create_vertex(chromosome, position, run_info, location_dict):
+def create_vertex(chromosome, position, location_dict, run_info):
     """ Creates a novel vertex and adds it to the location data structure. """
-    run_info.vertex += 1
-    new_ID = run_info.vertex
+    new_ID = vertex_counter.increment()
     new_vertex = {'location_ID': new_ID,
                   'genome_build': run_info.build,
                   'chromosome': chromosome,
@@ -537,10 +391,9 @@ def create_vertex(chromosome, position, run_info, location_dict):
 
     return new_vertex
 
-def create_edge(vertex_1, vertex_2, edge_type, strand, edge_dict, run_info):
+def create_edge(vertex_1, vertex_2, edge_type, strand, edge_dict): 
     """ Creates a novel edge and adds it to the edge data structure. """
-    run_info.edge += 1
-    new_ID = run_info.edge
+    new_ID = edge_counter.increment()
     new_edge = {'edge_ID': new_ID,
                 'v1': vertex_1,
                 'v2': vertex_2,
@@ -550,24 +403,22 @@ def create_edge(vertex_1, vertex_2, edge_type, strand, edge_dict, run_info):
 
     return new_edge
 
-def create_gene(chromosome, start, end, strand, memory_cursor, run_info):
+def create_gene(chromosome, start, end, strand, memory_cursor, tmp_gene):
     """ Create a novel gene and add it to the temporary table.
     """
-    run_info.genes += 1
-    new_ID = run_info.genes
+    new_ID = gene_counter.increment()
 
     new_gene = ( new_ID, chromosome, min(start, end), max(start, end), strand )
-    cols = '("gene_ID", "chromosome", "start", "end", "strand")' 
-    command = 'INSERT INTO temp_gene ' + cols + ' VALUES ' + '(?,?,?,?,?)'
+    cols = ' ("gene_ID", "chromosome", "start", "end", "strand")' 
+    command = 'INSERT INTO ' + tmp_gene + cols + ' VALUES ' + '(?,?,?,?,?)'
     memory_cursor.execute(command, new_gene)
     return new_ID
 
 def create_transcript(chromosome, start_pos, end_pos, gene_ID, edge_IDs, vertex_IDs, 
-                      transcript_dict, run_info):
+                      transcript_dict):
     """Creates a novel transcript and adds it to the transcript data structure.
     """
-    run_info.transcripts += 1
-    new_ID = run_info.transcripts
+    new_ID = transcript_counter.increment()
     if len(edge_IDs) > 1:
         jn_path = ",".join(map(str, edge_IDs[1:-1]))
     else:
@@ -580,7 +431,7 @@ def create_transcript(chromosome, start_pos, end_pos, gene_ID, edge_IDs, vertex_
                       'end_exon': edge_IDs[-1],
                       'start_vertex': vertex_IDs[0],
                       'end_vertex': vertex_IDs[-1],
-                      'n_exons': (len(edge_IDs) + 1)/2,
+                      'n_exons': int((len(edge_IDs) + 1)/2),
                       'chromosome': chromosome,
                       'start_pos': start_pos,
                       'end_pos': end_pos }
@@ -645,13 +496,13 @@ def match_all_splice_edges(vertices, strand, edge_dict, run_info):
 
         edge_match, curr_novelty = match_or_create_edge(vertex_1, vertex_2, 
                                                         edge_type, strand, 
-                                                        edge_dict, run_info)
+                                                        edge_dict)
         edge_matches.append(edge_match)
         novelty.append(curr_novelty)
 
     return edge_matches, novelty
 
-def match_or_create_edge(vertex_1, vertex_2, edge_type, strand, edge_dict, run_info):
+def match_or_create_edge(vertex_1, vertex_2, edge_type, strand, edge_dict):
     """ Searches for edge match to provided set of vertices. If none found, 
         creates a new edge. """
     novelty = 0
@@ -660,7 +511,7 @@ def match_or_create_edge(vertex_1, vertex_2, edge_type, strand, edge_dict, run_i
     if edge_match == None:
         # If no edge matches the position, one is created.
         edge_match = create_edge(vertex_1, vertex_2, edge_type, strand,
-                                     edge_dict, run_info)
+                                     edge_dict)
         novelty = 1
     return edge_match["edge_ID"], novelty
 
@@ -686,7 +537,7 @@ def match_all_transcript_edges(vertices, strand, edge_dict, run_info):
         
         edge_match, curr_novelty = match_or_create_edge(vertex_1, vertex_2, 
                                                         edge_type, strand,
-                                                        edge_dict, run_info) 
+                                                        edge_dict) 
         edge_matches.append(edge_match)
         novelty.append(curr_novelty)
                                                 
@@ -709,7 +560,7 @@ def search_for_ISM(edge_IDs, transcript_dict):
 
  
 def search_for_overlap_with_gene(chromosome, start, end, strand, 
-                                 cursor, run_info):
+                                 cursor, run_info, tmp_gene):
     """ Given a start and an end value for an interval, query the database to
         determine whether the interval overlaps with any genes. If it there is
         more than one match, prioritize same-strand first and foremost. 
@@ -721,25 +572,22 @@ def search_for_overlap_with_gene(chromosome, start, end, strand,
     max_end = max(start, end)
     query_interval = [min_start, max_end]
 
-    query = """ SELECT gene_ID,
+    query = Template(""" SELECT gene_ID,
                        chromosome,
                        MIN(start) AS start,
                        MAX(end) AS end,
                        strand
-                FROM temp_gene
-                WHERE (chromosome = '%s') AND
-                      ((start <= %d AND end >= %d) OR
-                      (start >= %d AND end <= %d) OR
-                      (start >= %d AND start <= %d) OR
-                      (end >= %d AND end <= %d))
-                 GROUP BY gene_ID;"""    
-
-
-    cursor.execute(query % (chromosome, min_start, max_end,
-                            min_start, max_end, min_start, max_end, min_start,
-                            max_end))
+                FROM $tmp_gene
+                WHERE (chromosome = '$chrom') AND
+                      ((start <= $min_start AND end >= $max_end) OR
+                      (start >= $min_start AND end <= $max_end) OR
+                      (start >= $min_start AND start <= $max_end) OR
+                      (end >= $min_start AND end <= $max_end))
+                 GROUP BY gene_ID;""").substitute({'tmp_gene':tmp_gene, 'chrom':chromosome,
+                                     'min_start':min_start, 'max_end':max_end})  
+    cursor.execute(query)
     matches = cursor.fetchall()
-
+  
     if len(matches) == 0:
         return None, None
     
@@ -817,7 +665,7 @@ def process_FSM(chrom, positions, strand, edge_IDs, vertex_IDs, all_matches, gen
 
     # Check if any of the matches have the same number of exons as the query.
     # Such a match should be prioritized because it's an FSM
-    n_exons = len(positions)/2
+    n_exons = int(len(positions)/2)
     FSM_matches = [ x for x in all_matches if x['n_exons'] == n_exons ]
 
     if len(FSM_matches) == 0:
@@ -864,7 +712,7 @@ def process_FSM(chrom, positions, strand, edge_IDs, vertex_IDs, all_matches, gen
                                                                    locations, run_info)
 
         edge_IDs = [start_exon] + edge_IDs + [end_exon]
-        vertex_IDs = [start_vertex] + vertex_IDs + ["end_vertex"]
+        vertex_IDs = [start_vertex] + vertex_IDs + [end_vertex]
 
     # Package information for output
     start_end_info = {"start_vertex": start_vertex,
@@ -891,14 +739,13 @@ def process_5p(chrom, positions, strand, vertex_IDs, gene_ID, gene_starts, edge_
                                          "start", gene_ID, gene_starts,
                                          locations, run_info)
     if start_vertex == None:
-        start_vertex = create_vertex(chrom, positions[0], run_info,
-                                             locations)['location_ID']
+        start_vertex = create_vertex(chrom, positions[0], locations, run_info)['location_ID']
 
     # Then get the start exon
     start_exon, start_novelty = match_or_create_edge(start_vertex,
                                                      vertex_IDs[0],
                                                      "exon", strand,
-                                                     edge_dict, run_info)
+                                                     edge_dict)
 
     # If known_start == 1, the start vertex is a known startpoint of this gene.
     #  start novelty refers to the novelty of the first exon (1 if yes, 0 if no)
@@ -916,13 +763,12 @@ def process_3p(chrom, positions, strand, vertex_IDs, gene_ID, gene_ends, edge_di
                                           "end", gene_ID, gene_ends,
                                           locations, run_info)
     if end_vertex == None:
-        end_vertex = create_vertex(chrom, positions[-1], run_info,
-                                   locations)['location_ID']
+        end_vertex = create_vertex(chrom, positions[-1], locations, run_info)['location_ID']
     # Then get the end exon
     end_exon, end_novelty = match_or_create_edge(vertex_IDs[-1],
                                                  end_vertex,
                                                  "exon", strand,
-                                                  edge_dict, run_info)
+                                                  edge_dict)
     # If known_end == 1, the end vertex is a known endpoint of this gene.
     # end novelty refers to the novelty of the final exon (1 if yes, 0 if no)
     return end_vertex, end_exon, end_novelty, known_end, diff_3p
@@ -937,7 +783,7 @@ def process_ISM(chrom, positions, strand, edge_IDs, vertex_IDs, all_matches, tra
     transcript_ID = None
     novelty = []
     start_end_info = {}
-    n_exons = len(positions)/2
+    n_exons = int(len(positions)/2)
 
     ISM = []
     suffix = []
@@ -979,7 +825,7 @@ def process_ISM(chrom, positions, strand, edge_IDs, vertex_IDs, all_matches, tra
     if known_start and known_end:
         novel_transcript = create_transcript(chrom, positions[0], positions[-1],
                                               gene_ID, edge_IDs, vertex_IDs,
-                                              transcript_dict, run_info)
+                                              transcript_dict)
         transcript_ID = novel_transcript['transcript_ID']
         novelty = [(transcript_ID, run_info.idprefix, "TALON",
                         "NIC_transcript", "TRUE")]
@@ -987,7 +833,6 @@ def process_ISM(chrom, positions, strand, edge_IDs, vertex_IDs, all_matches, tra
 
     # Iterate over matches to characterize ISMs
     for match in all_matches:
-        transcript_ID = run_info.transcripts + 1
 
         # Add ISM
         ISM.append(str(match['transcript_ID']))
@@ -1026,7 +871,7 @@ def process_ISM(chrom, positions, strand, edge_IDs, vertex_IDs, all_matches, tra
 
     novel_transcript = create_transcript(chrom, positions[0], positions[-1],
                                               gene_ID, edge_IDs, vertex_IDs,
-                                              transcript_dict, run_info)
+                                              transcript_dict)
 
     transcript_ID = novel_transcript['transcript_ID']
 
@@ -1110,7 +955,7 @@ def process_NIC(chrom, positions, strand, edge_IDs, vertex_IDs, transcript_dict,
     # Create a new transcript of that gene
     novel_transcript = create_transcript(chrom, positions[0], positions[-1],
                                               gene_ID, edge_IDs, vertex_IDs,
-                                              transcript_dict, run_info)
+                                              transcript_dict)
     transcript_ID = novel_transcript["transcript_ID"]
     novelty = [(transcript_ID, run_info.idprefix, "TALON",
                          "NIC_transcript","TRUE")]
@@ -1183,15 +1028,16 @@ def process_NNC(chrom, positions, strand, edge_IDs, vertex_IDs, transcript_dict,
     
     transcript_ID = create_transcript(chrom, positions[0], positions[-1],
                                               gene_ID, edge_IDs, vertex_IDs,
-                                              transcript_dict, run_info)["transcript_ID"]
+                                              transcript_dict)["transcript_ID"]
 
     novelty.append((transcript_ID, run_info.idprefix, "TALON",
                                "NNC_transcript", "TRUE"))
 
     return gene_ID, transcript_ID, novelty, start_end_info
 
-def process_spliced_antisense(chrom, positions, strand, edge_IDs, vertex_IDs, transcript_dict,
-                gene_starts, gene_ends, edge_dict, locations, vertex_2_gene, run_info, cursor):
+def process_spliced_antisense(chrom, positions, strand, edge_IDs, vertex_IDs, 
+                              transcript_dict, gene_starts, gene_ends, edge_dict, 
+                              locations, vertex_2_gene, run_info, cursor, tmp_gene):
     """ Annotate a transcript as antisense with splice junctions """
 
     gene_novelty = []
@@ -1235,10 +1081,10 @@ def process_spliced_antisense(chrom, positions, strand, edge_IDs, vertex_IDs, tr
     start_end_info["vertex_IDs"] = vertex_IDs    
 
     gene_ID = create_gene(chrom, positions[0], positions[-1],
-                              strand, cursor, run_info)
+                              strand, cursor, tmp_gene)
     transcript_ID = create_transcript(chrom, positions[0], positions[-1],
                                               gene_ID, edge_IDs, vertex_IDs,
-                                              transcript_dict, run_info)["transcript_ID"]
+                                              transcript_dict)["transcript_ID"]
 
     # Handle gene annotations
     gene_novelty.append((gene_ID, run_info.idprefix, "TALON",
@@ -1252,18 +1098,19 @@ def process_spliced_antisense(chrom, positions, strand, edge_IDs, vertex_IDs, tr
 
     return gene_ID, transcript_ID, gene_novelty, transcript_novelty, start_end_info
 
-def process_remaining_mult_cases(chrom, positions, strand, edge_IDs, vertex_IDs, transcript_dict,
-                gene_starts, gene_ends, edge_dict, locations, vertex_2_gene, run_info, cursor):
+def process_remaining_mult_cases(chrom, positions, strand, edge_IDs, vertex_IDs, 
+                                 transcript_dict, gene_starts, gene_ends, edge_dict, 
+                                 locations, vertex_2_gene, run_info, cursor, tmp_gene):
     """ This function is a catch-all for multiexonic transcripts that were not
         FSM, ISM, NIC, NNC, or spliced antisense.
     """
     gene_novelty = []
     transcript_novelty = []
     start_end_info = {}
-
+    
     gene_ID, match_strand = search_for_overlap_with_gene(chrom, positions[0],
                                                          positions[1], strand,
-                                                         cursor, run_info)
+                                                         cursor, run_info, tmp_gene)
 
     # We don't care about the gene when making these assignments
     start_vertex, start_exon, start_novelty, known_start, diff_5p = process_5p(chrom,
@@ -1294,24 +1141,24 @@ def process_remaining_mult_cases(chrom, positions, strand, edge_IDs, vertex_IDs,
 
     if gene_ID == None:
         gene_ID = create_gene(chrom, positions[0], positions[-1],
-                          strand, cursor, run_info)
+                          strand, cursor, tmp_gene)
 
         gene_novelty.append((gene_ID, run_info.idprefix, "TALON",
                      "intergenic_novel","TRUE"))
 
         transcript_ID = create_transcript(chrom, positions[0], positions[-1],
                                               gene_ID, edge_IDs, vertex_IDs,
-                                              transcript_dict, run_info)["transcript_ID"]
+                                              transcript_dict)["transcript_ID"]
         transcript_novelty.append((transcript_ID, run_info.idprefix, "TALON",
                               "intergenic_transcript", "TRUE"))
 
     elif match_strand != strand:
         anti_gene_ID = gene_ID
-        gene_ID = create_gene(chrom, positions[0], positions[-1],
-                          strand, cursor, run_info)
+        gene_ID = create_gene(chrom, positions[0], positions[-1], strand, 
+                              cursor, tmp_gene)
         transcript_ID = create_transcript(chrom, positions[0], positions[-1],
                                               gene_ID, edge_IDs, vertex_IDs,
-                                              transcript_dict, run_info)["transcript_ID"]
+                                              transcript_dict)["transcript_ID"]
 
         gene_novelty.append((gene_ID, run_info.idprefix, "TALON",
                      "antisense_gene","TRUE"))
@@ -1322,7 +1169,7 @@ def process_remaining_mult_cases(chrom, positions, strand, edge_IDs, vertex_IDs,
     else:
         transcript_ID = create_transcript(chrom, positions[0], positions[-1],
                                               gene_ID, edge_IDs, vertex_IDs,
-                                              transcript_dict, run_info)["transcript_ID"]
+                                              transcript_dict)["transcript_ID"]
         transcript_novelty.append((transcript_ID, run_info.idprefix, "TALON",
                               "genomic_transcript", "TRUE"))
     
@@ -1343,7 +1190,7 @@ def update_vertex_2_gene(gene_ID, vertex_IDs, strand, vertex_2_gene):
 
 def identify_transcript(chrom, positions, strand, cursor, location_dict, edge_dict,
                         transcript_dict, vertex_2_gene, gene_starts, gene_ends,
-                        run_info):
+                        run_info, tmp_gene):
     """ Inputs:
         - Information about the query transcript
           - chromosome
@@ -1367,7 +1214,7 @@ def identify_transcript(chrom, positions, strand, cursor, location_dict, edge_di
     """
     gene_novelty = []
     transcript_novelty = []
-    n_exons = len(positions)/2.0
+    n_exons = int(len(positions)/2.0)
     gene_ID = None
  
     # Get vertex matches for the transcript positions
@@ -1375,8 +1222,7 @@ def identify_transcript(chrom, positions, strand, cursor, location_dict, edge_di
                                                    location_dict, run_info)
 
     # Get edge matches for transcript exons and introns based on the vertices
-    edge_IDs, e_novelty = match_all_splice_edges(vertex_IDs, strand,
-                                                     edge_dict, run_info)
+    edge_IDs, e_novelty = match_all_splice_edges(vertex_IDs, strand, edge_dict, run_info)
 
     # Check novelty of exons and splice jns. This will help us categorize 
     # what type of novelty the transcript has
@@ -1440,7 +1286,7 @@ def identify_transcript(chrom, positions, strand, cursor, location_dict, edge_di
                                                                   gene_ends,
                                                                   edge_dict, location_dict,
                                                                   vertex_2_gene, run_info,
-                                                                  cursor)
+                                                                  cursor, tmp_gene)
 
     # Novel not in catalog transcripts contain new splice donors/acceptors
     # and contain at least one splice junction.
@@ -1452,18 +1298,17 @@ def identify_transcript(chrom, positions, strand, cursor, location_dict, edge_di
                                                             gene_starts, gene_ends,
                                                             edge_dict, location_dict,
                                                             vertex_2_gene, run_info)
-
     # Transcripts that don't match the previous categories end up here
     if gene_ID == None:
         gene_ID, transcript_ID, gene_novelty, transcript_novelty, start_end_info = \
                              process_remaining_mult_cases(chrom, positions,
-                                                                strand, edge_IDs,
-                                                                vertex_IDs,
-                                                                transcript_dict,
-                                                                gene_starts, gene_ends,
-                                                                edge_dict, location_dict,
-                                                                vertex_2_gene, run_info,
-                                                                cursor)
+                                                          strand, edge_IDs,
+                                                          vertex_IDs,
+                                                          transcript_dict,
+                                                          gene_starts, gene_ends,
+                                                          edge_dict, location_dict,
+                                                          vertex_2_gene, run_info,
+                                                          cursor, tmp_gene)
 
     # Add all novel vertices to vertex_2_gene now that we have the gene ID
     vertex_IDs = start_end_info["vertex_IDs"]
@@ -1505,18 +1350,18 @@ def identify_transcript(chrom, positions, strand, cursor, location_dict, edge_di
                                      "exon_status", "NOVEL"))
 
     # Package up information for output
-    annotations = {'gene_ID': gene_ID,
-                   'transcript_ID': transcript_ID,
-                   'gene_novelty': gene_novelty,
-                   'transcript_novelty': transcript_novelty,
-                   'exon_novelty': exon_novelty,
-                   'start_vertex': start_end_info["start_vertex"],
-                   'end_vertex': start_end_info["end_vertex"],
-                   'start_exon': start_end_info["start_exon"],
-                   'end_exon': start_end_info["end_exon"],
-                   'start_delta': start_end_info["diff_5p"],
-                   'end_delta': start_end_info["diff_3p"]}
-    
+    annotations = dstruct.Struct()
+    annotations.gene_ID = gene_ID
+    annotations.transcript_ID = transcript_ID
+    annotations.gene_novelty = gene_novelty
+    annotations.transcript_novelty = transcript_novelty
+    annotations.exon_novelty = exon_novelty
+    annotations.start_vertex = start_end_info["start_vertex"]
+    annotations.end_vertex = start_end_info["end_vertex"]
+    annotations.start_exon = start_end_info["start_exon"]
+    annotations.end_exon = start_end_info["end_exon"]
+    annotations.start_delta = start_end_info["diff_5p"]
+    annotations.end_delta = start_end_info["diff_3p"]
     return annotations
 
 def construct_names(gene_ID, transcript_ID, prefix, n_places):
@@ -1542,165 +1387,185 @@ def check_inputs(options):
         raise ValueError("Database file '%s' does not exist!" % database)
 
     # Make sure that the genome build exists in the provided TALON database.
-    conn = sqlite3.connect(database)
-    cursor = conn.cursor()
-    cursor.execute(""" SELECT DISTINCT name FROM genome_build """)
-    builds = [ str(x[0]) for x in cursor.fetchall() ]
-    if options.build not in builds:
-        build_names = ", ".join(list(builds))
-        raise ValueError("Please specify a genome build that exists in the" +
-                          " database. The choices are: " + build_names)
+    with sqlite3.connect(database) as conn:
+        cursor = conn.cursor()
+        cursor.execute(""" SELECT DISTINCT name FROM genome_build """)
+        builds = [ str(x[0]) for x in cursor.fetchall() ]
+        if options.build not in builds:
+            build_names = ", ".join(list(builds))
+            raise ValueError("Please specify a genome build that exists in the" +
+                             " database. The choices are: " + build_names)
 
-    # Make sure that each input dataset is not already in the database, and
-    # also make sure that each dataset name is unique
-    sam_files = []
-    dataset_metadata = []
-    curr_datasets = []
+        # Make sure that each input dataset is not already in the database, and
+        # also make sure that each dataset name is unique
+        sam_files = []
+        dataset_metadata = []
+        curr_datasets = []
 
-    cursor.execute(""" SELECT dataset_name FROM dataset """)
-    existing_datasets = [ str(x[0]) for x in cursor.fetchall() ]
+        cursor.execute(""" SELECT dataset_name FROM dataset """)
+        existing_datasets = [ str(x[0]) for x in cursor.fetchall() ]
 
-    with open(options.config_file, 'r') as f:
-        for line in f:
-            line = line.strip().split(',')
-            curr_sam = line[3]
-            if len(line) != 4:
-                raise ValueError('Incorrect number of comma-separated fields'+ \
-                                 ' in config file. There should be four: ' + \
-                                 '(dataset name, sample description, ' + \
-                                 'platform, associated sam file).')
+        with open(options.config_file, 'r') as f:
+            for line in f:
+                line = line.strip().split(',')
+                curr_sam = line[3]
+                if len(line) != 4:
+                    raise ValueError('Incorrect number of comma-separated fields'+ \
+                                     ' in config file. There should be four: ' + \
+                                     '(dataset name, sample description, ' + \
+                                     'platform, associated sam file).')
 
-            # Make sure that the sam file exists
-            if not Path(curr_sam).exists():
-                raise ValueError("SAM file '%s' does not exist!" % curr_sam)
+                # Make sure that the sam file exists
+                if not Path(curr_sam).exists():
+                    raise ValueError("SAM file '%s' does not exist!" % curr_sam)
 
-            metadata = (line[0], line[1], line[2])
-            dataname = metadata[0]
-            if dataname in existing_datasets:
-                warnings.warn("Ignoring dataset with name '" + dataname + \
-                              "' because it is already in the database.")
-            elif dataname in curr_datasets:
-                warnings.warn("Skipping duplicated instance of dataset '" + \
-                               dataname + "'.")
-            elif curr_sam in sam_files:
-                warnings.warn("Skipping duplicated instance of sam file '" + \
-                               curr_sam  + "'.")
-            else:
-                dataset_metadata.append(metadata)
-                curr_datasets.append(dataname)
-                if not curr_sam.endswith(".sam"):
-                    raise ValueError('Last field in config file must be a .sam file')
-                sam_files.append(curr_sam)      
-
-    conn.close()
+                metadata = (line[0], line[1], line[2])
+                dataname = metadata[0]
+                if dataname in existing_datasets:
+                    warnings.warn("Ignoring dataset with name '" + dataname + \
+                                  "' because it is already in the database.")
+                elif dataname in curr_datasets:
+                    warnings.warn("Skipping duplicated instance of dataset '" + \
+                                   dataname + "'.")
+                elif curr_sam in sam_files:
+                    warnings.warn("Skipping duplicated instance of sam file '" + \
+                                   curr_sam  + "'.")
+                else:
+                    dataset_metadata.append(metadata)
+                    curr_datasets.append(dataname)
+                    if not curr_sam.endswith(".sam"):
+                        raise ValueError('Last field in config file must be a .sam file')
+                    sam_files.append(curr_sam)      
+    if sam_files == []:
+        raise RuntimeError(("All of the provided dataset names are already in "
+                            "the database. Please check your config file."))
     return sam_files, dataset_metadata
 
 
-def init_run_info(cursor, genome_build, min_coverage = 0.9, min_identity = 0):
+def init_run_info(database, genome_build, min_coverage = 0.9, min_identity = 0,
+                  tmp_dir = "talon_tmp/"):
     """ Initializes a dictionary that keeps track of important run information
         such as the desired genome build, the prefix for novel identifiers,
         and the novel counters for the run. """
 
-    run_info = dstruct.Struct()
-    run_info.build = genome_build
-    run_info.min_coverage = min_coverage
-    run_info.min_identity = min_identity
+    with sqlite3.connect(database) as conn:
+        conn.row_factory = sqlite3.Row
+        cursor = conn.cursor()
 
-    # Fetch information from run_info table
-    cursor.execute("""SELECT * FROM run_info""")
-    for info in cursor.fetchall():
-        info_name = info['item']
-        value = info['value']
-        if info_name != "idprefix":
-            value = int(value)
-        run_info[info_name] = value
+        run_info = dstruct.Struct()
+        run_info.build = genome_build
+        run_info.min_coverage = min_coverage
+        run_info.min_identity = min_identity
+        run_info.tmp_dir = tmp_dir
+        os.system("mkdir -p %s " % (tmp_dir)) 
 
-    # Fetch counters
-    query = "SELECT * FROM counters WHERE category != 'genome_build'"
-    cursor.execute(query)
+        # Fetch information from run_info table
+        cursor.execute("""SELECT * FROM run_info""")
+        for info in cursor.fetchall():
+            info_name = info['item']
+            value = info['value']
+            if info_name != "idprefix":
+                value = int(value)
+            run_info[info_name] = value
 
-    for counter in cursor.fetchall():
-        counter_name = counter['category']
-        run_info[counter_name] = counter['count']
+        # Fetch dataset counter
+        query = "SELECT * FROM counters WHERE category == 'dataset'"
+        cursor.execute(query)
+        run_info.dataset = cursor.fetchone()['count']
 
     return run_info
 
-def prepare_data_structures(cursor, build, min_coverage, min_identity):
+def init_outfiles(outprefix, tmp_dir = "talon_tmp/"):
+    """ Initialize output files for the run that all processes will be able to
+        write to via the queue. """
+
+    # If there is a tmp dir there already, remove it
+    if os.path.exists(tmp_dir):
+        os.system("rm -r %s" % tmp_dir)
+    os.system("mkdir -p %s" % tmp_dir)
+ 
+    if not tmp_dir.endswith("/"):
+        tmp_dir = tmp_dir + "/"
+
+    # Check on main outpath
+    if os.path.isdir(outprefix):
+        if not outprefix.endswith("/"):
+            outprefix = outprefix + "/" 
+        # Add default prefix
+        outprefix = outprefix + "talon"
+
+    # Now initialize the files
+    outfiles = dstruct.Struct()  
+    outfiles.qc = outprefix + "_QC.log"
+    outfiles.abundance = tmp_dir + "abundance_tuples.tsv"
+    outfiles.genes = tmp_dir + "gene_tuples.tsv"
+    outfiles.transcripts = tmp_dir + "transcript_tuples.tsv"  
+    outfiles.edges = tmp_dir + "edge_tuples.tsv"
+    outfiles.v2g = tmp_dir + "vertex_2_gene_tuples.tsv"
+    outfiles.location = tmp_dir + "location_tuples.tsv"
+    outfiles.observed = tmp_dir + "observed_transcript_tuples.tsv"
+    outfiles.gene_annot = tmp_dir + "gene_annot_tuples.tsv"
+    outfiles.transcript_annot = tmp_dir + "transcript_annot_tuples.tsv"
+    outfiles.exon_annot = tmp_dir + "exon_annot_tuples.tsv"
+ 
+    for fname in outfiles:
+        # Replace with handle to open file
+        open(outfiles[fname], 'w').close()
+ 
+    return outfiles
+
+
+def prepare_data_structures(cursor, run_info, chrom = None, start = None, 
+                            end = None, tmp_id = "1"):
     """ Initializes data structures needed for the run and organizes them
         in a dictionary for more ease of use when passing them between functions
     """
+    build = run_info.build
+    min_coverage = run_info.min_coverage
+    min_identity = run_info.min_identity
+    struct_collection = dstruct.Struct()
 
-    make_temp_novel_gene_table(cursor, build)
-    make_temp_monoexonic_transcript_table(cursor, build)
-    run_info = init_run_info(cursor, build, min_coverage, min_identity)
-    location_dict = make_location_dict(build, cursor)
-    edge_dict = make_edge_dict(cursor)
-    transcript_dict = make_transcript_dict(cursor, build)
-    vertex_2_gene = make_vertex_2_gene_dict(cursor)
-    gene_starts, gene_ends = make_gene_start_and_end_dict(cursor, build)   
+    struct_collection.tmp_gene = init_refs.make_temp_novel_gene_table(cursor, 
+                                                        build, chrom = chrom, 
+                                                    start = start, end = end, 
+                                             tmp_tab = "temp_gene_" + tmp_id)
+    
+    struct_collection.tmp_monoexon = init_refs.make_temp_monoexonic_transcript_table(cursor, 
+                                          build, chrom = chrom,
+                                          start = start, end = end, 
+                                          tmp_tab = "temp_monoexon_" + tmp_id)
 
-    struct_collection = dstruct.Struct() 
-    struct_collection['run_info'] = run_info
-    struct_collection['location_dict'] = location_dict
-    struct_collection['edge_dict'] = edge_dict
-    struct_collection['transcript_dict'] = transcript_dict
-    struct_collection['vertex_2_gene'] = vertex_2_gene 
-    struct_collection['gene_starts'] = gene_starts
-    struct_collection['gene_ends'] = gene_ends
+    #query = "select name from sqlite_temp_master where type = 'table'; "
+    #cursor.execute(query)
+    #print([i["name"] for i in cursor.fetchall()])
+
+    location_dict = init_refs.make_location_dict(build, cursor, chrom = chrom, 
+                                                 start = start, end = end)
+
+    edge_dict = init_refs.make_edge_dict(cursor, build = build, chrom = chrom, 
+                                         start = start, end = end)
+
+    transcript_dict = init_refs.make_transcript_dict(cursor, build, chrom = chrom,
+                                           start = start, end = end)
+
+    vertex_2_gene = init_refs.make_vertex_2_gene_dict(cursor, build = build, 
+                                                      chrom = chrom, 
+                                                      start = start, end = end)
+
+    gene_starts, gene_ends = init_refs.make_gene_start_and_end_dict(cursor, 
+                                                                    build, 
+                                                                    chrom = chrom,
+                                                                    start = start,
+                                                                    end = end)   
+
+    struct_collection.location_dict = location_dict
+    struct_collection.edge_dict = edge_dict
+    struct_collection.transcript_dict = transcript_dict
+    struct_collection.vertex_2_gene = vertex_2_gene 
+    struct_collection.gene_starts = gene_starts
+    struct_collection.gene_ends = gene_ends
 
     return struct_collection
-
-def process_all_sam_files(sam_files, dataset_list, cursor, struct_collection, 
-                          outprefix):
-    """ Iterates over the provided sam files. """
-
-    novel_datasets = []
-    all_observed_transcripts = []
-    all_gene_annotations = []
-    all_transcript_annotations = []
-    all_exon_annotations = []
-    all_abundance = []
-
-    # Initialize QC output file
-    qc_file = outprefix + "_talon_QC.log"
-
-    with open(qc_file, 'w') as o:  # closes the file if any error occurs within the block
-        o.write("# TALON run filtering settings:\n")
-        o.write("# Fraction read aligned: " + \
-                str(struct_collection.run_info.min_coverage) + "\n")
-        o.write("# Min read identity to reference: " + \
-                str(struct_collection.run_info.min_identity) + "\n")
-        o.write("# Min transcript length: " + \
-                str(struct_collection.run_info.min_length) + "\n")
-        o.write("-------------------------------------------\n")
-        o.write("\t".join(["dataset", "read_ID", "passed_QC", "primary_mapped",
-                           "read_length", "fraction_aligned", "identity"]) + "\n")
-
-
-        for sam, d_metadata in zip(sam_files, dataset_list):
-            print("Working with dataset %s..." % d_metadata[0])
-
-            # Create annotation entry for this dataset
-            struct_collection.run_info['dataset'] += 1
-            d_id = struct_collection.run_info['dataset']
-            d_name = d_metadata[0]
-            novel_datasets += [(d_id, d_name, d_metadata[1], d_metadata[2])]
-
-            # Now process the current sam file
-            observed_transcripts, gene_annotations, transcript_annotations, \
-            exon_annotations, abundance = annotate_sam_transcripts(sam, d_name, cursor, struct_collection, o)
-
-            # Consolidate the outputs
-            all_observed_transcripts.extend(observed_transcripts)
-            all_gene_annotations.extend(gene_annotations)
-            all_transcript_annotations.extend(transcript_annotations)
-            all_exon_annotations.extend(exon_annotations)
-            all_abundance.extend(abundance)
-
-
-    return novel_datasets, all_observed_transcripts, all_gene_annotations, \
-           all_transcript_annotations, all_exon_annotations, all_abundance
-
 
 def compute_delta(orig_pos, new_pos, strand):
     """ Given a starting position and a new position, compute the distance
@@ -1724,8 +1589,8 @@ def compute_delta(orig_pos, new_pos, strand):
 
 def identify_monoexon_transcript(chrom, positions, strand, cursor, location_dict,
                                  edge_dict, transcript_dict, vertex_2_gene,
-                                 gene_starts, gene_ends, run_info):
-
+                                 gene_starts, gene_ends, run_info, tmp_gene,
+                                 tmp_monoexon):
     gene_novelty = []
     transcript_novelty = []
     exon_novelty = []
@@ -1735,23 +1600,22 @@ def identify_monoexon_transcript(chrom, positions, strand, cursor, location_dict
 
     start = positions[0]
     end = positions[-1]
-    # First, look for a monoexonic FSM transcript match that meets the cutoff
-    # distance criteria
-    query = """ SELECT * 
-                    FROM temp_monoexon AS tm
-                    WHERE tm.chromosome = '%s'
-                    AND tm.strand = '%s'
-                    AND tm.start >= %d
-                    AND tm.start <= %d
-                    AND tm.end >= %d
-                    AND tm.end <= %d  
-               """
-    lower_start_bound = start - cutoff_5p
-    upper_start_bound = start + cutoff_5p
-    lower_end_bound = end - cutoff_3p
-    upper_end_bound = end + cutoff_3p
-    cursor.execute(query % (chrom, strand, lower_start_bound, upper_start_bound,
-                            lower_end_bound, upper_end_bound))
+    # First, look for a monoexonic transcript match that overlaps the current
+    # transcript
+    query = Template(""" SELECT * 
+                    FROM $tmp_monoexon AS tm
+                    WHERE tm.chromosome = '$chrom'
+                    AND tm.strand = '$strand'
+                    AND ((min_pos <= $start AND max_pos >= $end)
+                      OR (min_pos >= $start AND max_pos <= $end)
+                      OR (min_pos >= $start AND min_pos <= $end)
+                      OR (max_pos >= $start AND max_pos <= $end))
+                    """).substitute({"tmp_monoexon": tmp_monoexon,
+                                     "chrom": chrom, "strand": strand, 
+                                     "start": min(start, end), 
+                                     "end": max(start, end)})
+                                    
+    cursor.execute(query)
     matches = cursor.fetchall()
 
     # If there is more than one match, apply a tiebreaker (pick the one with 
@@ -1805,27 +1669,27 @@ def identify_monoexon_transcript(chrom, positions, strand, cursor, location_dict
             # Find best gene match using overlap search if the ISM/NIC check didn't work
             gene_ID, match_strand = search_for_overlap_with_gene(chrom, positions[0],
                                                              positions[1], strand,
-                                                             cursor, run_info) 
+                                                             cursor, run_info, tmp_gene) 
             # Intergenic case
             if gene_ID == None:
                 gene_ID = create_gene(chrom, positions[0], positions[-1],
-                                      strand, cursor, run_info)
+                                      strand, cursor, tmp_gene)
 
                 gene_novelty.append((gene_ID, run_info.idprefix, "TALON",
                                      "intergenic_novel","TRUE"))
                 transcript_ID = create_transcript(chrom, positions[0], positions[-1],
                                               gene_ID, edge_IDs, vertex_IDs,
-                                              transcript_dict, run_info)["transcript_ID"]
+                                              transcript_dict)["transcript_ID"]
                 transcript_novelty.append((transcript_ID, run_info.idprefix, "TALON",
                                       "intergenic_transcript", "TRUE"))     
             # Antisense case
             elif match_strand != strand:
                 anti_gene_ID = gene_ID
                 gene_ID = create_gene(chrom, positions[0], positions[-1],
-                                      strand, cursor, run_info)
+                                      strand, cursor, tmp_gene)
                 transcript_ID = create_transcript(chrom, positions[0], positions[-1],
                                               gene_ID, edge_IDs, vertex_IDs,
-                                              transcript_dict, run_info)["transcript_ID"]
+                                              transcript_dict)["transcript_ID"]
 
                 gene_novelty.append((gene_ID, run_info.idprefix, "TALON",
                                      "antisense_gene","TRUE"))
@@ -1838,7 +1702,7 @@ def identify_monoexon_transcript(chrom, positions, strand, cursor, location_dict
             else:
                 transcript_ID = create_transcript(chrom, positions[0], positions[-1],
                                               gene_ID, edge_IDs, vertex_IDs,
-                                              transcript_dict, run_info)["transcript_ID"]
+                                              transcript_dict)["transcript_ID"]
                 transcript_novelty.append((transcript_ID, run_info.idprefix, "TALON",
                                   "genomic_transcript", "TRUE"))
 
@@ -1874,369 +1738,195 @@ def identify_monoexon_transcript(chrom, positions, strand, cursor, location_dict
         
         # Add the novel transcript to the temporary monoexon table
         new_mono = ( gene_ID, transcript_ID, chrom, start, end, strand, 
-                     vertex_IDs[0], vertex_IDs[-1], edge_IDs[0] )
+                     vertex_IDs[0], vertex_IDs[-1], edge_IDs[0],
+                     min(start, end), max(start, end) )
         cols = '("gene_ID", "transcript_ID", "chromosome", "start", "end",' + \
-                 '"strand", "start_vertex", "end_vertex", "exon_ID")'
-        command = 'INSERT INTO temp_monoexon ' + cols + ' VALUES ' + '(?,?,?,?,?,?,?,?,?)'
+                 '"strand", "start_vertex", "end_vertex", "exon_ID", "min_pos",' + \
+                  '"max_pos")'
+        command = 'INSERT INTO ' + tmp_monoexon + ' ' + cols + ' VALUES ' + \
+                  '(?,?,?,?,?,?,?,?,?,?,?)'
         cursor.execute(command, new_mono)
 
     # Package annotation information
-    annotations = {'gene_ID': gene_ID,
-                   'transcript_ID': transcript_ID,
-                   'gene_novelty': gene_novelty,
-                   'transcript_novelty': transcript_novelty,
-                   'exon_novelty': exon_novelty,
-                   'start_vertex': vertex_IDs[0],
-                   'end_vertex': vertex_IDs[-1],
-                   'start_exon': edge_IDs[0],
-                   'end_exon': edge_IDs[-1],
-                   'start_delta': diff_5p,
-                   'end_delta': diff_3p}
+    annotations = dstruct.Struct()
+    annotations.gene_ID = gene_ID
+    annotations.transcript_ID = transcript_ID
+    annotations.gene_novelty = gene_novelty
+    annotations.transcript_novelty = transcript_novelty
+    annotations.exon_novelty = exon_novelty
+    annotations.start_vertex = vertex_IDs[0]
+    annotations.end_vertex = vertex_IDs[-1]
+    annotations.start_exon = edge_IDs[0]
+    annotations.end_exon = edge_IDs[-1]
+    annotations.start_delta = diff_5p
+    annotations.end_delta = diff_3p
+
     return annotations
 
-def annotate_sam_transcripts(sam_file: str, dataset, cursor, struct_collection, QC_file):
-    """ Process SAM transcripts and annotate the ones that pass QC """
-
-    observed_transcripts = []
-    gene_annotations = []
-    transcript_annotations = []
-    exon_annotations = []
-    abundance = {}
-
-    mode = "rb" if sam_file.endswith(".bam") else "r"
-    with pysam.AlignmentFile(sam_file, mode) as sam:  # type: pysam.AlignmentFile
-        for record in sam:  # type: pysam.AlignedSegment
-            # Check whether we should try annotating this read or not
-            qc_metrics = check_read_quality(record, struct_collection)
-            passed_qc = qc_metrics[1]
-            QC_file.write("\t".join([str(x) for x in [dataset] + qc_metrics]) \
-                          + "\n")
-
-            if not passed_qc:
-                continue
-
-            # For transcripts that pass QC, parse the attributes to 
-            # determine the chromosome, positions, and strand of the transcript
-            read_ID = record.query_name
-            chrom = record.reference_name
-            read_length = record.query_length
-            sam_start = record.reference_start + 1
-            sam_end = record.reference_end
-            cigar = record.cigarstring
-            flag = record.flag
-            intron_list = tutils.get_introns(record, sam_start, cigar)
-            # Adjust intron positions by 1 to get splice sites
-            splice_sites = [x + 1 if i % 2 == 1 else x - 1 for i, x in
-                            enumerate(intron_list)]
-            positions = [sam_start] + splice_sites + [sam_end]
-
-            # Flip the positions order if the read is on the minus strand
-            if flag in [16, 272]:
-                strand = "-"
-                positions = positions[::-1]
-            else:
-                strand = "+"
-
-            # Now identify the transcript
-            location_dict = struct_collection.location_dict
-            edge_dict = struct_collection.edge_dict
-            transcript_dict = struct_collection.transcript_dict
-            vertex_2_gene = struct_collection.vertex_2_gene
-            gene_starts = struct_collection.gene_starts
-            gene_ends = struct_collection.gene_ends
-            run_info = struct_collection.run_info
-
-            #try:
-            n_exons = len(positions)/2
-            if n_exons > 1:
-                annotation_info = identify_transcript(chrom, positions, strand, 
-                                     cursor, location_dict, 
-                                     edge_dict, transcript_dict, 
-                                     vertex_2_gene, 
-                                     gene_starts, gene_ends,
-                                     run_info)
-            else:
-                annotation_info = identify_monoexon_transcript(chrom, positions, strand,
-                                                  cursor, location_dict,
-                                                  edge_dict, transcript_dict,
-                                                  vertex_2_gene,
-                                                  gene_starts, gene_ends,
-                                                  run_info)
-            #except Exception as e:
-            #    print(e)
-            #    warnings.warn("Problem identifying transcript '%s'. Skipping.."\
-            #                   % read_ID) 
-            #    sys.exit(1)
-                #continue
-                            
-            # Now that transcript has been annotated, unpack values and 
-            # create an observed entry and abundance record
-            gene_ID = annotation_info['gene_ID']
-            transcript_ID = annotation_info['transcript_ID']
-            gene_novelty = annotation_info['gene_novelty']
-            transcript_novelty = annotation_info['transcript_novelty']
-            exon_novelty = annotation_info['exon_novelty']
-            start_vertex = annotation_info['start_vertex']
-            end_vertex = annotation_info['end_vertex']
-            start_delta = annotation_info['start_delta']
-            end_delta = annotation_info['end_delta']
-            start_exon = annotation_info['start_exon']
-            end_exon = annotation_info['end_exon']
-
-            struct_collection.run_info['observed'] += 1
-            obs_ID = struct_collection.run_info['observed'] 
-            observed = (obs_ID, gene_ID, transcript_ID, read_ID, dataset, 
-                        start_vertex, end_vertex, start_exon, end_exon,
-                        start_delta, end_delta, read_length)
-            observed_transcripts.append(observed)
-
-            # Also add transcript to abundance dict
-            try:
-                abundance[transcript_ID] += 1
-            except:
-                abundance[transcript_ID] = 1
-
-            # Update annotation records
-            gene_annotations += gene_novelty
-            transcript_annotations += transcript_novelty
-            exon_annotations += exon_novelty
-
-    # Before returning abundance, reformat it as database rows
-    abundance_rows = []
-    for transcript, count in abundance.items():
-        curr_row = (transcript, dataset, count)
-        abundance_rows.append(curr_row)
-    
-    return observed_transcripts, gene_annotations, transcript_annotations, \
-           exon_annotations, abundance_rows
-            
-
-def check_read_quality(sam_record: pysam.AlignedSegment, struct_collection):
-    """ Process an individual sam read and return quality attributes. """
-    read_ID = sam_record.query_name
-    flag = sam_record.flag
-    cigar = sam_record.cigarstring
-    seq = sam_record.query
-    read_length = sam_record.query_length
-
-    # Only use uniquely mapped transcripts
-    if flag not in [0, 16]:
-        return [read_ID, 0, 0, read_length, "NA", "NA"]
-
-    # Only use reads that are greater than or equal to length threshold
-    if read_length < struct_collection.run_info.min_length:
-        return [read_ID, 0, 1, read_length, "NA", "NA"]
-
-    # Locate the MD field of the sam transcript
-    try:
-        md_tag = sam_record.get_tag('MD')
-    except KeyError:
-        raise ValueError("SAM transcript %s lacks an MD tag" % read_ID)
-
-    # Only use reads where alignment coverage and identity exceed
-    # cutoffs
-    coverage = tutils.compute_alignment_coverage(cigar)
-    identity = tutils.compute_alignment_identity(md_tag, seq)
-
-    if coverage < struct_collection.run_info.min_coverage or \
-       identity < struct_collection.run_info.min_identity:
-        return [read_ID, 0, 1, read_length, coverage, identity]
-
-    # At this point, the read has passed the quality control
-    return [read_ID, 1, 1, read_length, coverage, identity]
-    
-def update_database(cursor, batch_size, datasets, observed_transcripts, 
-                    gene_annotations, transcript_annotations, exon_annotations,
-                    abundance, struct_collection):
+def update_database(database, batch_size, outfiles, datasets):
     """ Adds new entries to the database. """
 
-    print("Adding novel genes to database...")
-    add_genes(cursor)
+    conn = sqlite3.connect(database)
+    conn.row_factory = sqlite3.Row
+    cursor = conn.cursor()
 
-    print("Adding novel transcripts to database...")
-    batch_add_transcripts(cursor, struct_collection.transcript_dict, batch_size) 
-
-    print("Adding novel exons/introns to database...")
-    batch_add_edges(cursor, struct_collection.edge_dict, batch_size)
-
-    print("Adding novel vertices/locations to database...")
-    batch_add_locations(cursor, struct_collection.location_dict, batch_size)
-
-    print("Updating gene-vertex assignments...")
-    batch_add_vertex2gene(cursor, struct_collection.vertex_2_gene, batch_size)
-
-    print("Adding %d dataset record(s) to database..." % len(datasets))
+    batch_add_genes(cursor, outfiles.genes, batch_size)
+    batch_add_transcripts(cursor, outfiles.transcripts, batch_size) 
+    batch_add_edges(cursor, outfiles.edges, batch_size)
+    batch_add_locations(cursor, outfiles.location, batch_size)
+    batch_add_vertex2gene(cursor, outfiles.v2g, batch_size)
     add_datasets(cursor, datasets)  
- 
-    print("Updating abundance table....")
-    batch_add_abundance(cursor, abundance, batch_size) 
+    batch_add_observed(cursor, outfiles.observed, batch_size)
+    update_counter(cursor, len(datasets))
+    batch_add_annotations(cursor, outfiles.gene_annot, "gene", batch_size)
+    batch_add_annotations(cursor, outfiles.transcript_annot, "transcript",
+                          batch_size)
+    batch_add_annotations(cursor, outfiles.exon_annot, "exon", batch_size)
 
-    print("Adding %d transcript observation(s) to database..." % len(observed_transcripts))
-    batch_add_observed(cursor, observed_transcripts, batch_size)
-
-    print("Updating counters...")
-    update_counter(cursor, struct_collection.run_info)
-
-    print("Updating gene, transcript, and exon annotations...")
-    batch_add_annotations(cursor, gene_annotations, "gene", batch_size)
-    batch_add_annotations(cursor, transcript_annotations, "transcript", batch_size)
-    batch_add_annotations(cursor, exon_annotations, "exon", batch_size)
+    check_database_integrity(cursor)
+    conn.commit()
+    conn.close()
 
     return
  
-def update_counter(cursor, run_info):
-    # Update the database counter
+def update_counter(cursor, n_datasets):
+    """ Update the database counter usign the global counter variables """
     
     update_g = 'UPDATE "counters" SET "count" = ? WHERE "category" = "genes"'
-    cursor.execute(update_g,[run_info.genes])
+    cursor.execute(update_g,[gene_counter.value()])
     
     update_t = 'UPDATE "counters" SET "count" = ? WHERE "category" = "transcripts"'
-    cursor.execute(update_t,[run_info.transcripts])
+    cursor.execute(update_t,[transcript_counter.value()])
 
     update_e = 'UPDATE "counters" SET "count" = ? WHERE "category" = "edge"'
-    cursor.execute(update_e,[run_info.edge])
+    cursor.execute(update_e,[edge_counter.value()])
 
     update_v = 'UPDATE "counters" SET "count" = ? WHERE "category" = "vertex"'
-    cursor.execute(update_v,[run_info.vertex])
+    cursor.execute(update_v,[vertex_counter.value()])
 
     update_d = 'UPDATE "counters" SET "count" = ? WHERE "category" = "dataset"'
-    cursor.execute(update_d,[run_info.dataset])
+    cursor.execute(update_d,[n_datasets])
 
     update_o = 'UPDATE "counters" SET "count" = ? WHERE "category" = "observed"'
-    cursor.execute(update_o,[run_info.observed])
+    cursor.execute(update_o,[observed_counter.value()])
 
     return
 
-def batch_add_vertex2gene(cursor, vertex_2_gene, batch_size):
+def batch_add_vertex2gene(cursor, v2g_file, batch_size):
     """ Add new vertex-gene relationships to the vertex table """
-    entries = []
-    for vertex_ID, gene_set in vertex_2_gene.items():
-        for gene in gene_set:
-            entries.append((vertex_ID, gene[0]))
 
-    index = 0
-    while index < len(entries):
-        try:
-            batch = entries[index:index + batch_size]
-        except:
-            batch = entries[index:]
-        index += batch_size
+    with open(v2g_file, 'r') as f:
+        while True:
+            batch = [ tuple(x.strip().split("\t")) for x in islice(f, batch_size) ]
 
-        try:
-            cols = " (" + ", ".join([str_wrap_double(x) for x in
-                   ["vertex_ID", "gene_ID"]]) + ") "
-            command = 'INSERT OR IGNORE INTO "vertex"' + cols + "VALUES " + \
-                      '(?,?)'
-            cursor.executemany(command, batch)
+            if batch == []:
+                break
 
-        except Exception as e:
-            print(e)
-            sys.exit(1)
+            try:
+                cols = " (" + ", ".join([str_wrap_double(x) for x in
+                       ["vertex_ID", "gene_ID"]]) + ") "
+                command = 'INSERT OR IGNORE INTO "vertex"' + cols + "VALUES " + \
+                          '(?,?)'
+                cursor.executemany(command, batch)
+
+            except Exception as e:
+                print(e)
+                sys.exit(1)
     return
 
-def batch_add_locations(cursor, location_dict, batch_size):
+def batch_add_locations(cursor, location_file, batch_size):
     """ Add new locations to database """
-    location_entries = []
-    for chrom_dict in location_dict.values():
-        for loc in list(chrom_dict.values()):
-            if type(loc) is dict:
-                location_entries.append((loc['location_ID'],
-                                         loc['genome_build'],
-                                         loc['chromosome'],
-                                         loc['position']))
 
-    index = 0
-    while index < len(location_entries):
-        try:
-            location_batch = location_entries[index:index + batch_size]
-        except:
-            location_batch = location_entries[index:]
-        index += batch_size
+    with open(location_file, 'r') as f:
+        while True:
+            batch = [ tuple(x.strip().split("\t")) for x in islice(f, batch_size) ]
 
-        try:
-            cols = " (" + ", ".join([str_wrap_double(x) for x in
-                   ["location_ID", "genome_build", "chromosome", "position"]]) + ") "
-            command = 'INSERT INTO "location"' + cols + "VALUES " + \
-                      '(?,?,?,?)'
-            cursor.executemany(command, location_batch)
+            if batch == []:
+                break
 
-        except Exception as e:
-            print(e)
-            sys.exit(1)
+            try:
+                cols = " (" + ", ".join([str_wrap_double(x) for x in
+                       ["location_ID", "genome_build", "chromosome", "position"]]) + ") "
+                command = 'INSERT INTO "location"' + cols + "VALUES " + \
+                          '(?,?,?,?)'
+                cursor.executemany(command, batch)
+
+            except Exception as e:
+                print(e)
+                sys.exit(1)
     return
     
 
-def batch_add_edges(cursor, edge_dict, batch_size):
+def batch_add_edges(cursor, edge_file, batch_size):
     """ Add new edges to database """
-    edge_entries = []
-    for edge in list(edge_dict.values()):
-        if type(edge) is dict:
-            edge_entries.append((edge['edge_ID'],
-                                 edge['v1'],
-                                 edge['v2'],
-                                 edge['edge_type'],
-                                 edge['strand']))
 
-    index = 0
-    while index < len(edge_entries):
-        try:
-            batch = edge_entries[index:index + batch_size]
-        except:
-            batch = edge_entries[index:]
-        index += batch_size
+    with open(edge_file, 'r') as f:
+        while True:
+            batch = [ tuple(x.strip().split("\t")) for x in islice(f, batch_size) ]
 
-        try:
-            cols = " (" + ", ".join([str_wrap_double(x) for x in
-                   ["edge_ID", "v1", "v2", "edge_type", "strand"]]) + ") "
-            command = 'INSERT INTO "edge"' + cols + "VALUES " + '(?,?,?,?,?)'
-            cursor.executemany(command, batch)
+            if batch == []:
+                break
 
-        except Exception as e:
-            print(e)
-            sys.exit(1)
+            try:
+                cols = " (" + ", ".join([str_wrap_double(x) for x in
+                       ["edge_ID", "v1", "v2", "edge_type", "strand"]]) + ") "
+                command = 'INSERT INTO "edge"' + cols + "VALUES " + '(?,?,?,?,?)'
+                cursor.executemany(command, batch)
+
+            except Exception as e:
+                print(e)
+                sys.exit(1)
 
     return
 
-def batch_add_transcripts(cursor, transcript_dict, batch_size):
+def batch_add_transcripts(cursor, transcript_file, batch_size):
     """ Add new transcripts to database """
 
-    transcript_entries = []
-    for transcript in list(transcript_dict.values()):
-        if type(transcript) is dict:
-            transcript_entries.append((transcript['transcript_ID'],
-                                       transcript['gene_ID'],
-                                       transcript['start_exon'],
-                                       transcript['jn_path'],
-                                       transcript['end_exon'],
-                                       transcript['start_vertex'],
-                                       transcript['end_vertex'],
-                                       transcript['n_exons']))
+    with open(transcript_file, 'r') as f:
+        while True:
+            batch_lines = islice(f, batch_size)
+            batch = []
+            for line in batch_lines:
+                transcript = line.strip().split("\t")
+                if transcript[3] == 'None':
+                    transcript[3] = None
+                batch.append(transcript)
 
-    index = 0
-    while index < len(transcript_entries):
-        try:
-            transcript_batch = transcript_entries[index:index + batch_size]
-        except:
-            transcript_batch = transcript_entries[index:]
-        index += batch_size
+            if batch == []:
+                break
 
-        try:
-            cols = " (" + ", ".join([str_wrap_double(x) for x in
-                   ["transcript_id", "gene_id", "start_exon", "jn_path", 
-                     "end_exon", "start_vertex", "end_vertex", "n_exons"]]) + ") "
-            command = 'INSERT INTO "transcripts"' + cols + "VALUES " + '(?,?,?,?,?,?,?,?)'
-            cursor.executemany(command, transcript_batch)
-        except Exception as e:
-            print(e)
-            sys.exit(1)
+            try:
+                cols = " (" + ", ".join([str_wrap_double(x) for x in
+                       ["transcript_id", "gene_id", "start_exon", "jn_path", 
+                         "end_exon", "start_vertex", "end_vertex", "n_exons"]]) + ") "
+                command = 'INSERT INTO "transcripts"' + cols + "VALUES " + '(?,?,?,?,?,?,?,?)'
+                cursor.executemany(command, batch)
+
+            except Exception as e:
+                print(e)
+                sys.exit(1)
 
     return
 
-def add_genes(cursor):
-    """ Extract gene entries from the temporary table """
+def batch_add_genes(cursor, gene_file, batch_size):
+    """ Add genes to the database gene table """
+  
+    with open(gene_file, 'r') as f:
+        while True:
+            batch = [ tuple(x.strip().split("\t")) for x in islice(f, batch_size) ]
 
-    query = "INSERT or IGNORE INTO genes SELECT gene_ID, strand FROM temp_gene;"
-    cursor.execute(query)
+            if batch == []:
+                break
+
+            try:
+                cols = " (" + ", ".join([str_wrap_double(x) for x in
+                       ["gene_ID", "strand"]]) + ") "
+                command = 'INSERT OR IGNORE INTO genes' + cols + "VALUES "+ '(?,?)'
+                cursor.executemany(command, batch)
+
+            except Exception as e:
+                print(e)
+                sys.exit(1)
     return
 
 def add_datasets(cursor, datasets):
@@ -2254,7 +1944,7 @@ def add_datasets(cursor, datasets):
         sys.exit(1)
     return
 
-def batch_add_annotations(cursor, annotations, annot_type, batch_size):
+def batch_add_annotations(cursor, annot_file, annot_type, batch_size):
     """ Add gene/transcript/exon annotations to the appropriate annotation table
     """
     batch_size = 1
@@ -2262,65 +1952,94 @@ def batch_add_annotations(cursor, annotations, annot_type, batch_size):
         raise ValueError("When running batch annot update, must specify " + \
                          "annot_type as 'gene', 'exon', or 'transcript'.")
 
-    index = 0
-    while index < len(annotations):
-        try:
-            batch = annotations[index:index + batch_size]
-        except:
-            batch = annotations[index:]
-        index += batch_size
+    with open(annot_file, 'r') as f:
+        while True:
+            batch = [ tuple(x.strip().split("\t")) for x in islice(f, batch_size) ]
 
-        try:
-            cols = " (" + ", ".join([str_wrap_double(x) for x in
-                   ["ID", "annot_name", "source", "attribute", "value"]]) + ") "
-            command = 'INSERT OR IGNORE INTO "' + annot_type + '_annotations" ' + cols + \
-                      "VALUES " + '(?,?,?,?,?)'
-            cursor.executemany(command, batch)
+            if batch == []:
+                break
 
-        except Exception as e:
-            print(e)
-            sys.exit(1)
+            try:
+                cols = " (" + ", ".join([str_wrap_double(x) for x in
+                       ["ID", "annot_name", "source", "attribute", "value"]]) + ") "
+                command = 'INSERT OR IGNORE INTO "' + annot_type + \
+                          '_annotations" ' + cols + "VALUES " + '(?,?,?,?,?)'
+                cursor.executemany(command, batch)
+
+            except Exception as e:
+                print(e)
+                sys.exit(1)
     return
 
-def batch_add_observed(cursor, observed, batch_size):
+def batch_add_observed(cursor, observed_file, batch_size):
     """ Adds observed tuples (obs_ID, gene_ID, transcript_ID, read_name,
         dataset, start_vertex_ID, end_vertex_ID, start_exon, end_exon, 
         start_delta, end_delta, read_length) to observed table of database. """
 
-    index = 0
-    while index < len(observed):
-        try:
-            batch = observed[index:index + batch_size]
-        except:
-            batch = observed[index:]
-        index += batch_size
+    abundance = {}
+    with open(observed_file, 'r') as f:
+        while True:
+            batch = []
+            for observed in islice(f, batch_size):
+                observed = observed.strip().split("\t")
+                  
+                # Start and end delta values may be None
+                if observed[9] == "None":
+                    observed[9] = None
+                if observed[10] == "None":
+                    observed[10] = None
 
-        # Add to database
-        try:
-            cols = " (" + ", ".join([str_wrap_double(x) for x in
-                   ["obs_ID", "gene_ID", "transcript_ID", "read_name",
-                    "dataset", "start_vertex", "end_vertex",
-                    "start_exon", "end_exon",
-                    "start_delta", "end_delta", "read_length"]]) + ") "
-            command = 'INSERT INTO "observed"' + cols + \
-                      "VALUES " + '(?,?,?,?,?,?,?,?,?,?,?,?)'
-            cursor.executemany(command, batch)
+                batch.append(tuple(observed))
 
-        except Exception as e:
-            print(e)
-            sys.exit(1)
+                # Add record to abundance dict
+                dataset = observed[4]
+                transcript_ID = observed[2]
+
+                if dataset not in abundance:
+                    abundance[dataset] = {}                
+
+                try:
+                    abundance[dataset][transcript_ID] += 1
+                except:
+                    abundance[dataset][transcript_ID] = 1
+
+            if batch == []:
+                break
+
+            # Add to database
+            try:
+                cols = " (" + ", ".join([str_wrap_double(x) for x in
+                       ["obs_ID", "gene_ID", "transcript_ID", "read_name",
+                        "dataset", "start_vertex", "end_vertex",
+                        "start_exon", "end_exon",
+                        "start_delta", "end_delta", "read_length"]]) + ") "
+                command = 'INSERT INTO "observed"' + cols + \
+                          "VALUES " + '(?,?,?,?,?,?,?,?,?,?,?,?)'
+                cursor.executemany(command, batch)
+
+            except Exception as e:
+                print(e)
+                sys.exit(1)
+
+    # Now create abundance tuples and add to DB
+    abundance_tuples = []
+    for dataset in abundance.keys():
+        for transcript, count in abundance[dataset].items():
+            abundance_tuples.append((transcript, dataset, count))
+
+    batch_add_abundance(cursor, abundance_tuples, batch_size)
     return
 
-def batch_add_abundance(cursor, abundances, batch_size):
-    """ Adds abundance tuples (transcript_ID, dataset, count) to the abundance
-        table of the database """
+def batch_add_abundance(cursor, entries, batch_size):
+    """ Reads abundance tuples (transcript_ID, dataset, count) and 
+        adds to the abundance table of the database """
 
     index = 0
-    while index < len(abundances):
+    while index < len(entries):
         try:
-            batch = abundances[index:index + batch_size]
+            batch = entries[index:index + batch_size]
         except:
-            batch = abundances[index:]
+            batch = entries[index:]
         index += batch_size
 
         try:
@@ -2336,11 +2055,14 @@ def batch_add_abundance(cursor, abundances, batch_size):
 def check_database_integrity(cursor):
     """ Perform some checks on the database. Run before committing changes"""
 
-    print("Validating database........")
+    ts = time.strftime("%Y-%m-%d %H:%M:%S", time.gmtime())
+    print("[ %s ] Validating database........" % (ts))
+
     # For each category, check that the number of table entries matches the counter
     counter_query = "SELECT * FROM counters"
     cursor.execute(counter_query)
     counters = cursor.fetchall()
+    fail = 0
 
     for table_name, curr_counter in counters:
         curr_counter = int(curr_counter)
@@ -2354,89 +2076,357 @@ def check_database_integrity(cursor):
         actual_count = int(cursor.fetchone()[0])
 
         if actual_count != curr_counter:
-            print("table_count: "  + str(actual_count))
-            print("counter_value: " + str(curr_counter))
-            raise ValueError("Database counter for '" + table_name + \
+            fail = 1
+            print("Database counter for '" + table_name + \
                   "' does not match the number of entries in the table." + \
                   " Discarding changes to database and exiting...")
+            print("table_count: "  + str(actual_count))
+            print("counter_value: " + str(curr_counter))
+
+    if fail == 1:
+        raise RuntimeError("Discrepancy found in database. " + \
+                           "Discarding changes to database and exiting...")
 
     return
 
-def write_counts_log_file(cursor, outprefix):
-    """ Create a log file with the following columns:
-            - dataset name
-            - Number of reads annotated
-            - Number of known genes detected (total)
-            - Number of novel genes detected (total)
-            - Number of known transcripts detected (total)
-            - Number of novel transcripts detected (total)
-            Breakdowns by category
-            - Number of antisense genes detected
-            - Number of intergenic genes detected
-            - Number of known transcripts
-            - Number of FSM transcripts detected (perfect + with novelty)
-            - Number of total ISM transcripts detected
-            - Number of suffix ISMs detected
-            - Number of antisense transcripts detected
-            - Number of genomic transcripts detected
+
+def parallel_talon(read_file, interval, database, run_info, queue):
+    """ Manage TALON processing of a single chunk of the input. Initialize
+        reference data structures covering only the provided interval region,
+        then send the read file to the annotation step. Once annotation is 
+        complete, return the data tuples generated so that they can be 
+        added to the database, OR alternately, pickle them and write to file
+        where they can be accessed later. """
+
+    ts = time.strftime("%Y-%m-%d %H:%M:%S", time.gmtime())
+    print("[ %s ] Annotating reads in interval %s:%d-%d..." % \
+          (ts, interval[0], interval[1], interval[2]))
+
+    with sqlite3.connect(database) as conn:
+        conn.row_factory = sqlite3.Row
+        cursor = conn.cursor()
+
+        #print("Processing annotation for interval %s:%d-%d..." % interval)
+        tmp_id = str(os.getpid())
+        struct_collection = prepare_data_structures(cursor, run_info,
+                                                    chrom = interval[0], 
+                                                    start = interval[1], 
+                                                    end = interval[2], 
+                                                    tmp_id = tmp_id)
+         
+        interval_id = "%s_%d_%d" % interval
+
+        with pysam.AlignmentFile(read_file, "rb") as sam:
+            for record in sam:  # type: pysam.AlignedSegment
+                # Check whether we should try annotating this read or not
+                qc_metrics = tutils.check_read_quality(record, run_info)
+
+                passed_qc = qc_metrics[2]
+                qc_msg = (run_info.outfiles.qc, "\t".join([str(x) for x in qc_metrics]))
+                queue.put(qc_msg)
+
+                if passed_qc:
+                    annotation_info = annotate_read(record, cursor, run_info, 
+                                                    struct_collection)
+                    unpack_observed(annotation_info, queue, 
+                                                  run_info.outfiles.observed)
+                    
+                    # Update annotation records
+                    # TODO: there is no need for entry to be a list/tuple
+                    for entry in annotation_info.gene_novelty:
+                        msg = (run_info.outfiles.gene_annot, 
+                               "\t".join([str(x) for x in entry]))
+                        queue.put(msg)
+                    for entry in annotation_info.transcript_novelty:
+                        msg = (run_info.outfiles.transcript_annot,
+                               "\t".join([str(x) for x in entry]))
+                        queue.put(msg)
+                    for entry in annotation_info.exon_novelty:
+                        msg = (run_info.outfiles.exon_annot,
+                               "\t".join([str(x) for x in entry]))
+                        queue.put(msg)
+
+        # Write the temp_gene table to file
+        cursor.execute("SELECT gene_ID, strand FROM " + struct_collection.tmp_gene)
+        for row in cursor.fetchall():
+            msg = ((run_info.outfiles.genes, str(row['gene_ID'])+"\t"+ row['strand']))
+            queue.put(msg)
+
+    # Pass messages to output files
+    # ========================================================================
+    # Write new transcripts to file
+    transcripts = struct_collection.transcript_dict
+    for transcript in list(transcripts.values()):
+        # Only write novel transcripts to file
+        if type(transcript) is dict:
+            entry = "\t".join([ str(x) for x in ( transcript['transcript_ID'],
+                                                 transcript['gene_ID'],
+                                                 transcript['start_exon'],
+                                                 transcript['jn_path'],
+                                                 transcript['end_exon'],
+                                                 transcript['start_vertex'],
+                                                 transcript['end_vertex'],
+                                                 transcript['n_exons'] ) ])
+            queue.put((run_info.outfiles.transcripts, entry))
+
+    # Write new edges to file
+    edges = struct_collection.edge_dict
+    for edge in list(edges.values()):
+        if type(edge) is dict:
+            entry = "\t".join([str(x) for x in [edge['edge_ID'], edge['v1'],
+                                                edge['v2'], edge['edge_type'],
+                                                edge['strand']]] )
+            queue.put((run_info.outfiles.edges, entry))
+
+    # Write locations to file
+    location_dict = struct_collection.location_dict
+    for chrom_dict in location_dict.values():
+        for loc in list(chrom_dict.values()):
+            if type(loc) is dict:
+                msg = (run_info.outfiles.location,
+                       "\t".join([ str(x) for x in (loc['location_ID'],
+                                                    loc['genome_build'],
+                                                    loc['chromosome'],
+                                                    loc['position'])]))
+                queue.put(msg)
+
+    # Write new vertex-gene combos to file
+    for vertex_ID, gene_set in struct_collection.vertex_2_gene.items():
+        for gene in gene_set:
+            msg = (run_info.outfiles.v2g, 
+                   "\t".join([ str(x) for x in (vertex_ID, gene[0])]))
+            queue.put(msg)
+
+    struct_collection = None
+ 
+    return
+
+def annotate_read(sam_record: pysam.AlignedSegment, cursor, run_info, 
+                  struct_collection, mode = 1):            
+    """ Accepts a pysam-formatted read as input, and compares it to the 
+        annotations in struct_collection to assign it a gene and transcript
+        identity. Returns annotation_info, which is a dict that has the 
+        following attributes:
+            gene_ID
+            transcript_ID
+            gene_novelty
+            transcript_novelty
+            exon_novelty
+            start_vertex
+            end_vertex
+            start_exon
+            end_exon
+            start_delta
+            end_delta  
     """
+    # Parse attributes to determine the chromosome, positions, and strand of the transcript
+    read_ID = sam_record.query_name
+    dataset = sam_record.get_tag("RG")
+    chrom = sam_record.reference_name
+    strand = "-" if sam_record.is_reverse else "+"
+    sam_start = sam_record.reference_start + mode 
+    sam_end = sam_record.reference_end
+    read_length = sam_record.query_alignment_length 
+    cigar = sam_record.cigarstring
 
-    # Run utility
-    summarize_datasets.write_counts_file(cursor, outprefix)
+    intron_list = tutils.get_introns(sam_record, sam_start, cigar)
 
-    return 
+    # Adjust intron positions by 1 to get splice sites in exon terms
+    splice_sites = [x + 1 if i % 2 == 1 else x - 1 for i, x in
+                    enumerate(intron_list)]
+    positions = [sam_start] + splice_sites + [sam_end]
+
+    # Flip the positions' order if the read is on the minus strand
+    if strand == "-":
+        positions = positions[::-1]
+
+    # Now identify the transcript
+    location_dict = struct_collection.location_dict
+    edge_dict = struct_collection.edge_dict
+    transcript_dict = struct_collection.transcript_dict
+    vertex_2_gene = struct_collection.vertex_2_gene
+    gene_starts = struct_collection.gene_starts
+    gene_ends = struct_collection.gene_ends
+
+    n_exons = int(len(positions)/2)
+    if n_exons > 1:
+        annotation_info = identify_transcript(chrom, positions, strand,
+                                              cursor, location_dict,
+                                              edge_dict, transcript_dict,
+                                              vertex_2_gene,
+                                              gene_starts, gene_ends,
+                                              run_info, 
+                                              struct_collection.tmp_gene)
+    else:
+        annotation_info = identify_monoexon_transcript(chrom, positions, strand,
+                                          cursor, location_dict,
+                                          edge_dict, transcript_dict,
+                                          vertex_2_gene,
+                                          gene_starts, gene_ends,
+                                          run_info, struct_collection.tmp_gene,
+                                          struct_collection.tmp_monoexon)
+    
+    annotation_info.read_ID = read_ID
+    annotation_info.dataset = dataset
+    annotation_info.location = "%s:%d-%d" % (chrom, sam_start, sam_end)
+    annotation_info.strand = strand
+    annotation_info.read_length = read_length
+    annotation_info.n_exons = n_exons
+    
+    return annotation_info
+
+def unpack_observed(annotation_info, queue, obs_file):
+    """ Now that transcript has been annotated, unpack values and
+        create an observed entry. Send the observed entry to the queue 
+        for output to obs_file."""
+
+    obs_ID = observed_counter.increment()
+    observed = (obs_ID, annotation_info.gene_ID, annotation_info.transcript_ID, 
+                annotation_info.read_ID, annotation_info.dataset,
+                annotation_info.start_vertex, annotation_info.end_vertex, 
+                annotation_info.start_exon, annotation_info.end_exon,
+                annotation_info.start_delta, annotation_info.end_delta, 
+                annotation_info.read_length)
+    msg = (obs_file, "\t".join([str(x) for x in observed]))
+    queue.put(msg)
+
+    return
+
+def listener(queue, outfiles, QC_header, timeout = 72):
+    """ During the run, this function listens for messages on the provided
+        queue. When a message is received (consisting of a filename and a 
+        string), it writes the string to that file. Timeout unit is in hours"""
+
+    # Open all of the outfiles
+    open_files = {}
+    for fpath in outfiles.values():
+        open_files[fpath] = open(fpath, 'w')
+
+    # Add a header to the QC file
+    QC_file = open_files[outfiles.qc]
+    QC_file.write(QC_header + "\n")
+
+    # Set a timeout
+    wait_until = datetime.now() + timedelta(hours=timeout)
+
+    while True:
+        msg = queue.get()
+        msg_fname = msg[0]
+        msg_value = msg[1]
+        if datetime.now() > wait_until or msg_value == 'complete':
+            ts = time.strftime("%Y-%m-%d %H:%M:%S", time.gmtime())
+            print("[ %s ] Shutting down message queue..." % (ts))
+            for f in open_files.values():
+                f.close()
+            break
+       
+        open_files[msg_fname].write(msg_value + "\n")
+        open_files[msg_fname].flush()
+
+def make_QC_header(coverage, identity, length):
+    """ Create a header for the read QC file """
+   
+    cols = "\t".join(["dataset", "read_ID", "passed_QC", "primary_mapped",
+                      "read_length", "fraction_aligned", "identity"])
+    header = "\n".join(["# TALON run filtering settings:",
+                        "# Min fraction read aligned: %f " % coverage,
+                        "# Min read identity to reference: %f" % identity,
+                        "# Min transcript length: %d" % length,
+                        "# -------------------------------------------",
+                        cols])
+                      
+    return header
 
 def main():
     """ Runs program """
+    ts = time.strftime("%Y-%m-%d %H:%M:%S", time.gmtime())
+    print("[ %s ] Started TALON run" % (ts))
 
     options = get_args()
-    sam_files, dataset_list = check_inputs(options)
-
-    # Fire up the database connection
-    database = options.database
-    conn = sqlite3.connect(database)
-    conn.row_factory = sqlite3.Row
-    cursor = conn.cursor()
-
+    sam_files, dset_metadata = check_inputs(options)
+    threads = int(options.threads)
+    if threads < 2: threads = 2 # Value of 1 will not work
+ 
     # Input parameters
+    database = options.database
     build = options.build
     min_coverage = float(options.min_coverage)
     min_identity = float(options.min_identity)
     outprefix = options.outprefix
 
-    # Prepare data structures from the database content
-    print("Processing annotation...")
-    struct_collection = prepare_data_structures(cursor, build, min_coverage, 
-                                                min_identity)
+    # Set globally accessible counters
+    get_counters(database)
 
-    # Read and annotate input sam files. Also, write output QC log file.
-    print("Processing SAM files...")
-    print("-------------------------------------")
-    datasets, observed_transcripts, gene_annotations, transcript_annotations, \
-    exon_annotations, abundance = process_all_sam_files(sam_files, dataset_list, cursor, 
-                                      struct_collection, outprefix)
-    print("-------------------------------------")
+    # Initialize worker pool
+    with mp.Pool(processes=threads) as pool:
+        run_info = init_run_info(database, build, min_coverage, min_identity)
+        run_info.outfiles = init_outfiles(options.outprefix)
 
-    # Update database
+        # Create annotation entry for each dataset
+        datasets = []
+        dataset_db_entries = []
+        for d_name, description, platform in dset_metadata:
+            run_info['dataset'] += 1
+            d_id = run_info['dataset']
+            datasets.append(d_name)
+            dataset_db_entries.append((d_id, d_name, description, platform))
+
+        # Partition the reads
+        read_groups, intervals, header_file = procsams.partition_reads(sam_files, datasets)
+        read_files = procsams.write_reads_to_file(read_groups, intervals, header_file)
+        ts = time.strftime("%Y-%m-%d %H:%M:%S", time.gmtime())
+        print("[ %s ] Split reads into %d intervals" % (ts, len(read_groups)))
+
+        # Set up a queue specifically for writing to outfiles
+        manager = mp.Manager()
+        queue = manager.Queue()
+
+        # Create job tuples to submit
+        jobs = []
+        for read_file, interval in zip(read_files, intervals):
+            jobs.append((read_file, interval, database, run_info, queue))
+
+        ts = time.strftime("%Y-%m-%d %H:%M:%S", time.gmtime())
+        print("[ %s ] Launching parallel annotation jobs" % (ts))
+
+        # Start running listener, which will monitor queue for messages
+        QC_header = make_QC_header(run_info.min_coverage, run_info.min_identity, 
+                                   run_info.min_length)
+        pool.apply_async(listener, (queue, run_info.outfiles, QC_header)) 
+
+        # Now launch the parallel TALON jobs
+        pool.starmap(parallel_talon, jobs)
+
+        # Now we are done, kill the listener
+        msg_done = (None, 'complete')
+        queue.put(msg_done)
+        pool.close()
+        pool.join()
+
+    ts = time.strftime("%Y-%m-%d %H:%M:%S", time.gmtime())
+    print("[ %s ] All jobs complete. Starting database update." % (ts))
+
+    # Update the database
     batch_size = 10000
-    update_database(cursor, batch_size, datasets, observed_transcripts,
-                    gene_annotations, transcript_annotations, exon_annotations,
-                    abundance, struct_collection)
+    update_database(database, batch_size, run_info.outfiles, dataset_db_entries)
+    ts = time.strftime("%Y-%m-%d %H:%M:%S", time.gmtime())
+    print("[ %s ] Database update complete." % (ts))
 
-    # Validate database
-    check_database_integrity(cursor) 
-    conn.commit()
+    # Write output reads file
+    ts = time.strftime("%Y-%m-%d %H:%M:%S", time.gmtime())
+    print("[ %s ] Creating read-wise annotation file." % (ts))
+    get_read_annotations.make_read_annot_file(database, build,  
+                                              outprefix, datasets = datasets)
 
-    # TODO: output files
-    # Write a file enumerating how many known/novel genes and transcripts
-    # were detected in each dataset
-    #write_counts_log_file(cursor, outprefix)
-    conn.close()
+    ## For debugging
+    #print("Genes: %d" % gene_counter.value())
+    #print("Transcripts: %d" % transcript_counter.value())
+    #print("Observed: %d" % observed_counter.value())
 
+    ts = time.strftime("%Y-%m-%d %H:%M:%S", time.gmtime())
+    print("[ %s ] DONE" % (ts))
 
 if __name__ == '__main__':
-    #pr = cProfile.Profile()
-    #pr.enable()
     main()
-    #pr.disable()
-    #pr.print_stats()
+
+

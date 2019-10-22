@@ -1,5 +1,5 @@
 import pytest
-from talon import talon
+from talon import talon, init_refs
 from .helper_fns import  fetch_correct_ID, get_db_cursor
 @pytest.mark.integration
 
@@ -11,21 +11,23 @@ class TestIdentifyRemaining(object):
         """
         conn, cursor = get_db_cursor()
         build = "toy_build"
-        edge_dict = talon.make_edge_dict(cursor)
-        location_dict = talon.make_location_dict(build, cursor)
-        run_info = talon.init_run_info(cursor, build)
-        transcript_dict = talon.make_transcript_dict(cursor, build)
-        vertex_2_gene = talon.make_vertex_2_gene_dict(cursor)
-        gene_starts, gene_ends = talon.make_gene_start_and_end_dict(cursor, build)
-        correct_gene_ID = run_info.genes + 1
+        database = "scratch/toy.db"
+        talon.get_counters(database)
+        edge_dict = init_refs.make_edge_dict(cursor)
+        location_dict = init_refs.make_location_dict(build, cursor)
+        run_info = talon.init_run_info(database, build)
+        transcript_dict = init_refs.make_transcript_dict(cursor, build)
+        vertex_2_gene = init_refs.make_vertex_2_gene_dict(cursor)
+        gene_starts, gene_ends = init_refs.make_gene_start_and_end_dict(cursor, build)
+        correct_gene_ID = talon.gene_counter.value() + 1
 
         # Construct temp novel gene db
-        talon.make_temp_novel_gene_table(cursor, "toy_build")
+        init_refs.make_temp_novel_gene_table(cursor, "toy_build")
 
         chrom = "chrX"
         positions = [ 1, 100, 900, 1000]
-        edge_IDs = [ run_info.edge + 1, run_info.edge + 2 ]
-        vertex_IDs = [ run_info.vertex + 1, run_info.vertex + 2 ]
+        edge_IDs = [ talon.edge_counter.value() + 1, talon.edge_counter.value() + 2 ]
+        vertex_IDs = [ talon.vertex_counter.value() + 1, talon.vertex_counter.value() + 2 ]
         strand = "+"
 
         gene_ID, transcript_ID, gene_novelty, transcript_novelty, start_end_info = \
@@ -36,7 +38,7 @@ class TestIdentifyRemaining(object):
                                                                 gene_starts, gene_ends, 
                                                                 edge_dict, location_dict,
                                                                 vertex_2_gene, run_info, 
-                                                                cursor)
+                                                                cursor, "temp_gene")
 
         assert gene_ID == correct_gene_ID
         assert transcript_dict[frozenset(start_end_info["edge_IDs"])] != None
@@ -49,21 +51,24 @@ class TestIdentifyRemaining(object):
         """
         conn, cursor = get_db_cursor()
         build = "toy_build"
-        edge_dict = talon.make_edge_dict(cursor)
-        location_dict = talon.make_location_dict(build, cursor)
-        run_info = talon.init_run_info(cursor, build)
-        transcript_dict = talon.make_transcript_dict(cursor, build)
-        vertex_2_gene = talon.make_vertex_2_gene_dict(cursor)
-        gene_starts, gene_ends = talon.make_gene_start_and_end_dict(cursor, build)
-        correct_gene_ID = run_info.genes + 1
+        database = "scratch/toy.db"
+        talon.get_counters(database)
+
+        edge_dict = init_refs.make_edge_dict(cursor)
+        location_dict = init_refs.make_location_dict(build, cursor)
+        run_info = talon.init_run_info(database, build)
+        transcript_dict = init_refs.make_transcript_dict(cursor, build)
+        vertex_2_gene = init_refs.make_vertex_2_gene_dict(cursor)
+        gene_starts, gene_ends = init_refs.make_gene_start_and_end_dict(cursor, build)
+        correct_gene_ID = talon.gene_counter.value() + 1
 
         # Construct temp novel gene db
-        talon.make_temp_novel_gene_table(cursor, "toy_build")
+        init_refs.make_temp_novel_gene_table(cursor, "toy_build")
 
         chrom = "chr2"
         positions = [ 1000, 950, 700, 600]
-        edge_IDs = [ run_info.edge + 1, run_info.edge + 2 ]
-        vertex_IDs = [ run_info.vertex + 1, run_info.vertex + 2 ]
+        edge_IDs = [ talon.edge_counter.value() + 1, talon.edge_counter.value() + 2 ]
+        vertex_IDs = [ talon.vertex_counter.value() + 1, talon.vertex_counter.value() + 2 ]
         strand = "-"
 
         gene_ID, transcript_ID, gene_novelty, transcript_novelty, start_end_info = \
@@ -74,7 +79,7 @@ class TestIdentifyRemaining(object):
                                                                 gene_starts, gene_ends,
                                                                 edge_dict, location_dict,
                                                                 vertex_2_gene, run_info,
-                                                                cursor)
+                                                                cursor, "temp_gene")
         assert gene_ID == correct_gene_ID
         assert transcript_dict[frozenset(start_end_info["edge_IDs"])] != None
         assert gene_novelty[0][-2] == "antisense_gene"
@@ -86,20 +91,22 @@ class TestIdentifyRemaining(object):
         """
         conn, cursor = get_db_cursor()
         build = "toy_build"
-        edge_dict = talon.make_edge_dict(cursor)
-        location_dict = talon.make_location_dict(build, cursor)
-        run_info = talon.init_run_info(cursor, build)
-        transcript_dict = talon.make_transcript_dict(cursor, build)
-        vertex_2_gene = talon.make_vertex_2_gene_dict(cursor)
-        gene_starts, gene_ends = talon.make_gene_start_and_end_dict(cursor, build)
+        database = "scratch/toy.db"
+        talon.get_counters(database)
+        edge_dict = init_refs.make_edge_dict(cursor)
+        location_dict = init_refs.make_location_dict(build, cursor)
+        run_info = talon.init_run_info(database, build)
+        transcript_dict = init_refs.make_transcript_dict(cursor, build)
+        vertex_2_gene = init_refs.make_vertex_2_gene_dict(cursor)
+        gene_starts, gene_ends = init_refs.make_gene_start_and_end_dict(cursor, build)
 
         # Construct temp novel gene db
-        talon.make_temp_novel_gene_table(cursor, "toy_build")
+        init_refs.make_temp_novel_gene_table(cursor, "toy_build")
 
         chrom = "chr1"
         positions = [ 1000, 950, 700, 600]
-        edge_IDs = [ run_info.edge + 1, run_info.edge + 2 ]
-        vertex_IDs = [ run_info.vertex + 1, run_info.vertex + 2 ]
+        edge_IDs = [ talon.edge_counter.value() + 1, talon.edge_counter.value() + 2 ]
+        vertex_IDs = [ talon.vertex_counter.value() + 1, talon.vertex_counter.value() + 2 ]
         strand = "-"
 
         gene_ID, transcript_ID, gene_novelty, transcript_novelty, start_end_info = \
@@ -110,7 +117,7 @@ class TestIdentifyRemaining(object):
                                                                 gene_starts, gene_ends,
                                                                 edge_dict, location_dict,
                                                                 vertex_2_gene, run_info,
-                                                                cursor)
+                                                                cursor, "temp_gene")
         correct_gene_ID = fetch_correct_ID("TG3", "gene", cursor)
         assert gene_ID == correct_gene_ID
         assert transcript_dict[frozenset(start_end_info["edge_IDs"])] != None

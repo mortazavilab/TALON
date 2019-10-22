@@ -1,5 +1,5 @@
 import pytest
-from talon import talon
+from talon import talon, init_refs
 from .helper_fns import fetch_correct_ID, get_db_cursor
 @pytest.mark.integration
 
@@ -11,16 +11,18 @@ class TestIdentifyNIC(object):
         """
         conn, cursor = get_db_cursor()
         build = "toy_build"
-        edge_dict = talon.make_edge_dict(cursor)
-        location_dict = talon.make_location_dict(build, cursor)
-        run_info = talon.init_run_info(cursor, build)
-        transcript_dict = talon.make_transcript_dict(cursor, build)
-        vertex_2_gene = talon.make_vertex_2_gene_dict(cursor)
-        gene_starts, gene_ends = talon.make_gene_start_and_end_dict(cursor, build)
+        database = "scratch/toy.db"
+        talon.get_counters(database)
+        edge_dict = init_refs.make_edge_dict(cursor)
+        location_dict = init_refs.make_location_dict(build, cursor)
+        run_info = talon.init_run_info(database, build)
+        transcript_dict = init_refs.make_transcript_dict(cursor, build)
+        vertex_2_gene = init_refs.make_vertex_2_gene_dict(cursor)
+        gene_starts, gene_ends = init_refs.make_gene_start_and_end_dict(cursor, build)
 
         chrom = "chr1"
         positions = [ 1, 100, 900, 1000]
-        edge_IDs = [ run_info.edge + 1 ]
+        edge_IDs = [ talon.edge_counter.value() + 1 ]
         vertex_IDs = [ 2, 5 ]
         strand = "+"
         v_novelty = [0, 0]
@@ -45,20 +47,22 @@ class TestIdentifyNIC(object):
 
         conn, cursor = get_db_cursor()
         build = "toy_build"
-        edge_dict = talon.make_edge_dict(cursor)
-        locations = talon.make_location_dict(build, cursor)
-        run_info = talon.init_run_info(cursor, build)
-        transcript_dict = talon.make_transcript_dict(cursor, build)
-        vertex_2_gene = talon.make_vertex_2_gene_dict(cursor)
-        gene_starts, gene_ends = talon.make_gene_start_and_end_dict(cursor, build)
+        database = "scratch/toy.db"
+        talon.get_counters(database)
+        edge_dict = init_refs.make_edge_dict(cursor)
+        locations = init_refs.make_location_dict(build, cursor)
+        run_info = talon.init_run_info(database, build)
+        transcript_dict = init_refs.make_transcript_dict(cursor, build)
+        vertex_2_gene = init_refs.make_vertex_2_gene_dict(cursor)
+        gene_starts, gene_ends = init_refs.make_gene_start_and_end_dict(cursor, build)
 
         # Construct temp novel gene db
-        talon.make_temp_novel_gene_table(cursor, "toy_build")
+        init_refs.make_temp_novel_gene_table(cursor, "toy_build")
 
         chrom = "chr1"
         start = 1000
         end = 1
-        edge_IDs = [ run_info.edge + 1 ] 
+        edge_IDs = [ talon.edge_counter.value() + 1 ] 
         positions = [ 1000, 900, 100, 1]
         vertex_IDs = [ 5, 2 ]
         strand = "-"
@@ -75,7 +79,7 @@ class TestIdentifyNIC(object):
                                                                   gene_ends, 
                                                                   edge_dict, locations, 
                                                                   vertex_2_gene, run_info,
-                                                                  cursor)
+                                                                  cursor, "temp_gene")
         #anti_gene_ID = talon.find_gene_match_on_vertex_basis(vertex_IDs, 
         #                                                     anti_strand,
         #                                                     vertex_2_gene)

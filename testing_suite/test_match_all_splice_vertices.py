@@ -1,5 +1,5 @@
 import pytest
-from talon import talon
+from talon import talon, init_refs
 from .helper_fns import get_db_cursor
 @pytest.mark.dbunit
 
@@ -11,9 +11,11 @@ class TestMatchAllVertices(object):
         """
         conn, cursor = get_db_cursor()
         build = "toy_build"
-        location_dict = talon.make_location_dict(build, cursor)
-        run_info = talon.init_run_info(cursor, build)
-        orig_vertex_count = run_info['vertex']
+        database = "scratch/toy.db"
+        talon.get_counters(database)
+        location_dict = init_refs.make_location_dict(build, cursor)
+        run_info = talon.init_run_info(database, build)
+        orig_vertex_count = talon.vertex_counter.value()
         strand = "+"
         conn.close()
 
@@ -25,16 +27,18 @@ class TestMatchAllVertices(object):
                                                                   run_info)
 
         assert vertex_IDs == [2, 3, 4, 5]
-        assert run_info['vertex'] == orig_vertex_count
+        assert talon.vertex_counter.value() == orig_vertex_count
 
     def test_with_novel_location(self):
         """ Example where the toy transcript database contains a novel position.
         """
         conn, cursor = get_db_cursor()
         build = "toy_build"
-        location_dict = talon.make_location_dict(build, cursor)
-        run_info = talon.init_run_info(cursor, build)
-        orig_vertex_count = run_info['vertex']
+        database = "scratch/toy.db"
+        talon.get_counters(database)
+        location_dict = init_refs.make_location_dict(build, cursor)
+        run_info = talon.init_run_info(database, build)
+        orig_vertex_count = talon.vertex_counter.value()
         orig_n_locations = len(location_dict["chr1"])
         conn.close()
 
@@ -47,7 +51,7 @@ class TestMatchAllVertices(object):
                                                                   run_info)
 
         # Make sure that no match got returned
-        new_vertex_count = run_info['vertex']
+        new_vertex_count = talon.vertex_counter.value()
         assert vertex_IDs == [ new_vertex_count, 3, 4, 5]
        
         # Make sure the data structures got updated

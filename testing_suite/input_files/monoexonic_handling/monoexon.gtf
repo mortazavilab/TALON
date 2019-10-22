@@ -1,0 +1,6 @@
+chr1	monoexon	gene	1000	2000	.	+	.	gene_id "ENSG01"; gene_type "protein_coding"; gene_status "KNOWN"; gene_name "TG1"; 
+chr1	monoexon	transcript	1000	2000	.	+	.	gene_id "ENSG01"; transcript_id "ENST01"; gene_type "protein_coding"; gene_status "KNOWN"; gene_name "TG1"; transcript_type "processed_transcript"; transcript_status "KNOWN"; transcript_name "TG1-001";
+chr1	monoexon	exon	1000	2000	.	+	.	gene_id "ENSG01"; transcript_id "ENST01"; gene_type "protein_coding"; gene_status "KNOWN"; gene_name "TG1"; transcript_type "processed_transcript"; transcript_status "KNOWN"; transcript_name "TG1-001"; exon_number "1"; exon_id "ENSE01";
+chr1	monoexon	gene	1500	1550	.	-	.	gene_id "ENSG03"; gene_type "protein_coding"; gene_status "KNOWN"; gene_name "TG2";
+chr1	monoexon	transcript	1500	1550	.	-	.	gene_id "ENSG03"; transcript_id "ENST03"; gene_type "protein_coding"; gene_status "KNOWN"; gene_name "TG2"; transcript_type "processed_transcript"; transcript_status "KNOWN"; transcript_name "TG2-001";
+chr1	monoexon	exon	1500	1550	.	-	.	gene_id "ENSG03"; transcript_id "ENST03"; gene_type "protein_coding"; gene_status "KNOWN"; gene_name "TG2"; transcript_type "processed_transcript"; transcript_status "KNOWN"; transcript_name "TG2-001"; exon_number "1"; exon_id "ENSE02";
