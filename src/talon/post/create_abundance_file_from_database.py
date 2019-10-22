@@ -59,7 +59,7 @@ def create_outname(options):
         were used. """
 
     outname = options.outprefix + "_talon_abundance"
-    if options.whitelist == True:
+    if options.whitelist != None:
         outname = "_".join([ outname, "filtered" ])
 
     outname += ".tsv"
@@ -422,7 +422,7 @@ def main():
     database = options.database
     annot = options.annot
     build = options.build
-    observed = options.observed
+    
     whitelist_file = options.whitelist
     dataset_file = options.datasets_file
     outfile = create_outname(options)
@@ -437,7 +437,7 @@ def main():
     # Determine which transcripts to include    
     whitelist = putils.handle_filtering(database, 
                                         annot, 
-                                        observed, 
+                                        False, 
                                         whitelist_file, 
                                         dataset_file)
 
@@ -451,7 +451,7 @@ def main():
     transcript_lengths = get_transcript_lengths(database, build)
 
     # Create the abundance file
-    datasets = datasets = fetch_dataset_list(dataset_file, database)
+    datasets = fetch_dataset_list(dataset_file, database)
     novelty_type = make_novelty_type_struct(database, datasets)
     abundances, colnames = fetch_abundances(database, datasets, annot, transcript_whitelist)
     prefix = fetch_naming_prefix(database)
