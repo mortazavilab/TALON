@@ -2119,7 +2119,6 @@ def parallel_talon(read_file, interval, database, run_info, queue):
         with pysam.AlignmentFile(read_file, "rb") as sam:
             for record in sam:  # type: pysam.AlignedSegment
                 # Check whether we should try annotating this read or not
-                #print(record.query_name)
                 qc_metrics = tutils.check_read_quality(record, run_info)
 
                 passed_qc = qc_metrics[2]
@@ -2330,8 +2329,8 @@ def make_QC_header(coverage, identity, length):
     cols = "\t".join(["dataset", "read_ID", "passed_QC", "primary_mapped",
                       "read_length", "fraction_aligned", "identity"])
     header = "\n".join(["# TALON run filtering settings:",
-                        "# Min fraction read aligned: %d " % coverage,
-                        "# Min read identity to reference: %d" % identity,
+                        "# Min fraction read aligned: %f " % coverage,
+                        "# Min read identity to reference: %f" % identity,
                         "# Min transcript length: %d" % length,
                         "# -------------------------------------------",
                         cols])
