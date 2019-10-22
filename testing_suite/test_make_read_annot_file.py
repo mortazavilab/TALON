@@ -7,8 +7,9 @@ class TestGetReadAnnot(object):
     """ Make sure that the post-TALON get_read_annotations utility is working """
 
     def test_fetch_reads(self):
-        """ Test if the start and end positions returned for each read is
-            correct. """
+        """ Test if the start and end positions returned for each read are
+            correct. These positions and read lengths should not include
+            soft-clipped regions. """
         database = "scratch/toy_mod.db"
         build = "toy_build"
         reads = get_read_annotations.fetch_reads(database, build)
@@ -41,3 +42,5 @@ class TestGetReadAnnot(object):
                 assert read_end == 209
             else:
                 pytest.fail("Unexpected read ID")
+
+   

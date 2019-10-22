@@ -94,7 +94,9 @@ def make_temp_monoexonic_transcript_table(cursor, build, chrom = None,
                                       genes.strand,
                                       t.start_vertex,
                                       t.end_vertex,
-                                      t.start_exon as exon_ID
+                                      t.start_exon as exon_ID,
+                                      MIN(loc1.position, loc2.position) as min_pos,
+                                      MAX(loc1.position, loc2.position) as max_pos
                                    FROM transcripts as t
                                    LEFT JOIN location as loc1
                                        ON loc1.location_ID = t.start_vertex

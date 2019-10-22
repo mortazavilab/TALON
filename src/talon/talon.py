@@ -1518,24 +1518,6 @@ def init_outfiles(outprefix, tmp_dir = "talon_tmp/"):
  
     return outfiles
 
-#def prepare_tmp_tables(cursor, run_info, chrom = None, start = None,
-#                            end = None, tmp_id = "1"):
-#    """ Make temporary tables in memory to hold genes and monoexonic transcripts
-#    """
-#
-#    init_refs.make_temp_novel_gene_table(cursor, build, chrom = chrom,
-#                                         start = start, end = end,
-#                                         tmp_tab = "tmp_gene_" + tmp_id)
-#
-#    init_refs.make_temp_monoexonic_transcript_table(cursor, build, chrom = chrom,
-#                                          start = start, end = end,
-#                                          tmp_tab = "tmp_monoexon_" + tmp_id)
-#
-#    query = "select name from sqlite_master where type = 'table'; "
-#    cursor.execute(query)
-#    for i in cursor.fetchall():
-#        print([str(x) for x in i])
-#    return
 
 def prepare_data_structures(cursor, run_info, chrom = None, start = None, 
                             end = None, tmp_id = "1"):
@@ -1624,23 +1606,22 @@ def identify_monoexon_transcript(chrom, positions, strand, cursor, location_dict
 
     start = positions[0]
     end = positions[-1]
-    # First, look for a monoexonic FSM transcript match that meets the cutoff
-    # distance criteria
-    query = """ SELECT * 
-                    FROM %s AS tm
-                    WHERE tm.chromosome = '%s'
-                    AND tm.strand = '%s'
-                    AND tm.start >= %d
-                    AND tm.start <= %d
-                    AND tm.end >= %d
-                    AND tm.end <= %d  
-               """
-    lower_start_bound = start - cutoff_5p
-    upper_start_bound = start + cutoff_5p
-    lower_end_bound = end - cutoff_3p
-    upper_end_bound = end + cutoff_3p
-    cursor.execute(query % (tmp_monoexon, chrom, strand, lower_start_bound, 
-                            upper_start_bound, lower_end_bound, upper_end_bound))
+    # First, look for a monoexonic transcript match that overlaps the current
+    # transcript
+    query = Template(""" SELECT * 
+                    FROM $tmp_monoexon AS tm
+                    WHERE tm.chromosome = '$chrom'
+                    AND tm.strand = '$strand'
+                    AND ((min_pos <= $start AND max_pos >= $end)
+                      OR (min_pos >= $start AND max_pos <= $end)
+                      OR (min_pos >= $start AND min_pos <= $end)
+                      OR (max_pos >= $start AND max_pos <= $end))
+                    """).substitute({"tmp_monoexon": tmp_monoexon,
+                                     "chrom": chrom, "strand": strand, 
+                                     "start": min(start, end), 
+                                     "end": max(start, end)})
+                                    
+    cursor.execute(query)
     matches = cursor.fetchall()
 
     # If there is more than one match, apply a tiebreaker (pick the one with 
