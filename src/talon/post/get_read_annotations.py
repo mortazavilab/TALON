@@ -387,6 +387,7 @@ def make_read_annot_file(database, build, outprefix, datasets = "all"):
             transcript_ID = str(transcript_ID)
             o.write("\t".join([read_name, dataset, genome_build, chrom,
                                read_start, read_end, strand, n_exons, read_length,
+                               gene_ID, transcript_ID,
                                annot_gene_id, annot_transcript_id, 
                                annot_gene_name, annot_transcript_name, 
                                curr_gene_novelty, curr_transcript_novelty, 
