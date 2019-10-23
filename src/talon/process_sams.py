@@ -46,12 +46,12 @@ def preprocess_sam(sam_files, datasets, tmp_dir = "talon_tmp/", n_threads = 0):
 
     merged_bam = tmp_dir + "merged.bam"
     merge_args = [merged_bam] + renamed_sams + ["-f", "-r", "-@", str(n_threads)]
-    index_args = [merged_bam, "-@", str(n_threads)]
+    # index_args = [merged_bam, "-@", str(n_threads)]
 
     # Merge datasets and use -r option to include a read group tag
     try:
         pysam.merge(*merge_args)
-        pysam.index(*index_args)
+        pysam.index(merged_bam)
         ts = time.strftime("%Y-%m-%d %H:%M:%S", time.gmtime())
         print("[ %s ] Merged input SAM/BAM files" % (ts))
     except:
@@ -120,7 +120,6 @@ def get_reads_in_interval(sam, chrom, start, end):
     """ Given an open pysam.AlignmentFile, return only the reads that overlap
         the provided interval. Note that this means there may be reads that
         extend beyond the bounds of the interval. """
-
     iterator = sam.fetch(chrom, start, end)
     reads = [ x for x in iterator ]
     return reads
