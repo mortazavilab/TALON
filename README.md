@@ -116,6 +116,10 @@ Options:
                         output. First column should be TALON gene ID,
                         second column should be TALON transcript ID.
                         Other columns are ignored.
+  -d FILE, --datasets=FILE
+                        Optional: A file indicating which datasets should be
+                        included (one dataset name per line). Default is to
+                        include all datasets.
   --o=FILE              Prefix for output file
 ```
 The columns in the abundance file are as follows:
