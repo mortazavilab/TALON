@@ -381,7 +381,10 @@ def make_read_annot_file(database, build, outprefix, datasets = "all"):
             annot_gene_id = gene_IDs[gene_ID]
             annot_gene_name = gene_names[gene_ID]
             annot_transcript_id = transcript_IDs[transcript_ID]
-            annot_transcript_name = transcript_names[transcript_ID]
+            try:
+                annot_transcript_name = transcript_names[transcript_ID]
+            except: 
+                annot_transcript_name = "None"
 
             gene_ID = str(gene_ID)
             transcript_ID = str(transcript_ID)
