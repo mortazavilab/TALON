@@ -13,6 +13,8 @@ To install TALON, simply download the files using Github's "Download ZIP" button
 
 Go to the directory and run `pip install .`. This will install TALON. You can now run the commands from anywhere.
 
+If the above installation doesn't work, it's likely due to difficulties with MacOS allowing installation of pybedtools. A workaround is to install pybedtools using conda. To do so run `conda install -c bioconda pybedtools`, then try to `pip install .` from the TALON directory again.
+
 NOTE: Talon versions 4.2 and lower are not installable. Check the README of those releases to see how you can run the scripts from the install directory, or visit the wiki here: https://github.com/dewyman/TALON/wiki/Archived-TALON-documentation.
 
 # How to run
