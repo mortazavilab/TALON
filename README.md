@@ -45,7 +45,7 @@ Options:
 ```
 
 ## Running TALON
-Now that you've initilialized your database, you're ready to annotate long read datasets using TALON. The input database is modified in place to track and quantify transcripts in the provided dataset(s). You can add more datasets at any time by creating a config file for them and running this command.
+Now that you've initilialized your database, you're ready to annotate long read datasets using TALON. The input database is modified in place to track and quantify transcripts in the provided dataset(s). You can add more datasets at any time by creating a config file for them and running this command. Please note that TALON versions 4.4+ can be run in multithreaded fashion for a much faster runtime.
 
 ```
 talon --h
@@ -58,6 +58,8 @@ Options:
   --db FILE,            TALON database. Created using talon_initialize_database.
   --build STRING,       Genome build (i.e. hg38) to use. Must be in the
                         database.
+  --threads THREADS, -t THREADS
+                        Number of threads to run program with. Default = 2.
   --cov, -c             Minimum alignment coverage in order to use a SAM entry. Default = 0.9
   --identity, -i        Minimum alignment identity in order to use a SAM entry. Default = 0
   --o OUTPREFIX         Prefix for output files
