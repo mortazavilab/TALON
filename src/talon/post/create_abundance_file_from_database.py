@@ -427,12 +427,12 @@ def main():
     dataset_file = options.datasets_file
     outfile = create_outname(options)
 
-    check_annot_validity(annot, database)
-    check_build_validity(build, database)
-
     # Make sure that the input database exists!
     if not Path(database).exists():
         raise ValueError("Database file '%s' does not exist!" % database)
+
+    check_annot_validity(annot, database)
+    check_build_validity(build, database)
 
     # Determine which transcripts to include    
     whitelist = putils.handle_filtering(database, 
