@@ -86,12 +86,12 @@ The second output file (suffix 'read_annot.tsv') appears at the very end of the 
 9. Read length (soft-clipped bases not included)
 10. Gene ID (issued by TALON, integer)
 11. Transcript ID (issued by TALON, integer)
-12. Annotation gene ID (ie Ensembl). Will start with 'ENCODE' if gene is a novel gene called by TALON pipeline.
-13. Annotation transcript ID (ie Ensembl). Will start with 'ENCODE' if transcript is a novel transcript called by TALON pipeline.
+12. Annotation gene ID 
+13. Annotation transcript ID 
 14. Annotation gene name (human-readable gene symbol)
 15. Annotion transcript name (human-readable transcript symbol)
-16. Gene novelty: one of 'Known", "Antisense", or "Intergenic". Called by TALON pipeline.
-17. Transcript novelty: one of "Known", "ISM", "NIC", "NNC", "Antisense", "Intergenic", or "Genomic". Called by TALON pipeline.
+16. Gene novelty: one of 'Known", "Antisense", or "Intergenic". 
+17. Transcript novelty: one of "Known", "ISM", "NIC", "NNC", "Antisense", "Intergenic", or "Genomic". 
 18. ISM subtype. If transcript novelty is not ISM, this field will be 'None'. If the transcript is an ISM, then this field can be 'Prefix', 'Suffix', 'Both', or 'None'.
 
 Note: It is possible to obtain this file from a TALON database at any time by running this utility
