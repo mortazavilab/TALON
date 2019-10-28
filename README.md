@@ -71,7 +71,7 @@ TALON generates two output files in the course of a run. The QC log (file with s
 4. primary_mapped	(1/0)
 5. read_length	
 6. fraction_aligned	
-7. identity
+7. identity  
 This is useful for tracking why a particular read was or was not included in the TALON analysis.
 
 The second output file (suffix 'read_annot.tsv') appears at the very end of the run and contains a line for every read that was successfully annotated. The columns are as follows:
@@ -92,7 +92,7 @@ The second output file (suffix 'read_annot.tsv') appears at the very end of the 
 15. Annotion transcript name (human-readable transcript symbol)
 16. Gene novelty: one of 'Known", "Antisense", or "Intergenic". 
 17. Transcript novelty: one of "Known", "ISM", "NIC", "NNC", "Antisense", "Intergenic", or "Genomic". 
-18. ISM subtype. If transcript novelty is not ISM, this field will be 'None'. If the transcript is an ISM, then this field can be 'Prefix', 'Suffix', 'Both', or 'None'.
+18. ISM subtype. If transcript novelty is not ISM, this field will be 'None'. If the transcript is an ISM, then this field can be 'Prefix', 'Suffix', 'Both', or 'None'.  
 
 Note: It is possible to obtain this file from a TALON database at any time by running this utility
 ```
