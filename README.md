@@ -64,7 +64,7 @@ Options:
   --identity, -i        Minimum alignment identity in order to use a SAM entry. Default = 0
   --o OUTPREFIX         Prefix for output files
 ```
-TALON generates two output files in the course of a run. The QC log (file with suffix 'QC.log') contains the following columns:
+TALON generates two output files in the course of a run. The QC log (file with suffix 'QC.log') is useful for tracking why a particular read was or was not included in the TALON analysis. It contains the following columns:
 1. dataset	
 2. read_ID	
 3. passed_QC (1/0)	
@@ -72,7 +72,6 @@ TALON generates two output files in the course of a run. The QC log (file with s
 5. read_length	
 6. fraction_aligned	
 7. identity  
-This is useful for tracking why a particular read was or was not included in the TALON analysis.
 
 The second output file (suffix 'read_annot.tsv') appears at the very end of the run and contains a line for every read that was successfully annotated. The columns are as follows:
 1. Name of individual read
