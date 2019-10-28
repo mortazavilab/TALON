@@ -64,6 +64,56 @@ Options:
   --identity, -i        Minimum alignment identity in order to use a SAM entry. Default = 0
   --o OUTPREFIX         Prefix for output files
 ```
+TALON generates two output files in the course of a run. The QC log (file with suffix 'QC.log') contains the following columns:
+1. dataset	
+2. read_ID	
+3. passed_QC (1/0)	
+4. primary_mapped	(1/0)
+5. read_length	
+6. fraction_aligned	
+7. identity
+This is useful for tracking why a particular read was or was not included in the TALON analysis.
+
+The second output file (suffix 'read_annot.tsv') appears at the very end of the run and contains a line for every read that was successfully annotated. The columns are as follows:
+1. Name of individual read
+2. Name of dataset the read belongs to
+3. Name of genome build used in TALON run
+4. Chromosome
+5. Read start position (1-based). This refers to the 5' end start, so for reads on the - strand, this number will be larger than the read end (col 6).
+6. Read end position (1-based). This refs to the 3' end stop, so for reads on the - strand, this will be smaller than the read start (col 5).
+7. Strand (+ or -)
+8. Number of exons in the transcript
+9. Read length (soft-clipped bases not included)
+10. Gene ID (issued by TALON, integer)
+11. Transcript ID (issued by TALON, integer)
+12. Annotation gene ID (ie Ensembl). Will start with 'ENCODE' if gene is a novel gene called by TALON pipeline.
+13. Annotation transcript ID (ie Ensembl). Will start with 'ENCODE' if transcript is a novel transcript called by TALON pipeline.
+14. Annotation gene name (human-readable gene symbol)
+15. Annotion transcript name (human-readable transcript symbol)
+16. Gene novelty: one of 'Known", "Antisense", or "Intergenic". Called by TALON pipeline.
+17. Transcript novelty: one of "Known", "ISM", "NIC", "NNC", "Antisense", "Intergenic", or "Genomic". Called by TALON pipeline.
+18. ISM subtype. If transcript novelty is not ISM, this field will be 'None'. If the transcript is an ISM, then this field can be 'Prefix', 'Suffix', 'Both', or 'None'.
+
+Note: It is possible to obtain this file from a TALON database at any time by running this utility
+```
+talon_fetch_reads --h
+
+Usage: talon_fetch_reads [-h] [--db FILE,] [--build STRING,]
+                         [--datasets STRING,] [--o OUTPREFIX]
+
+This utility queries a TALON database in order to get read-specific annotation
+information.
+
+optional arguments:
+  -h, --help          show this help message and exit
+  --db FILE,          TALON database
+  --build STRING,     Genome build (i.e. hg38) to use. Must be in the
+                      database.
+  --datasets STRING,  Optional: Comma-delimited list of datasets to include.
+                      Default behavior is to include all datasets in the
+                      database.
+  --o OUTPREFIX       Prefix for output files
+```
 
 ## TALON utilities
 
