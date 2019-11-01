@@ -70,14 +70,24 @@ def fetch_dataset_list(dataset_file, database):
 
     conn = sqlite3.connect(database)
     cursor = conn.cursor()
-
-    if dataset_file != None:
-        datasets = qutils.parse_datasets(dataset_file, cursor)
-    else:
-        datasets = qutils.fetch_all_datasets(cursor)
-   
+    all_db_datasets = qutils.fetch_all_datasets(cursor)
     conn.close()
-    return datasets
+
+    if dataset_file == None:
+        
+        return all_db_datasets
+
+    else:
+        datasets = []
+        with open(dataset_file, 'r') as f:
+            for line in f:
+                dataset = line.strip()
+                if dataset not in all_db_datasets:
+                    raise ValueError("Dataset name '%s' not found in database" \
+                                      % (dataset))
+                datasets.append(dataset)
+   
+        return datasets
 
 def create_abundance_dict(database, datasets):
     """Process the abundance table by dataset in order to create a dictionary

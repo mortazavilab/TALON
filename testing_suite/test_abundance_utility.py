@@ -84,14 +84,43 @@ class TestAbundance(object):
         data = pd.read_csv(abd, sep="\t", header = 0)
 
         print(data)
-        assert set(list(data.columns)) == set(["gene_ID", "transcript_ID",
+        assert list(data.columns) == ["gene_ID", "transcript_ID",
                                                "annot_gene_id",
                                                "annot_transcript_id", "annot_gene_name",
                                                "annot_transcript_name", "n_exons",
                                                "length", "gene_novelty",
                                                "transcript_novelty",
                                                "ISM_subtype",
-                                               "PB65_B018", "D12"])
+                                               "D12", "PB65_B018"]
         assert data.shape[0] == 8
         assert set(data.transcript_ID) == set([1744, 8437, 8453, 8456, 8457, 8458, 8459, 8460]) 
 
+    def test_dataset_order(self):
+        """ Make sure datasets appear in same order as dataset file """
+
+        database =  "scratch/chr11_and_Tcf3.db"
+        datasets = "input_files/chr11_and_Tcf3/testing_datasets2.txt"
+
+        for i in range(10):
+            try:
+                subprocess.check_output(
+                    ["talon_abundance", "--db", database,
+                     "-a", "gencode_vM7",
+                     "-b", "mm10",
+                     "--datasets", datasets,
+                     "--o", "scratch/chr11_and_Tcf3_dset2"])
+            except:
+                pytest.fail("Talon abundance crashed on whitelist case")
+
+            # Now check the correctness of the abundance file
+            abd = "scratch/chr11_and_Tcf3_dset2_talon_abundance.tsv"
+            data = pd.read_csv(abd, sep="\t", header = 0)
+
+            assert list(data.columns) == ["gene_ID", "transcript_ID",
+                                                   "annot_gene_id",
+                                                   "annot_transcript_id", "annot_gene_name",
+                                                   "annot_transcript_name", "n_exons",
+                                                   "length", "gene_novelty",
+                                                   "transcript_novelty",
+                                                   "ISM_subtype",
+                                                   "D12", "PB65_B018", "PB65_B017"]
