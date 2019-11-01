@@ -25,11 +25,42 @@ class TestAbundance(object):
         print(data)
         assert list(data.columns) == ["gene_ID", "transcript_ID", 
                                       "annot_gene_id", 
-                                      "annot_transcript_id",	                                             "annot_gene_name", 
-                                      "annot_transcript_name", 
-                                      "n_exons", 
+                                      "annot_transcript_id", "annot_gene_name", 
+                                      "annot_transcript_name", "n_exons", 
                                       "length", "gene_novelty", 
                                       "transcript_novelty", 
                                       "ISM_subtype", 
                                       "PB65_B017", "PB65_B018", "D12"]
         assert data.shape[0] == 15
+
+    def test_with_whitelist(self):
+        """ Test abundance utility with a transcript whitelist """
+        database =  "scratch/chr11_and_Tcf3.db"
+        whitelist = "input_files/chr11_and_Tcf3/testing_whitelist.txt"
+        try:
+            subprocess.check_output(
+                ["talon_abundance", "--db", database,
+                 "-a", "gencode_vM7",
+                 "-b", "mm10",
+                 "--whitelist", whitelist,
+                 "--o", "scratch/chr11_and_Tcf3_whitelist"])
+        except:
+            pytest.fail("Talon abundance crashed on whitelist case")
+        
+        # Now check the correctness of the abundance file
+        abd = "scratch/chr11_and_Tcf3_whitelist_talon_abundance_filtered.tsv"
+        data = pd.read_csv(abd, sep="\t", header = 0)
+        
+        print(data)
+        assert list(data.columns) == ["gene_ID", "transcript_ID",
+                                      "annot_gene_id",
+                                      "annot_transcript_id", "annot_gene_name",
+                                      "annot_transcript_name", "n_exons",
+                                      "length", "gene_novelty",
+                                      "transcript_novelty",
+                                      "ISM_subtype",
+                                      "PB65_B017", "PB65_B018", "D12"]
+        assert set(data.transcript_ID) == set([28,1744])
+        assert int(data.loc[data['transcript_ID'] == 28]['PB65_B017']) == 1
+        assert int(data.loc[data['transcript_ID'] == 28]['PB65_B018']) == 0
+        assert int(data.loc[data['transcript_ID'] == 28]['D12']) == 0
