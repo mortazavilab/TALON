@@ -97,6 +97,7 @@ def get_args():
     parser.add_argument("--identity", "-i", dest = "min_identity",
         help = "Minimum alignment identity in order to use a SAM entry. Default = 0",
         type = str, default = 0)
+    parser.add_argument('--tmpdir', dest='TMPDIR', type=str, default='talon_tmp/', help="tmp dir for TALON. Default talon_tmp/")
     parser.add_argument("--o", dest = "outprefix", help = "Prefix for output files",
         type = str)
 
@@ -1442,8 +1443,7 @@ def check_inputs(options):
     return sam_files, dataset_metadata
 
 
-def init_run_info(database, genome_build, min_coverage = 0.9, min_identity = 0,
-                  tmp_dir = "talon_tmp/"):
+def init_run_info(database, genome_build,tmp_dir, min_coverage = 0.9, min_identity = 0):
     """ Initializes a dictionary that keeps track of important run information
         such as the desired genome build, the prefix for novel identifiers,
         and the novel counters for the run. """
@@ -1475,7 +1475,7 @@ def init_run_info(database, genome_build, min_coverage = 0.9, min_identity = 0,
 
     return run_info
 
-def init_outfiles(outprefix, tmp_dir = "talon_tmp/"):
+def init_outfiles(outprefix, tmp_dir):
     """ Initialize output files for the run that all processes will be able to
         write to via the queue. """
 
@@ -2353,14 +2353,14 @@ def main():
     min_coverage = float(options.min_coverage)
     min_identity = float(options.min_identity)
     outprefix = options.outprefix
-
+    tmpdir=options.TMPDIR
     # Set globally accessible counters
     get_counters(database)
 
     # Initialize worker pool
     with mp.Pool(processes=threads) as pool:
-        run_info = init_run_info(database, build, min_coverage, min_identity)
-        run_info.outfiles = init_outfiles(options.outprefix)
+        run_info = init_run_info(database, build, tmpdir , min_coverage, min_identity)
+        run_info.outfiles = init_outfiles(options.outprefix, tmpdir)
 
         # Create annotation entry for each dataset
         datasets = []
@@ -2372,8 +2372,8 @@ def main():
             dataset_db_entries.append((d_id, d_name, description, platform))
 
         # Partition the reads
-        read_groups, intervals, header_file = procsams.partition_reads(sam_files, datasets)
-        read_files = procsams.write_reads_to_file(read_groups, intervals, header_file)
+        read_groups, intervals, header_file = procsams.partition_reads(sam_files, datasets,tmpdir )
+        read_files = procsams.write_reads_to_file(read_groups, intervals, header_file, tmpdir)
         ts = time.strftime("%Y-%m-%d %H:%M:%S", time.gmtime())
         print("[ %s ] Split reads into %d intervals" % (ts, len(read_groups)))
 
