@@ -368,9 +368,16 @@ def make_read_annot_file(database, build, outprefix, datasets = "all"):
 
             gene_ID = int(gene_ID)
             transcript_ID = int(transcript_ID)
+
             # Get novelty info
-            curr_gene_novelty = gene_novelty[gene_ID]
-            curr_transcript_novelty = transcript_novelty[transcript_ID]
+            try:
+                curr_gene_novelty = gene_novelty[gene_ID]
+            except:
+                curr_gene_novelty = "Other"
+            try:
+                curr_transcript_novelty = transcript_novelty[transcript_ID]
+            except:
+                curr_transcript_novelty = "Other"
 
             if curr_transcript_novelty == "ISM":
                 curr_ISM_novelty = ISM_novelty[transcript_ID]
