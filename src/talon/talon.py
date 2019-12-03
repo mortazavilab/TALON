@@ -2070,7 +2070,11 @@ def check_database_integrity(cursor):
         # Vertex case needs to be handled differently
         if table_name == "vertex":
             table_name = "location"
-             
+
+        # Skip dataset counter because it is not necessarily expected to be the same
+        if table_name == "dataset":
+            continue            
+ 
         query = "select COUNT(*) from " + table_name
         cursor.execute(query)
         actual_count = int(cursor.fetchone()[0])
