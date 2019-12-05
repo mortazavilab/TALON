@@ -89,6 +89,23 @@ except Exception as e:
     print(e)
     sys.exit("Database initialization failed on chr22 annotation")
 
+try:
+    os.system("mkdir -p scratch/multiexon_read_overlapping_monoexon_transcript")
+    subprocess.check_output(
+       ["talon_initialize_database",
+        "--f", "input_files/multiexon_read_overlapping_monoexon_transcript/HMGB1P1.gtf",
+        "--a",  "gencode_v29",
+        "--5p", "500",
+        "--3p", "300",
+        "--idprefix", "ENCODEH",
+        "--l", "300",
+        "--g",  "hg38", "--o", 
+        "scratch/multiexon_read_overlapping_monoexon_transcript/talon"])
+
+except Exception as e:
+    print(e)
+    sys.exit("Database initialization failed on HMGB1P1 annotation")
+
 # Actually perform the toy_mod run
 try:
     subprocess.check_output(
