@@ -15,11 +15,11 @@ def get_args():
                 'are 1-based.')
 	parser = argparse.ArgumentParser(description=desc)
 
-	parser.add_argument('-gtf', dest='gtf', default=None,
+	parser.add_argument('--gtf', dest='gtf', default=None,
 		help = 'TALON GTF file from which to extract exons/introns')
-	parser.add_argument('-db', dest='db', default=None,
+	parser.add_argument('--db', dest='db', default=None,
 		help = 'TALON database from which to extract exons/introns')
-	parser.add_argument('-ref', dest='ref_gtf', 
+	parser.add_argument('--ref', dest='ref_gtf', 
 		help = ('GTF reference file (ie GENCODE). Will be used to '
                         'label novelty.'))
 	parser.add_argument('--mode', dest='mode', 
@@ -418,7 +418,7 @@ def main():
 		loc_df, edge_df, t_df = create_dfs_db(args.db)
 
 	elif args.gtf:
-		loc_df, edge_df, t_df = create_df_gtf(args.gtf)
+		loc_df, edge_df, t_df = create_dfs_gtf(args.gtf)
 
 	edge_df = add_coord_info(edge_df, loc_df)
 	edge_df = subset_edges(edge_df, mode=args.mode)
