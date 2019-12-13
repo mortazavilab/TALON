@@ -10,19 +10,25 @@ import numpy as np
 
 def get_args():
 
-	desc = 'Plots the support for transcript isoforms based on Illumina data'
+	desc = ('Extracts the locations, novelty, and transcript assignments of'
+                ' exons/introns in a TALON database or GTF file. All positions '
+                'are 1-based.')
 	parser = argparse.ArgumentParser(description=desc)
 
-	parser.add_argument('-gtf', dest='gtf', 
-		help = 'GTF from TALON', default=None)
-	parser.add_argument('-db', dest='db', 
-		help = 'DB from which to extract tids/sjs', default=None)
-	parser.add_argument('-sample', dest='sample_name', 
-		help = 'Sample name ie GM12878')
+	parser.add_argument('-gtf', dest='gtf', default=None,
+		help = 'TALON GTF file from which to extract exons/introns')
+	parser.add_argument('-db', dest='db', default=None,
+		help = 'TALON database from which to extract exons/introns')
 	parser.add_argument('-ref', dest='ref_gtf', 
-		help = 'GTF reference (ie GENCODE)')
+		help = ('GTF reference file (ie GENCODE). Will be used to '
+                        'label novelty.'))
 	parser.add_argument('--mode', dest='mode', 
-		help="'intron' or 'exon'; obtain/analyze SJs as exons or introns", default='intron')
+		help= ("Choices are 'intron' or 'exon' (default is 'intron'). "
+			"Determines whether to include introns or exons in the "
+			"output"), default='intron')
+	parser.add_argument('--outprefix', dest='outprefix',
+		help = 'Prefix for output file')
+
 
 	args = parser.parse_args()
 
@@ -34,10 +40,10 @@ def get_args():
 
 # get value associated with keyword in the 9th column of gtf
 def get_field_value(key, fields):
-    if key not in fields:
-        return None
-    else:
-        return fields.split(key+' "')[1].split()[0].replace('";','')
+	if key not in fields:
+		return None
+	else:
+		return fields.split(key+' "')[1].split()[0].replace('";','')
 
 # create loc_df (for nodes), edge_df (for edges), and t_df (for paths)
 def create_dfs_db(db):
@@ -420,7 +426,8 @@ def main():
 	edge_df = determine_sj_novelty(ref_loc_df, loc_df, edge_df)
 	edge_df = find_tids_from_sj(edge_df, t_df, mode=args.mode)
 
-	edge_df.to_csv('{}_{}_sj_use_summary.tsv'.format(args.sample_name, args.mode), sep='\t', index=False)
+	edge_df.to_csv('{}_{}_sj_summary.tsv'.format(args.outprefix, args.mode), 
+			sep='\t', index=False)
 
 
 if __name__ == '__main__':
