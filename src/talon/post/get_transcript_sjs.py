@@ -74,12 +74,7 @@ def create_dfs_db(db):
 	loc_df.vertex_id = loc_df.vertex_id.map(int)
 
 	# edge_df
-	q = """SELECT e.* 
-			FROM edge e 
-			JOIN vertex V ON e.v1=v.vertex_ID 
-			JOIN gene_annotations ga ON v.gene_ID=ga.ID 
-			WHERE ga.attribute='gene_name'
-		""" 
+	q = """SELECT * FROM edge """
 
 	c.execute(q)
 	edges = c.fetchall()
@@ -155,7 +150,7 @@ def create_dfs_gtf(gtf):
 								   'TSS', 'alt_TSS',
 								   'TES', 'alt_TES',
 								   'internal'])
-	loc_df.set_index(['chrom', 'coord', 'strand'], inplace=True)
+	loc_df.set_index(['chrom', 'coord'], inplace=True)
 
 	edge_df = pd.DataFrame(columns=['edge_id', 'edge_type',
 								    'strand', 'v1', 'v2'])
@@ -216,23 +211,20 @@ def create_dfs_gtf(gtf):
 				
 				for c in coords:
 
-					ind = (curr_chr, int(c), curr_strand)
+					ind = (curr_chr, int(c))
 
 					# loc not in loc_df already
 					if ind not in loc_df.index.tolist():
 
 						# label as not a TSS/TES until further notice
 						attr = {'vertex_id': vertex_id,	   
-								'TSS': False, 'TES': False,
-								'alt_TSS': False,
-								'alt_TES': False, 
-								'internal': False, 'coord': int(c),
+								'coord': int(c),
 								'strand': curr_strand, 'chrom': curr_chr}
 
 						# update loc_df and increment vertex_id
 						loc_df.reset_index(inplace=True)
 						loc_df = loc_df.append(attr, ignore_index=True)
-						loc_df.set_index(['chrom', 'coord', 'strand'], inplace=True)
+						loc_df.set_index(['chrom', 'coord'], inplace=True)
 
 						curr_loc = int(vertex_id)
 						vertex_id += 1

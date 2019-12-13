@@ -41,10 +41,7 @@ def run_df_tests(ref_loc_df, ref_edge_df, ref_t_df):
     # Make sure the correct positions made it into the location df
     expected_locs = [("chr1", 1), ("chr1", 100), ("chr1", 500), ("chr1", 600),
                      ("chr1", 900), ("chr1", 1000), ("chr4", 1000),
-                     ("chr4", 4000), ("chr1", 1500), ("chr1", 2000),
-                     ("chr1", 900), ("chr1", 1000)]
-    print(ref_loc_df)
-    assert 1 == 2
+                     ("chr4", 4000), ("chr1", 1500), ("chr1", 2000)]
     assert len(ref_loc_df) == len(expected_locs)
 
     for item in expected_locs:
