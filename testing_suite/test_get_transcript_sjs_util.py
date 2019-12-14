@@ -1,5 +1,5 @@
 import pytest
-import pandas
+import pandas as pd
 import os
 import subprocess
 import sys
@@ -35,6 +35,92 @@ class TestGetTranscriptSJs(object):
         database = "scratch/get_transcript_sjs/talon.db"
         ref_loc_df, ref_edge_df, ref_t_df = tsj.create_dfs_db(database)
         run_df_tests(ref_loc_df, ref_edge_df, ref_t_df)
+
+    def test_subset_edges(self):
+        """ Make sure that this function returns only exons or introns
+            as indicated """
+        edge_df = pd.DataFrame({'edge_type': ['exon', 'intron'],
+                                'strand': ['+', '+'],
+                                'v1': [ 0, 1 ], 'v2': [1, 2],
+                                'edge_id': [ (0, 1), (1, 2) ],
+                                'chrom': ['chr1', 'chr1'],
+                                'start': [1, 100],
+                                'stop': [100, 500]})
+
+        intron_df = tsj.subset_edges(edge_df, mode='intron')
+        exon_df = tsj.subset_edges(edge_df, mode='exon')
+        assert len(intron_df) == len(exon_df) == 1
+        assert list(intron_df.iloc[0]) == ['intron', '+', 1, 2, (1,2), 'chr1', 100, 500]
+        assert list(exon_df.iloc[0]) == ['exon', '+', 0, 1, (0,1), 'chr1', 1, 100]
+       
+    def test_determine_sj_novelty_NIC_intron(self):
+        """ Test that chr1:100-900 gets classified as having a known start and stop,
+            but a novel combination """
+
+        gtf_file = "input_files/test_get_transcript_sjs_util/annot.gtf"
+        ref_loc_df, ref_edge_df, ref_t_df = prep_gtf(gtf_file, 'intron')
+
+        query_gtf = "input_files/test_get_transcript_sjs_util/intron_NIC.gtf"
+        loc_df, edge_df, t_df = prep_gtf(query_gtf, 'intron')
+
+        edge_df = tsj.determine_sj_novelty(ref_loc_df, ref_edge_df, loc_df, edge_df)
+        assert edge_df.iloc[0].start_known == True
+        assert edge_df.iloc[0].stop_known == True
+        assert edge_df.iloc[0].combination_known == False
+        
+    def test_determine_sj_novelty_NNC_intron_donor(self):
+         """ Test that chr1:90-900 gets classified as having a known stop and
+             novel start"""
+ 
+         gtf_file = "input_files/test_get_transcript_sjs_util/annot.gtf"
+         ref_loc_df, ref_edge_df, ref_t_df = prep_gtf(gtf_file, 'intron')
+ 
+         query_gtf = "input_files/test_get_transcript_sjs_util/intron_NNC_donor.gtf"
+         loc_df, edge_df, t_df = prep_gtf(query_gtf, 'intron')
+ 
+         edge_df = tsj.determine_sj_novelty(ref_loc_df, ref_edge_df, loc_df, edge_df)
+         assert edge_df.iloc[0].start_known == False
+         assert edge_df.iloc[0].stop_known == True
+         assert edge_df.iloc[0].combination_known == False    
+
+    def test_determine_sj_novelty_NNC_intron_acceptor(self):
+         """ Test that chr1:100-800 gets classified as having a known start and 
+             novel stop"""
+
+         gtf_file = "input_files/test_get_transcript_sjs_util/annot.gtf"
+         ref_loc_df, ref_edge_df, ref_t_df = prep_gtf(gtf_file, 'intron')
+
+         query_gtf = "input_files/test_get_transcript_sjs_util/intron_NNC_acceptor.gtf"
+         loc_df, edge_df, t_df = prep_gtf(query_gtf, 'intron')
+
+         edge_df = tsj.determine_sj_novelty(ref_loc_df, ref_edge_df, loc_df, edge_df)
+         assert edge_df.iloc[0].start_known == True
+         assert edge_df.iloc[0].stop_known == False
+         assert edge_df.iloc[0].combination_known == False
+
+    def test_determine_sj_novelty_antisense(self):
+         """ Test that chr1:600-1000 on - strand gets classified as all novel"""
+
+         gtf_file = "input_files/test_get_transcript_sjs_util/annot.gtf"
+         ref_loc_df, ref_edge_df, ref_t_df = prep_gtf(gtf_file, 'intron')
+
+         query_gtf = "input_files/test_get_transcript_sjs_util/intron_novel_antisense.gtf"
+         loc_df, edge_df, t_df = prep_gtf(query_gtf, 'intron')
+
+         edge_df = tsj.determine_sj_novelty(ref_loc_df, ref_edge_df, loc_df, edge_df)
+         
+         assert edge_df.iloc[0].start_known == False
+         assert edge_df.iloc[0].stop_known == False
+         assert edge_df.iloc[0].combination_known == False
+ 
+def prep_gtf(gtf, mode):
+    """ Wrapper for GTF processing steps used by get_transcript_sjs main """
+    loc_df, edge_df, t_df = tsj.create_dfs_gtf(gtf)
+    edge_df = tsj.add_coord_info(edge_df, loc_df)
+    edge_df = tsj.subset_edges(edge_df, mode=mode)
+    edge_df = tsj.format_edge_df(edge_df)
+
+    return loc_df, edge_df, t_df
         
 def run_df_tests(ref_loc_df, ref_edge_df, ref_t_df):
     """ Runs the location, edge, and transcript tests on dfs """

@@ -1,0 +1,4 @@
+chr1	toy	gene	1	1000	.	+	.	gene_id "ENSG01"; gene_type "protein_coding"; gene_status "KNOWN"; gene_name "TG1"; 
+chr1	toy	transcript	1	1000	.	+	.	gene_id "ENSG01"; transcript_id "intron_NIC";
+chr1	toy	exon	1	100	.	+	.	gene_id "ENSG01"; transcript_id "intron_NIC"; gene_type "protein_coding"; gene_status "KNOWN"; gene_name "TG1"; transcript_type "processed_transcript"; transcript_status "KNOWN"; transcript_name "TG1-001"; exon_number "1"; exon_id "ENSE01";
+chr1	toy	exon	900	1000	.	+	.	gene_id "ENSG01"; transcript_id "intron_NIC"; exon_number "2"; exon_id "ENSE03";

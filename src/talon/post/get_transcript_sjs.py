@@ -125,11 +125,6 @@ def create_dfs_db(db):
 			 get_db_strand(x, edge_df), axis=1)
 	loc_df = create_dupe_index(loc_df, 'vertex_id')
 	loc_df = set_dupe_index(loc_df, 'vertex_id')
-	loc_df['internal'] = False
-	loc_df['TSS'] = False
-	loc_df['alt_TSS'] = False
-	loc_df['TES'] = False
-	loc_df['alt_TES'] = False
 
 	edge_df.drop('talon_edge_id', axis=1, inplace=True)
 	edge_df = create_dupe_index(edge_df, 'edge_id')
@@ -145,11 +140,7 @@ def create_dfs_gtf(gtf):
 		raise Exception('GTF file not found. Check path.')
 
 	# get dfs by parsing through gtf
-	loc_df = pd.DataFrame(columns=['chrom', 'coord',
-								   'strand','vertex_id',
-								   'TSS', 'alt_TSS',
-								   'TES', 'alt_TES',
-								   'internal'])
+	loc_df = pd.DataFrame(columns=['chrom', 'coord', 'strand','vertex_id'])
 	loc_df.set_index(['chrom', 'coord'], inplace=True)
 
 	edge_df = pd.DataFrame(columns=['edge_id', 'edge_type',
@@ -216,7 +207,6 @@ def create_dfs_gtf(gtf):
 					# loc not in loc_df already
 					if ind not in loc_df.index.tolist():
 
-						# label as not a TSS/TES until further notice
 						attr = {'vertex_id': vertex_id,	   
 								'coord': int(c),
 								'strand': curr_strand, 'chrom': curr_chr}
@@ -332,25 +322,21 @@ def subset_edges(edge_df, mode='intron'):
 		lambda x: True if x.edge_type == mode else False, axis=1)]
 	return sjs
 
-def determine_sj_novelty(ref_df, df, edge_df):
+def determine_sj_novelty(ref_loc_df, ref_edge_df, loc_df, edge_df):
 
-	drop_cols = ['vertex_id', 'TSS', 'alt_TSS', 'TES', 'alt_TES', 'internal']
-	ref_df.drop(drop_cols, axis=1, inplace=True)
-	df.drop(drop_cols, axis=1, inplace=True)
+	drop_cols = ['vertex_id']
+	ref_loc_df.drop(drop_cols, axis=1, inplace=True)
+	loc_df.drop(drop_cols, axis=1, inplace=True)
 
-	ref_df.reset_index(drop= True,inplace=True)
-	ref_df['annotated'] = True
-	df.reset_index(drop=True, inplace=True)
+	ref_loc_df.reset_index(drop= True,inplace=True)
+	ref_loc_df['annotated'] = True
+	loc_df.reset_index(drop=True, inplace=True)
 
-	merged_locs = ref_df.merge(df, how='right', 
+	merged_locs = ref_loc_df.merge(loc_df, how='right', 
 		on=['chrom', 'strand', 'coord'])
 	merged_locs.fillna(value=False, inplace=True)
 
 	merged_locs.set_index(['chrom', 'strand', 'coord'], inplace=True)
-	print(merged_locs)
-	print(merged_locs.index)
-
-	print(edge_df)
 
 	edge_df['start_known'] = edge_df.apply(
 		lambda x: merged_locs.loc[(x.chrom, x.strand, x.start), 'annotated'],
@@ -359,10 +345,18 @@ def determine_sj_novelty(ref_df, df, edge_df):
 		lambda x: merged_locs.loc[(x.chrom, x.strand, x.stop), 'annotated'],
 		axis=1)
 
-	edge_df = create_dupe_index(edge_df, 'edge_id')
-	edge_df = set_dupe_index(edge_df, 'edge_id')
-	
-	return edge_df
+        # Combined novelty (i.e. has start been seen with stop before)        
+	ref_edge_df.reset_index(drop= True,inplace=True)
+	ref_edge_df.drop('edge_id', axis = 1, inplace=True)
+	ref_edge_df['combination_known'] = True
+	merged_edge = ref_edge_df.merge(edge_df, how='right',
+                on=['chrom', 'strand', 'start', 'stop'])
+	merged_edge.fillna(value=False, inplace=True)
+
+	#edge_df = create_dupe_index(edge_df, 'edge_id')
+	#edge_df = set_dupe_index(edge_df, 'edge_id')
+
+	return merged_edge
 
 # renames old index dupe column in df and resets the index
 def reset_dupe_index(df, ind_name):
@@ -405,6 +399,9 @@ def main():
 	args = get_args()
 
 	ref_loc_df, ref_edge_df, ref_t_df = create_dfs_gtf(args.ref_gtf)
+	ref_edge_df = add_coord_info(ref_edge_df, ref_loc_df)
+	ref_edge_df = subset_edges(ref_edge_df, mode=args.mode)
+	ref_edge_df = format_edge_df(ref_edge_df)
 
 	if args.db: 
 		loc_df, edge_df, t_df = create_dfs_db(args.db)
@@ -415,7 +412,7 @@ def main():
 	edge_df = add_coord_info(edge_df, loc_df)
 	edge_df = subset_edges(edge_df, mode=args.mode)
 	edge_df = format_edge_df(edge_df)
-	edge_df = determine_sj_novelty(ref_loc_df, loc_df, edge_df)
+	edge_df = determine_sj_novelty(ref_loc_df, ref_edge_df, loc_df, edge_df)
 	edge_df = find_tids_from_sj(edge_df, t_df, mode=args.mode)
 
 	edge_df.to_csv('{}_{}_sj_summary.tsv'.format(args.outprefix, args.mode), 
