@@ -1,9 +1,6 @@
 import os
 import pandas as pd
-import glob
-import seaborn as sns
 import argparse
-import time
 import sqlite3
 import numpy as np
 

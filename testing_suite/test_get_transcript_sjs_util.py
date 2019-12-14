@@ -22,6 +22,10 @@ class TestGetTranscriptSJs(object):
 
         os.system("mkdir -p scratch/get_transcript_sjs")
         try:
+            os.remove("scratch/get_transcript_sjs/talon.db")
+        except:
+            pass
+        try:
             subprocess.check_output(
                 ["talon_initialize_database",
                  "--f", "input_files/test_get_transcript_sjs_util/annot.gtf",
