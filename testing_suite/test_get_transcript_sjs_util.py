@@ -69,6 +69,19 @@ class TestGetTranscriptSJs(object):
         assert edge_df.iloc[0].start_known == True
         assert edge_df.iloc[0].stop_known == True
         assert edge_df.iloc[0].combination_known == True
+
+    def test_determine_sj_novelty_Known_exon(self):
+        """ Test that chr1:1-100 gets classified as all known """
+        gtf_file = "input_files/test_get_transcript_sjs_util/annot.gtf"
+        ref_loc_df, ref_edge_df, ref_t_df = prep_gtf(gtf_file, 'exon')
+
+        query_gtf = "input_files/test_get_transcript_sjs_util/known.gtf"
+        loc_df, edge_df, t_df = prep_gtf(query_gtf, 'exon')
+
+        edge_df = tsj.determine_sj_novelty(ref_loc_df, ref_edge_df, loc_df, edge_df)
+        assert edge_df.iloc[0].start_known == True
+        assert edge_df.iloc[0].stop_known == True
+        assert edge_df.iloc[0].combination_known == True
        
     def test_determine_sj_novelty_NIC_intron(self):
         """ Test that chr1:100-900 gets classified as having a known start and stop,
@@ -98,7 +111,24 @@ class TestGetTranscriptSJs(object):
          edge_df = tsj.determine_sj_novelty(ref_loc_df, ref_edge_df, loc_df, edge_df)
          assert edge_df.iloc[0].start_known == False
          assert edge_df.iloc[0].stop_known == True
-         assert edge_df.iloc[0].combination_known == False    
+         assert edge_df.iloc[0].combination_known == False
+
+    def test_determine_sj_novelty_NNC_exon_end(self):
+         """ Test that chr1:1-90 gets classified as having a known start and
+             novel stop"""
+
+         gtf_file = "input_files/test_get_transcript_sjs_util/annot.gtf"
+         ref_loc_df, ref_edge_df, ref_t_df = prep_gtf(gtf_file, 'exon')
+
+         query_gtf = "input_files/test_get_transcript_sjs_util/intron_NNC_donor.gtf"
+         loc_df, edge_df, t_df = prep_gtf(query_gtf, 'exon')
+
+         edge_df = tsj.determine_sj_novelty(ref_loc_df, ref_edge_df, loc_df, edge_df)
+         exon = edge_df.loc[edge_df['start'] == 1].iloc[0]
+         print(exon)
+         assert exon.start_known == True
+         assert exon.stop_known == False
+         assert exon.combination_known == False    
 
     def test_determine_sj_novelty_NNC_intron_acceptor(self):
          """ Test that chr1:100-800 gets classified as having a known start and 
@@ -115,6 +145,23 @@ class TestGetTranscriptSJs(object):
          assert edge_df.iloc[0].stop_known == False
          assert edge_df.iloc[0].combination_known == False
 
+    def test_determine_sj_novelty_NNC_exon_start(self):
+         """ Test that chr1:800-1000 gets classified as having a known stop and
+             novel start"""
+
+         gtf_file = "input_files/test_get_transcript_sjs_util/annot.gtf"
+         ref_loc_df, ref_edge_df, ref_t_df = prep_gtf(gtf_file, 'exon')
+
+         query_gtf = "input_files/test_get_transcript_sjs_util/intron_NNC_acceptor.gtf"
+         loc_df, edge_df, t_df = prep_gtf(query_gtf, 'exon')
+
+         edge_df = tsj.determine_sj_novelty(ref_loc_df, ref_edge_df, loc_df, edge_df)
+         exon = edge_df.loc[edge_df['start'] == 800].iloc[0]
+         print(exon)
+         assert exon.start_known == False
+         assert exon.stop_known == True
+         assert exon.combination_known == False
+
     def test_determine_sj_novelty_antisense(self):
          """ Test that chr1:600-1000 on - strand gets classified as all novel"""
 
@@ -126,6 +173,21 @@ class TestGetTranscriptSJs(object):
 
          edge_df = tsj.determine_sj_novelty(ref_loc_df, ref_edge_df, loc_df, edge_df)
          
+         assert edge_df.iloc[0].start_known == False
+         assert edge_df.iloc[0].stop_known == False
+         assert edge_df.iloc[0].combination_known == False
+
+    def test_determine_exon_novelty_antisense(self):
+         """ Test that chr1:1-1000 on - strand gets classified as all novel"""
+
+         gtf_file = "input_files/test_get_transcript_sjs_util/annot.gtf"
+         ref_loc_df, ref_edge_df, ref_t_df = prep_gtf(gtf_file, 'exon')
+
+         query_gtf = "input_files/test_get_transcript_sjs_util/antisense_exon.gtf"
+         loc_df, edge_df, t_df = prep_gtf(query_gtf, 'exon')
+         edge_df = tsj.determine_sj_novelty(ref_loc_df, ref_edge_df, loc_df, edge_df)
+         exon = edge_df.loc[edge_df['start'] == 100].iloc[0]
+
          assert edge_df.iloc[0].start_known == False
          assert edge_df.iloc[0].stop_known == False
          assert edge_df.iloc[0].combination_known == False

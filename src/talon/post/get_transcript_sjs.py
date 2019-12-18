@@ -388,7 +388,6 @@ def find_tids_from_sj(edge_df, t_df, mode='intron'):
 	return edge_df
 
 def add_tids_to_sj(x, t_df):
-	# return [tid for tid, edges in zip(t_df.tid, t_df.edges) if x.edge_id in edges]
 	return ','.join([tid for tid, edges in zip(t_df.tid, t_df.edges) if x.edge_id in edges])
 
 
