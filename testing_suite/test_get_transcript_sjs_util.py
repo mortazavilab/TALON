@@ -56,6 +56,19 @@ class TestGetTranscriptSJs(object):
         assert len(intron_df) == len(exon_df) == 1
         assert list(intron_df.iloc[0]) == ['intron', '+', 1, 2, (1,2), 'chr1', 100, 500]
         assert list(exon_df.iloc[0]) == ['exon', '+', 0, 1, (0,1), 'chr1', 1, 100]
+
+    def test_determine_sj_novelty_Known_intron(self):
+        """ Test that chr1:100-500 gets classified as all known """
+        gtf_file = "input_files/test_get_transcript_sjs_util/annot.gtf"
+        ref_loc_df, ref_edge_df, ref_t_df = prep_gtf(gtf_file, 'intron')
+
+        query_gtf = "input_files/test_get_transcript_sjs_util/known.gtf"
+        loc_df, edge_df, t_df = prep_gtf(query_gtf, 'intron')
+
+        edge_df = tsj.determine_sj_novelty(ref_loc_df, ref_edge_df, loc_df, edge_df)
+        assert edge_df.iloc[0].start_known == True
+        assert edge_df.iloc[0].stop_known == True
+        assert edge_df.iloc[0].combination_known == True
        
     def test_determine_sj_novelty_NIC_intron(self):
         """ Test that chr1:100-900 gets classified as having a known start and stop,
