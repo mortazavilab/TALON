@@ -13,6 +13,7 @@ class TestGetTranscriptSJs(object):
             make sure they contain the correct entries """
         gtf_file = "input_files/test_get_transcript_sjs_util/annot.gtf" 
         ref_loc_df, ref_edge_df, ref_t_df = tsj.create_dfs_gtf(gtf_file)
+        print(ref_loc_df)
         run_df_tests(ref_loc_df, ref_edge_df, ref_t_df)
 
     def test_db_to_dfs(self):
@@ -65,7 +66,7 @@ class TestGetTranscriptSJs(object):
         query_gtf = "input_files/test_get_transcript_sjs_util/known.gtf"
         loc_df, edge_df, t_df = prep_gtf(query_gtf, 'intron')
 
-        edge_df = tsj.determine_sj_novelty(ref_loc_df, ref_edge_df, loc_df, edge_df)
+        edge_df = tsj.determine_sj_novelty(ref_edge_df, edge_df)
         assert edge_df.iloc[0].start_known == True
         assert edge_df.iloc[0].stop_known == True
         assert edge_df.iloc[0].combination_known == True
@@ -78,7 +79,7 @@ class TestGetTranscriptSJs(object):
         query_gtf = "input_files/test_get_transcript_sjs_util/known.gtf"
         loc_df, edge_df, t_df = prep_gtf(query_gtf, 'exon')
 
-        edge_df = tsj.determine_sj_novelty(ref_loc_df, ref_edge_df, loc_df, edge_df)
+        edge_df = tsj.determine_sj_novelty(ref_edge_df, edge_df)
         assert edge_df.iloc[0].start_known == True
         assert edge_df.iloc[0].stop_known == True
         assert edge_df.iloc[0].combination_known == True
@@ -93,7 +94,7 @@ class TestGetTranscriptSJs(object):
         query_gtf = "input_files/test_get_transcript_sjs_util/intron_NIC.gtf"
         loc_df, edge_df, t_df = prep_gtf(query_gtf, 'intron')
 
-        edge_df = tsj.determine_sj_novelty(ref_loc_df, ref_edge_df, loc_df, edge_df)
+        edge_df = tsj.determine_sj_novelty(ref_edge_df, edge_df)
         assert edge_df.iloc[0].start_known == True
         assert edge_df.iloc[0].stop_known == True
         assert edge_df.iloc[0].combination_known == False
@@ -108,7 +109,7 @@ class TestGetTranscriptSJs(object):
          query_gtf = "input_files/test_get_transcript_sjs_util/intron_NNC_donor.gtf"
          loc_df, edge_df, t_df = prep_gtf(query_gtf, 'intron')
  
-         edge_df = tsj.determine_sj_novelty(ref_loc_df, ref_edge_df, loc_df, edge_df)
+         edge_df = tsj.determine_sj_novelty(ref_edge_df, edge_df)
          assert edge_df.iloc[0].start_known == False
          assert edge_df.iloc[0].stop_known == True
          assert edge_df.iloc[0].combination_known == False
@@ -123,7 +124,7 @@ class TestGetTranscriptSJs(object):
          query_gtf = "input_files/test_get_transcript_sjs_util/intron_NNC_donor.gtf"
          loc_df, edge_df, t_df = prep_gtf(query_gtf, 'exon')
 
-         edge_df = tsj.determine_sj_novelty(ref_loc_df, ref_edge_df, loc_df, edge_df)
+         edge_df = tsj.determine_sj_novelty(ref_edge_df, edge_df)
          exon = edge_df.loc[edge_df['start'] == 1].iloc[0]
          print(exon)
          assert exon.start_known == True
@@ -140,7 +141,7 @@ class TestGetTranscriptSJs(object):
          query_gtf = "input_files/test_get_transcript_sjs_util/intron_NNC_acceptor.gtf"
          loc_df, edge_df, t_df = prep_gtf(query_gtf, 'intron')
 
-         edge_df = tsj.determine_sj_novelty(ref_loc_df, ref_edge_df, loc_df, edge_df)
+         edge_df = tsj.determine_sj_novelty(ref_edge_df, edge_df)
          assert edge_df.iloc[0].start_known == True
          assert edge_df.iloc[0].stop_known == False
          assert edge_df.iloc[0].combination_known == False
@@ -155,7 +156,7 @@ class TestGetTranscriptSJs(object):
          query_gtf = "input_files/test_get_transcript_sjs_util/intron_NNC_acceptor.gtf"
          loc_df, edge_df, t_df = prep_gtf(query_gtf, 'exon')
 
-         edge_df = tsj.determine_sj_novelty(ref_loc_df, ref_edge_df, loc_df, edge_df)
+         edge_df = tsj.determine_sj_novelty(ref_edge_df, edge_df)
          exon = edge_df.loc[edge_df['start'] == 800].iloc[0]
          print(exon)
          assert exon.start_known == False
@@ -171,7 +172,7 @@ class TestGetTranscriptSJs(object):
          query_gtf = "input_files/test_get_transcript_sjs_util/intron_novel_antisense.gtf"
          loc_df, edge_df, t_df = prep_gtf(query_gtf, 'intron')
 
-         edge_df = tsj.determine_sj_novelty(ref_loc_df, ref_edge_df, loc_df, edge_df)
+         edge_df = tsj.determine_sj_novelty(ref_edge_df, edge_df)
          
          assert edge_df.iloc[0].start_known == False
          assert edge_df.iloc[0].stop_known == False
@@ -185,12 +186,26 @@ class TestGetTranscriptSJs(object):
 
          query_gtf = "input_files/test_get_transcript_sjs_util/antisense_exon.gtf"
          loc_df, edge_df, t_df = prep_gtf(query_gtf, 'exon')
-         edge_df = tsj.determine_sj_novelty(ref_loc_df, ref_edge_df, loc_df, edge_df)
+         edge_df = tsj.determine_sj_novelty(ref_edge_df, edge_df)
          exon = edge_df.loc[edge_df['start'] == 100].iloc[0]
 
          assert edge_df.iloc[0].start_known == False
          assert edge_df.iloc[0].stop_known == False
          assert edge_df.iloc[0].combination_known == False
+
+    def test_transcript_exon_assignment(self):
+        """ Test that exon chr1:1-1000 (+) gets assigned only to transcripts
+            1 and 2 """
+        gtf_file = "input_files/test_get_transcript_sjs_util/annot.gtf"
+        ref_loc_df, ref_edge_df, ref_t_df = prep_gtf(gtf_file, 'exon')
+
+        query_gtf = "input_files/test_get_transcript_sjs_util/transcript_exon_assignment.gtf"
+        loc_df, edge_df, t_df = prep_gtf(query_gtf, 'exon')
+        edge_df = tsj.determine_sj_novelty(ref_edge_df, edge_df)
+        edge_df =tsj.find_tids_from_sj(edge_df, t_df, mode = 'exon')
+        print(edge_df)
+
+        assert 1 == 2
  
 def prep_gtf(gtf, mode):
     """ Wrapper for GTF processing steps used by get_transcript_sjs main """
@@ -204,9 +219,10 @@ def prep_gtf(gtf, mode):
 def run_df_tests(ref_loc_df, ref_edge_df, ref_t_df):
     """ Runs the location, edge, and transcript tests on dfs """
     # Make sure the correct positions made it into the location df
-    expected_locs = [("chr1", 1), ("chr1", 100), ("chr1", 500), ("chr1", 600),
-                     ("chr1", 900), ("chr1", 1000), ("chr4", 1000),
-                     ("chr4", 4000), ("chr1", 1500), ("chr1", 2000)]
+    expected_locs = [("chr1", 1), ("chr1", 100), ("chr1", 500), 
+                     ("chr1", 600), ("chr1", 900), ("chr1", 1000), 
+                     ("chr4", 1000), ("chr4", 4000), 
+                     ("chr1", 1500), ("chr1", 2000)]
     assert len(ref_loc_df) == len(expected_locs)
 
     for item in expected_locs:
