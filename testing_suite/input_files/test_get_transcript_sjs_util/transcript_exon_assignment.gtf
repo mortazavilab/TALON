@@ -1,10 +1,9 @@
 chr1	toy	gene	1	1000	.	+	.	gene_id "ENSG01"; 
-chr1	toy	transcript	1	600	.	+	.	gene_id "ENSG01";
+chr1	toy	transcript	1	100	.	+	.	gene_id "ENSG01"; transcript_id "ENST01";
 chr1	toy	exon	1	100	.	+	.	gene_id "ENSG01"; transcript_id "ENST01";
-chr1	toy	exon	500	600	.	+	.	gene_id "ENSG01"; transcript_id "ENST01";
-chr1	toy	transcript	1	1000	.	+	.	gene_id "ENSG01"; transcript_id "intron_NIC";
-chr1	toy	exon	1	100	.	+	.	gene_id "ENSG01"; transcript_id "intron_NIC";
-chr1	toy	exon	900	1000	.	+	.	gene_id "ENSG01"; transcript_id "intron_NIC"; exon_number "2"; exon_id "ENSE03";
+chr1	toy	transcript	1	1000	.	+	.	gene_id "ENSG01"; transcript_id "ENST02";
+chr1	toy	exon	1	100	.	+	.	gene_id "ENSG01"; transcript_id "ENST02";
+chr1	toy	exon	900	1000	.	+	.	gene_id "ENSG01"; transcript_id "ENST02";
 chr1	toy	gene	1	100	.	-	.	gene_id "ENSG02";
-chr1	toy	transcript	1	100	.	-	.	gene_id "ENSG02"; transcript_id "antisense_exon";
-chr1	toy	exon	1	100	.	-	.	gene_id "ENSG02"; transcript_id "intron_NIC";
+chr1	toy	transcript	1	100	.	-	.	gene_id "ENSG02"; transcript_id "antisense";
+chr1	toy	exon	1	100	.	-	.	gene_id "ENSG02"; transcript_id "antisense";

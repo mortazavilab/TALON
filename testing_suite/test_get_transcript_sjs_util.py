@@ -205,7 +205,6 @@ class TestGetTranscriptSJs(object):
         edge_df =tsj.find_tids_from_sj(edge_df, t_df, mode = 'exon')
         print(edge_df)
 
-        assert 1 == 2
  
 def prep_gtf(gtf, mode):
     """ Wrapper for GTF processing steps used by get_transcript_sjs main """
