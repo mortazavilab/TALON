@@ -209,7 +209,118 @@ class TestGetTranscriptSJs(object):
         assert exon1.iloc[0].tids == "ENST01,ENST02"
         assert exon2.iloc[0].tids == "ENST02"
         assert exon3.iloc[0].tids == "antisense"
- 
+
+    def test_full_gtf_mode_intron(self):
+        """ Attempt to run the utility from the top in gtf and intron mode.
+            Then check that the output file looks as expected. """
+        
+        try:
+            subprocess.check_output(
+                ["talon_get_sjs",
+                 "--gtf", "input_files/test_get_transcript_sjs_util/transcript_exon_assignment.gtf",
+                 "--ref",  "input_files/test_get_transcript_sjs_util/annot.gtf",
+                 "--mode", "intron",
+                 "--o", "scratch/get_transcript_sjs/full_gtf"])
+        except Exception as e:
+            print(e)
+            sys.exit("talon_get_sjs failed on GTF + intron mode run")
+            pytest.fail()
+
+        # Read in and check the file
+        data = pd.read_csv("scratch/get_transcript_sjs/full_gtf_introns.tsv",
+                           sep='\t', header = 0)
+        
+        assert data.iloc[0].tolist() == ["chr1", 100, 900, "+", True, True, False, "ENST02"]
+        assert len(data) == 1
+
+    def test_full_gtf_mode_exon(self):
+        """ Attempt to run the utility from the top in gtf and exon mode.
+            Then check that the output file looks as expected. """
+
+        try:
+            subprocess.check_output(
+                ["talon_get_sjs",
+                 "--gtf", "input_files/test_get_transcript_sjs_util/transcript_exon_assignment.gtf",
+                 "--ref",  "input_files/test_get_transcript_sjs_util/annot.gtf",
+                 "--mode", "exon",
+                 "--o", "scratch/get_transcript_sjs/full_gtf"])
+        except Exception as e:
+            print(e)
+            sys.exit("talon_get_sjs failed on GTF + intron mode run")
+            pytest.fail()
+
+        # Read in and check the file
+        data = pd.read_csv("scratch/get_transcript_sjs/full_gtf_exons.tsv",
+                           sep='\t', header = 0)
+
+        exon1 = data[(data.chrom == 'chr1') & (data.start == 1) & (data.stop == 100)]
+        exon2 = data[(data.chrom == 'chr1') & (data.start == 900) & (data.stop == 1000)]
+        exon3 = data[(data.chrom == 'chr1') & (data.start == 100) & (data.stop == 1)]
+        assert exon1.iloc[0].tolist() == ['chr1', 1, 100, "+", True, True, True, "ENST01,ENST02"]
+        assert exon2.iloc[0].tolist() == ['chr1', 900, 1000, "+", True, True, True, "ENST02"]
+        assert exon3.iloc[0].tolist() == ['chr1', 100, 1, "-", False, False, False, "antisense"]
+        assert len(data) == 3
+
+    def test_full_db_mode_intron(self):
+        """ Attempt to run the utility from the top in db and intron mode.
+            Then check that the output file looks as expected. """
+
+        database = "scratch/get_transcript_sjs/talon_intron.db"        
+        os.system("mkdir -p scratch/get_transcript_sjs")
+        try:
+            os.remove(database)
+        except:
+            pass
+        try:
+            subprocess.check_output(
+                ["talon_initialize_database",
+                 "--f", "input_files/test_get_transcript_sjs_util/annot.gtf",
+                 "--a",  "toy_annot",
+                 "--l", "0",
+                 "--g",  "toy_build", "--o", "scratch/get_transcript_sjs/talon_intron"])
+        except Exception as e:
+            print(e)
+            sys.exit("Database initialization failed on toy annotation")
+            pytest.fail()
+        try:
+            subprocess.check_output(
+                ["talon",
+                 "--f", "input_files/test_get_transcript_sjs_util/intron_config.csv",
+                 "--db", database,
+                 "--b", "toy_build", "--cov", "0", "--i", "0", "--o", 
+                 "scratch/get_transcript_sjs/talon_intron"])
+        except Exception as e:
+            print(e)
+            sys.exit("TALON run failed")
+            pytest.fail()
+
+
+        try:
+            subprocess.check_output(
+                ["talon_get_sjs",
+                 "--db", database,
+                 "--ref",  "input_files/test_get_transcript_sjs_util/annot.gtf",
+                 "--mode", "intron",
+                 "--o", "scratch/get_transcript_sjs/full_db"])
+        except Exception as e:
+            print(e)
+            sys.exit("talon_get_sjs failed on GTF + intron mode run")
+            pytest.fail()
+
+        # Read in and check the file
+        data = pd.read_csv("scratch/get_transcript_sjs/full_db_introns.tsv",
+                           sep='\t', header = 0)
+
+        intron1 = data[(data.chrom == 'chr1') & (data.start == 100) & (data.stop == 500)]
+        intron2 = data[(data.chrom == 'chr1') & (data.start == 600) & (data.stop == 900)]
+        intron3 = data[(data.chrom == 'chr1') & (data.start == 1500) & (data.stop == 1000)]
+        intron4 = data[(data.chrom == 'chr1') & (data.start == 100) & (data.stop == 900)]
+        assert intron1.iloc[0].tolist() == ['chr1', 100, 500, "+", True, True, True, "ENST01"]
+        assert intron2.iloc[0].tolist() == ['chr1', 600, 900, "+", True, True, True, "ENST01"]
+        assert intron3.iloc[0].tolist() == ['chr1', 1500, 1000, "-", True, True, True, "ENST03"]
+        assert intron4.iloc[0].tolist() == ["chr1", 100, 900, "+", True, True, False, "TALONT000000004"]
+        assert len(data) == 4
+
 def prep_gtf(gtf, mode):
     """ Wrapper for GTF processing steps used by get_transcript_sjs main """
     loc_df, edge_df, t_df = tsj.create_dfs_gtf(gtf)

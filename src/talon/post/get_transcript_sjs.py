@@ -108,8 +108,6 @@ def create_dfs_db(db):
 	paths = get_db_edge_paths(paths)
 
 	t_df['tid'] = np.asarray(tids)
-	t_df['gid'] = np.asarray(gids)
-	t_df['gname'] = np.asarray(gnames)
 	t_df['path'] = np.asarray(paths)
 
 	t_df = create_dupe_index(t_df, 'tid')
@@ -389,8 +387,13 @@ def main():
 	edge_df = determine_sj_novelty(ref_edge_df, edge_df)
 	edge_df = find_tids_from_sj(edge_df, t_df, mode=args.mode)
 
-	edge_df.to_csv('{}_{}_sj_summary.tsv'.format(args.outprefix, args.mode), 
-			sep='\t', index=False)
+	edge_df = edge_df.rename(columns={'tids': 'transcript_ids'})
+	edge_df.to_csv('{}_{}s.tsv'.format(args.outprefix, args.mode), 
+			sep='\t', index=False, columns=["chrom","start","stop",
+                                                        "strand", "start_known", 
+                                                        "stop_known", 
+                                                        "combination_known",
+                                                        "transcript_ids"])
 
 
 if __name__ == '__main__':
