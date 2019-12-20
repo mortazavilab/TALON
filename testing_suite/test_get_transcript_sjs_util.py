@@ -22,21 +22,8 @@ class TestGetTranscriptSJs(object):
             make sure they contain the correct entries. """
 
         os.system("mkdir -p scratch/get_transcript_sjs")
-        try:
-            os.remove("scratch/get_transcript_sjs/talon.db")
-        except:
-            pass
-        try:
-            subprocess.check_output(
-                ["talon_initialize_database",
-                 "--f", "input_files/test_get_transcript_sjs_util/annot.gtf",
-                 "--a",  "toy_annot",
-                 "--l", "0",
-                 "--g",  "toy_build", "--o", "scratch/get_transcript_sjs/talon"])
-        except Exception as e:
-            print(e)
-            sys.exit("Database initialization failed on toy annotation")       
- 
+        gtf = "input_files/test_get_transcript_sjs_util/annot.gtf"
+        make_database(gtf, "scratch/get_transcript_sjs/talon")
         database = "scratch/get_transcript_sjs/talon.db"
         ref_loc_df, ref_edge_df, ref_t_df = tsj.create_dfs_db(database)
         run_df_tests(ref_loc_df, ref_edge_df, ref_t_df)
@@ -265,22 +252,10 @@ class TestGetTranscriptSJs(object):
         """ Attempt to run the utility from the top in db and intron mode.
             Then check that the output file looks as expected. """
 
-        database = "scratch/get_transcript_sjs/talon_intron.db"
         os.system("mkdir -p scratch/get_transcript_sjs")
-        try:
-            os.remove("scratch/get_transcript_sjs/talon_intron.db")
-        except:
-            pass
-        try:
-            subprocess.check_output(
-                ["talon_initialize_database",
-                 "--f", "input_files/test_get_transcript_sjs_util/annot.gtf",
-                 "--a",  "toy_annot",
-                 "--l", "0",
-                 "--g",  "toy_build", "--o", "scratch/get_transcript_sjs/talon_intron"])
-        except Exception as e:
-            print(e)
-            sys.exit("Database initialization failed on toy annotation")
+        gtf = "input_files/test_get_transcript_sjs_util/annot.gtf"
+        make_database(gtf, "scratch/get_transcript_sjs/talon_intron")
+        database = "scratch/get_transcript_sjs/talon_intron.db"
 
         try:
             subprocess.check_output(
@@ -322,25 +297,14 @@ class TestGetTranscriptSJs(object):
 
     def test_full_db_mode_exon(self):
         """ Attempt to run the utility from the top in db and exon mode.
-            Then check that the output file looks as expected. """
+            Then check that the output file looks as expected.
+            Note: the database used is exactly the same as for the intron case,
+            hence the 'intron' names. """
 
-        database = "scratch/get_transcript_sjs/talon_intron.db"        
         os.system("mkdir -p scratch/get_transcript_sjs")
-        try:
-            os.remove("scratch/get_transcript_sjs/talon_intron.db")
-        except:
-            pass
-
-        try:
-            subprocess.check_output(
-                ["talon_initialize_database",
-                 "--f", "input_files/test_get_transcript_sjs_util/annot.gtf",
-                 "--a",  "toy_annot",
-                 "--l", "0",
-                 "--g",  "toy_build", "--o", "scratch/get_transcript_sjs/talon_intron"])
-        except Exception as e:
-            print(e)
-            sys.exit("Database initialization failed on toy annotation")
+        gtf = "input_files/test_get_transcript_sjs_util/annot.gtf"
+        make_database(gtf, "scratch/get_transcript_sjs/talon_intron")
+        database = "scratch/get_transcript_sjs/talon_intron.db"
 
         try:
             subprocess.check_output(
@@ -385,6 +349,26 @@ class TestGetTranscriptSJs(object):
         assert exon6.iloc[0].tolist() == ["chr1", 1000, 900, "-", True, True, True, "ENST03"]
         assert exon7.iloc[0].tolist() == ["chr1", 100, 1, "-", False, False, False, "TALONT000000005"]
         assert len(data) == 7
+
+def make_database(gtf, prefix):
+    """ Wrapper to init TALON database """
+    try:
+        existing_db = prefix + ".db"
+        os.remove(existing_db)
+    except:
+        pass
+
+    try:
+        subprocess.check_output(
+            ["talon_initialize_database",
+             "--f", gtf,
+             "--a",  "toy_annot",
+             "--l", "0",
+             "--g",  "toy_build", "--o", prefix])
+    except Exception as e:
+        print(e)
+        sys.exit("Database initialization failed on toy annotation")
+    return
 
 def prep_gtf(gtf, mode):
     """ Wrapper for GTF processing steps used by get_transcript_sjs main """
