@@ -203,8 +203,12 @@ class TestGetTranscriptSJs(object):
         loc_df, edge_df, t_df = prep_gtf(query_gtf, 'exon')
         edge_df = tsj.determine_sj_novelty(ref_edge_df, edge_df)
         edge_df =tsj.find_tids_from_sj(edge_df, t_df, mode = 'exon')
-        print(edge_df)
-
+        exon1 = edge_df.loc[(edge_df.chrom == 'chr1') & (edge_df.start == 1)]
+        exon2 = edge_df.loc[(edge_df.chrom == 'chr1') & (edge_df.start == 900)]
+        exon3 = edge_df.loc[(edge_df.chrom == 'chr1') & (edge_df.start == 100)]
+        assert exon1.iloc[0].tids == "ENST01,ENST02"
+        assert exon2.iloc[0].tids == "ENST02"
+        assert exon3.iloc[0].tids == "antisense"
  
 def prep_gtf(gtf, mode):
     """ Wrapper for GTF processing steps used by get_transcript_sjs main """
