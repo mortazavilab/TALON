@@ -265,7 +265,22 @@ class TestGetTranscriptSJs(object):
         """ Attempt to run the utility from the top in db and intron mode.
             Then check that the output file looks as expected. """
 
-        database = "scratch/get_transcript_sjs/talon.db"
+        database = "scratch/get_transcript_sjs/talon_intron.db"
+        os.system("mkdir -p scratch/get_transcript_sjs")
+        try:
+            os.remove("scratch/get_transcript_sjs/talon_intron.db")
+        except:
+            pass
+        try:
+            subprocess.check_output(
+                ["talon_initialize_database",
+                 "--f", "input_files/test_get_transcript_sjs_util/annot.gtf",
+                 "--a",  "toy_annot",
+                 "--l", "0",
+                 "--g",  "toy_build", "--o", "scratch/get_transcript_sjs/talon_intron"])
+        except Exception as e:
+            print(e)
+            sys.exit("Database initialization failed on toy annotation")
 
         try:
             subprocess.check_output(
@@ -310,6 +325,34 @@ class TestGetTranscriptSJs(object):
             Then check that the output file looks as expected. """
 
         database = "scratch/get_transcript_sjs/talon_intron.db"        
+        os.system("mkdir -p scratch/get_transcript_sjs")
+        try:
+            os.remove("scratch/get_transcript_sjs/talon_intron.db")
+        except:
+            pass
+
+        try:
+            subprocess.check_output(
+                ["talon_initialize_database",
+                 "--f", "input_files/test_get_transcript_sjs_util/annot.gtf",
+                 "--a",  "toy_annot",
+                 "--l", "0",
+                 "--g",  "toy_build", "--o", "scratch/get_transcript_sjs/talon_intron"])
+        except Exception as e:
+            print(e)
+            sys.exit("Database initialization failed on toy annotation")
+
+        try:
+            subprocess.check_output(
+                 ["talon",
+                 "--f", "input_files/test_get_transcript_sjs_util/intron_config.csv",
+                 "--db", database,
+                 "--b", "toy_build", "--cov", "0", "--i", "0", "--o",
+                 "scratch/get_transcript_sjs/talon_intron"])
+        except Exception as e:
+            print(e)
+            sys.exit("TALON run failed")
+            pytest.fail()
 
         try:
             subprocess.check_output(
@@ -332,13 +375,16 @@ class TestGetTranscriptSJs(object):
         exon3 = data[(data.chrom == 'chr1') & (data.start == 900) & (data.stop == 1000)]
         exon4 = data[(data.chrom == 'chr4') & (data.start == 4000) & (data.stop == 1000)]
         exon5 = data[(data.chrom == 'chr1') & (data.start == 2000) & (data.stop == 1500)]
-        exon5 = data[(data.chrom == 'chr1') & (data.start == 1000) & (data.stop == 900)]
-        exon6 = data[(data.chrom == 'chr1') & (data.start == 100) & (data.stop == 1)]
-        #assert exon1.iloc[0].tolist() == ['chr1', 1, 100, "+", True, True, True, "ENST01"]
-        #assert exon2.iloc[0].tolist() == ['chr1', 600, 900, "+", True, True, True, "ENST01"]
-        #assert exon3.iloc[0].tolist() == ['chr1', 1500, 1000, "-", True, True, True, "ENST03"]
-        #assert exon4.iloc[0].tolist() == ["chr1", 100, 900, "+", True, True, False, "TALONT000000004"]
-        #assert len(data) == 6
+        exon6 = data[(data.chrom == 'chr1') & (data.start == 1000) & (data.stop == 900)]
+        exon7 = data[(data.chrom == 'chr1') & (data.start == 100) & (data.stop == 1)]
+        assert exon1.iloc[0].tolist() == ['chr1', 1, 100, "+", True, True, True, "ENST01,TALONT000000004"]
+        assert exon2.iloc[0].tolist() == ['chr1', 500, 600, "+", True, True, True, "ENST01"]
+        assert exon3.iloc[0].tolist() == ['chr1', 900, 1000, "+", True, True, True, "ENST01,TALONT000000004"]
+        assert exon4.iloc[0].tolist() == ["chr4", 4000, 1000, "-", True, True, True, "ENST07"]
+        assert exon5.iloc[0].tolist() == ["chr1", 2000, 1500, "-", True, True, True, "ENST03"]
+        assert exon6.iloc[0].tolist() == ["chr1", 1000, 900, "-", True, True, True, "ENST03"]
+        assert exon7.iloc[0].tolist() == ["chr1", 100, 1, "-", False, False, False, "TALONT000000005"]
+        assert len(data) == 7
 
 def prep_gtf(gtf, mode):
     """ Wrapper for GTF processing steps used by get_transcript_sjs main """
