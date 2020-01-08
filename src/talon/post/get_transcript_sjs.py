@@ -108,8 +108,6 @@ def create_dfs_db(db):
 	paths = get_db_edge_paths(paths)
 
 	t_df['tid'] = np.asarray(tids)
-	t_df['gid'] = np.asarray(gids)
-	t_df['gname'] = np.asarray(gnames)
 	t_df['path'] = np.asarray(paths)
 
 	t_df = create_dupe_index(t_df, 'tid')
@@ -118,8 +116,6 @@ def create_dfs_db(db):
 	# furnish the last bit of info in each df
 	t_df['path'] = [[int(n) for n in path]
 					 for path in get_db_vertex_paths(paths, edge_df)]
-	loc_df['strand'] = loc_df.apply(lambda x:
-			 get_db_strand(x, edge_df), axis=1)
 	loc_df = create_dupe_index(loc_df, 'vertex_id')
 	loc_df = set_dupe_index(loc_df, 'vertex_id')
 
@@ -137,7 +133,7 @@ def create_dfs_gtf(gtf):
 		raise Exception('GTF file not found. Check path.')
 
 	# get dfs by parsing through gtf
-	loc_df = pd.DataFrame(columns=['chrom', 'coord', 'strand','vertex_id'])
+	loc_df = pd.DataFrame(columns=['chrom', 'coord','vertex_id'])
 	loc_df.set_index(['chrom', 'coord'], inplace=True)
 
 	edge_df = pd.DataFrame(columns=['edge_id', 'edge_type',
@@ -198,7 +194,6 @@ def create_dfs_gtf(gtf):
 				else: coords = [curr_stop, curr_start]
 				
 				for c in coords:
-
 					ind = (curr_chr, int(c))
 
 					# loc not in loc_df already
@@ -206,7 +201,7 @@ def create_dfs_gtf(gtf):
 
 						attr = {'vertex_id': vertex_id,	   
 								'coord': int(c),
-								'strand': curr_strand, 'chrom': curr_chr}
+								'chrom': curr_chr}
 
 						# update loc_df and increment vertex_id
 						loc_df.reset_index(inplace=True)
@@ -293,14 +288,6 @@ def get_db_vertex_paths(paths, edge_df):
 		vertex_paths.append(path)
 	return vertex_paths
 
-# get the strand of each vertex
-def get_db_strand(x, edge_df):
-	# use v1 or v2 depending on where vertex is in edge
-	try: 
-		strand = edge_df.loc[edge_df.v1 == x.vertex_id, 'strand'].values[0]
-	except:
-		strand = edge_df.loc[edge_df.v2 == x.vertex_id, 'strand'].values[0]
-	return strand
 
 # creates the duplicate index
 def create_dupe_index(df, ind_name):
@@ -319,41 +306,30 @@ def subset_edges(edge_df, mode='intron'):
 		lambda x: True if x.edge_type == mode else False, axis=1)]
 	return sjs
 
-def determine_sj_novelty(ref_loc_df, ref_edge_df, loc_df, edge_df):
+def determine_sj_novelty(ref_edge_df, edge_df):
 
-	drop_cols = ['vertex_id']
-	ref_loc_df.drop(drop_cols, axis=1, inplace=True)
-	loc_df.drop(drop_cols, axis=1, inplace=True)
+	# Merge known starts from ref_edge_df with the query edges
+	ref_edge_df['start_known'] = True
+	edge_df = edge_df.merge(ref_edge_df[['chrom', 'start', 'strand', 'start_known']],
+				how = 'left', 
+				on = ['chrom', 'strand', 'start'])
+	edge_df.fillna(value=False, inplace=True)
 
-	ref_loc_df.reset_index(drop= True,inplace=True)
-	ref_loc_df['annotated'] = True
-	loc_df.reset_index(drop=True, inplace=True)
+	# Merge known ends from ref_edge_df with the query edges
+	ref_edge_df['stop_known'] = True
+	edge_df = edge_df.merge(ref_edge_df[['chrom', 'stop', 'strand', 'stop_known']],
+                                how = 'left',
+                                on = ['chrom', 'strand', 'stop'])
+	edge_df.fillna(value=False, inplace=True)
 
-	merged_locs = ref_loc_df.merge(loc_df, how='right', 
-		on=['chrom', 'strand', 'coord'])
-	merged_locs.fillna(value=False, inplace=True)
-
-	merged_locs.set_index(['chrom', 'strand', 'coord'], inplace=True)
-
-	edge_df['start_known'] = edge_df.apply(
-		lambda x: merged_locs.loc[(x.chrom, x.strand, x.start), 'annotated'],
-		axis=1)
-	edge_df['stop_known'] = edge_df.apply(
-		lambda x: merged_locs.loc[(x.chrom, x.strand, x.stop), 'annotated'],
-		axis=1)
-
-        # Combined novelty (i.e. has start been seen with stop before)        
-	ref_edge_df.reset_index(drop= True,inplace=True)
-	ref_edge_df.drop('edge_id', axis = 1, inplace=True)
+	# Now determine whether the edge in whole has been seen before
 	ref_edge_df['combination_known'] = True
-	merged_edge = ref_edge_df.merge(edge_df, how='right',
-                on=['chrom', 'strand', 'start', 'stop'])
-	merged_edge.fillna(value=False, inplace=True)
+	edge_df = edge_df.merge(ref_edge_df[['chrom', 'start', 'stop', 'strand', 
+					     'combination_known']],
+                                 how = 'left', on = ['chrom', 'strand', 'start', 'stop'])
+	edge_df.fillna(value=False, inplace=True)
 
-	#edge_df = create_dupe_index(edge_df, 'edge_id')
-	#edge_df = set_dupe_index(edge_df, 'edge_id')
-
-	return merged_edge
+	return edge_df
 
 # renames old index dupe column in df and resets the index
 def reset_dupe_index(df, ind_name):
@@ -408,11 +384,16 @@ def main():
 	edge_df = add_coord_info(edge_df, loc_df)
 	edge_df = subset_edges(edge_df, mode=args.mode)
 	edge_df = format_edge_df(edge_df)
-	edge_df = determine_sj_novelty(ref_loc_df, ref_edge_df, loc_df, edge_df)
+	edge_df = determine_sj_novelty(ref_edge_df, edge_df)
 	edge_df = find_tids_from_sj(edge_df, t_df, mode=args.mode)
 
-	edge_df.to_csv('{}_{}_sj_summary.tsv'.format(args.outprefix, args.mode), 
-			sep='\t', index=False)
+	edge_df = edge_df.rename(columns={'tids': 'transcript_ids'})
+	edge_df.to_csv('{}_{}s.tsv'.format(args.outprefix, args.mode), 
+			sep='\t', index=False, columns=["chrom","start","stop",
+                                                        "strand", "start_known", 
+                                                        "stop_known", 
+                                                        "combination_known",
+                                                        "transcript_ids"])
 
 
 if __name__ == '__main__':
