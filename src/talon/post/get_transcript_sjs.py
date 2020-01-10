@@ -34,13 +34,26 @@ def get_args():
 
 	return args
 
+# creates a dictionary of the last field of a gtf
+# adapted from Dana Wyman
+def get_fields(fields):
+    attributes = {}
 
-# get value associated with keyword in the 9th column of gtf
-def get_field_value(key, fields):
-	if key not in fields:
-		return None
-	else:
-		return fields.split(key+' "')[1].split()[0].replace('";','')
+    description = fields.strip()
+    description = [x.strip() for x in description.split(";")]
+    for pair in description:
+        if pair == "": continue
+
+        pair = pair.replace('"', '')
+        key, val = pair.split()
+        attributes[key] = val
+
+    # put in placeholders for important attributes (such as gene_id) if they
+    # are absent
+    if "gene_id" not in attributes:
+        attributes["gene_id"] = "NULL"
+
+    return attributes    
 
 # create loc_df (for nodes), edge_df (for edges), and t_df (for paths)
 def create_dfs_db(db):
@@ -125,142 +138,168 @@ def create_dfs_db(db):
 
 	return loc_df, edge_df, t_df
 
-# create loc_df (for nodes), edge_df (for edges), and t_df (for paths)
-def create_dfs_gtf(gtf):
+	# create loc_df (nodes), edge_df (edges), and t_df (transcripts) from gtf
+	# adapted from Dana Wyman and TALON
+def create_dfs_gtf(gtf_file):
 
 	# make sure file exists
-	if not os.path.exists(gtf):
+	if not os.path.exists(gtf_file):
 		raise Exception('GTF file not found. Check path.')
 
-	# get dfs by parsing through gtf
-	loc_df = pd.DataFrame(columns=['chrom', 'coord','vertex_id'])
-	loc_df.set_index(['chrom', 'coord'], inplace=True)
+	# depending on the strand, determine the stard and stop
+	# coords of an intron or exon
+	def find_edge_start_stop(v1, v2, strand):
+		if strand == '-':
+			start = max([v1, v2])
+			stop = min([v1, v2])
+		elif strand == '+':
+			start = min([v1, v2])
+			stop = max([v1, v2])
+		return start, stop
 
-	edge_df = pd.DataFrame(columns=['edge_id', 'edge_type',
-								    'strand', 'v1', 'v2'])
-	t_df = pd.DataFrame(columns=['tid', 'gid',
-								 'gname', 'path'])
+	# dictionaries to hold unique edges and transcripts
+	transcripts = {}
+	exons = {}
 
-	# loop initialization
-	vertex_id = 0
-	transcript_paths = []
-	transcript_path = []
+	with open(gtf_file) as gtf:
+		for line in gtf:
 
-	with open(gtf, 'r') as infile:
-		for line in infile:
+			# ignore header lines
+			if '##' in line:
+				continue
 
-			# skip header lines
-			if '##' in line: continue
-
+			# split each entry
 			line = line.strip().split('\t')
 
-			# gene entry 
-			if line[2] == 'gene':
-				curr_gid = get_field_value('gene_id', line[-1])
-				curr_gname = get_field_value('gene_name', line[-1])
+			# get some fields from gtf that we care about
+			chrom = line[0]
+			entry_type = line[2]
+			start = line[3]
+			stop = line[4]
+			strand = line[6]
+			fields = line[-1]
 
-			# transcript entry
-			elif line[2] == 'transcript':
-				curr_tid = get_field_value('transcript_id', line[-1])
+			# transcript entry 
+			if entry_type == "transcript":
+				attributes = get_fields(fields)
+				tid = attributes['transcript_id']
+				gid = attributes['gene_id']
+				gname = attributes['gene_name']
+
+				# add transcript to dictionary 
+				transcript = {tid: {'gid': gid,
+									'gname': gname,
+									'tid': tid,
+									'strand': strand,
+									'exons': []}}
+				transcripts.update(transcript)
 				
-				# start a new transcript path
-				if transcript_path != []:
-
-					# add to list of transcript paths and transcript df 
-					transcript_paths.append(transcript_path)
-					t_df = t_df.append({'tid': prev_tid,
-								 'gid': prev_gid,
-								 'gname': prev_gname,
-								 'path': transcript_path},
-								 ignore_index=True)
-
-				transcript_path = []
-
-				# reset some stuff
-				terminal_loc = True
-				exon = 0
-				intron = 1
-
 			# exon entry
-			elif line[2] == 'exon':
+			elif entry_type == "exon":
+				attributes = get_fields(fields)
+				start, stop = find_edge_start_stop(start, stop, strand)
+				eid = '{}_{}_{}_{}_exon'.format(chrom, start, stop, strand)
+				tid = attributes['transcript_id']	
 
-				# get exon info 
-				curr_chr = line[0]
-				curr_start = line[3]
-				curr_stop = line[4]
-				curr_strand = line[6]
-				
-				if curr_strand == '+': coords = [curr_start, curr_stop]
-				else: coords = [curr_stop, curr_start]
-				
-				for c in coords:
-					ind = (curr_chr, int(c))
+				# add novel exon to dictionary 
+				if eid not in exons:
+					edge = {eid: {'eid': eid,
+								  'chrom': chrom,
+								  'v1': int(start),
+								  'v2': int(stop),
+								  'strand': strand}}
+					exons.update(edge)
+		   
+		   		# add this exon to the transcript's list of exons
+				if tid in transcripts:
+					transcripts[tid]['exons'].append(eid)
 
-					# loc not in loc_df already
-					if ind not in loc_df.index.tolist():
+	# once we have all transcripts, make loc_df
+	locs = {}
+	vertex_id = 0
+	for edge_id, edge in exons.items():
+		chrom = edge['chrom']
+		strand = edge['strand']
 
-						attr = {'vertex_id': vertex_id,	   
-								'coord': int(c),
-								'chrom': curr_chr}
+		v1 = edge['v1']
+		v2 = edge['v2']
 
-						# update loc_df and increment vertex_id
-						loc_df.reset_index(inplace=True)
-						loc_df = loc_df.append(attr, ignore_index=True)
-						loc_df.set_index(['chrom', 'coord'], inplace=True)
+		# exon start
+		key = (chrom, v1)
+		if key not in locs:
+			locs[key] = vertex_id
+			vertex_id += 1
+		# exon end
+		key = (chrom, v2)
+		if key not in locs:
+			locs[key] = vertex_id
+			vertex_id += 1
 
-						curr_loc = int(vertex_id)
-						vertex_id += 1
+	# add locs-indexed path to transcripts, and populate edges
+	edges = {}
+	for _,t in transcripts.items():
+		t['path'] = []
+		strand = t['strand']
+		t_exons = t['exons']
 
-					# loc was already added to graph
-					else: curr_loc = int(loc_df.loc[ind].vertex_id)	
-	
-					# add an edge to previous loc if not terminal loc 
-					# and if the edge doesn't already exist
-					if not terminal_loc:
-						curr_edge = (prev_loc, curr_loc)
-						
-						if curr_edge not in edge_df.edge_id.to_list():
-							attrs = {'edge_id': (curr_edge[0], curr_edge[1]),
-								     'v1': curr_edge[0],
-									 'v2': curr_edge[1], 
-									 'strand': curr_strand}
-							if exon: attrs.update({'edge_type': 'exon'})
-							elif intron: attrs.update({'edge_type': 'intron'})
+		for i, exon_id in enumerate(t_exons):
 
-							edge_df = edge_df.append(attrs, ignore_index=True)
+			# pull some information from exon dict
+			exon = exons[exon_id]
+			chrom = exon['chrom']
+			v1 = exon['v1']
+			v2 = exon['v2']
+			strand = exon['strand']
 
-					# update transcript path with each loc 
-					transcript_path.append(curr_loc)
-					prev_loc = curr_loc
-					prev_tid = curr_tid
-					prev_gid = curr_gid
-					prev_gname = curr_gname
-					terminal_loc = False
-					
-					# exon or intron
-					exon = abs(exon-1)
-					intron = abs(intron-1)
-					
-	# append last transcript info
-	transcript_paths.append(transcript_path)
-	t_df = t_df.append({'tid': curr_tid,
-					    'gid': curr_gid,
-					    'gname': curr_gname,
-						'path': transcript_path},
-						ignore_index=True)
+			# add current exon and subsequent intron 
+			# (if not the last exon) for each exon to edges
+			key = (chrom, v1, v2, strand)
+			v1_key = (chrom, v1)
+			v2_key = (chrom, v2)
+			edge_id = (locs[v1_key], locs[v2_key])
+			if key not in edges:
+				edges[key] = {'edge_id': edge_id, 'edge_type': 'exon'}
 
-	# label node/edge types and finish formatting dfs correctly
-	loc_df.reset_index(inplace=True)
+			# add exon locs to path
+			t['path'] += list(edge_id)
+
+			# if this isn't the last exon, we also needa add an intron
+			# this consists of v2 of the prev exon and v1 of the next exon
+			if i < len(t_exons)-1:
+				next_exon = exons[t_exons[i+1]]
+				v1 = next_exon['v1']
+				key = (chrom, v2, v1, strand)
+				v1_key = (chrom, v1)
+				edge_id = (locs[v2_key], locs[v1_key])
+				if key not in edges:
+					edges[key] = {'edge_id': edge_id, 'edge_type': 'intron'}
+
+	# turn transcripts, edges, and locs into dataframes
+	locs = [{'chrom': key[0],
+			 'coord': key[1],
+			 'vertex_id': vertex_id} for key, vertex_id in locs.items()]
+	loc_df = pd.DataFrame(locs)
+
+	edges = [{'v1': item['edge_id'][0],
+			  'v2': item['edge_id'][1], 
+			  'strand': key[3],
+			  'edge_id': item['edge_id'],
+			  'edge_type': item['edge_type']} for key, item in edges.items()]
+	edge_df = pd.DataFrame(edges)
+
+	transcripts = [{'tid': key,
+					'gid': item['gid'],
+					'gname': item['gname'],
+					'path': item['path']} for key, item in transcripts.items()]
+	t_df = pd.DataFrame(transcripts)
+
+	# final df formatting
 	loc_df = create_dupe_index(loc_df, 'vertex_id')
 	loc_df = set_dupe_index(loc_df, 'vertex_id')
-
-	loc_df.coord = loc_df.coord.map(int)
-
-	t_df = create_dupe_index(t_df, 'tid')
-	t_df = set_dupe_index(t_df, 'tid')
-
 	edge_df = create_dupe_index(edge_df, 'edge_id')
 	edge_df = set_dupe_index(edge_df, 'edge_id')
+	t_df = create_dupe_index(t_df, 'tid')
+	t_df = set_dupe_index(t_df, 'tid')
 
 	return loc_df, edge_df, t_df
 
