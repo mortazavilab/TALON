@@ -174,8 +174,8 @@ def create_dfs_gtf(gtf_file):
 			# get some fields from gtf that we care about
 			chrom = line[0]
 			entry_type = line[2]
-			start = line[3]
-			stop = line[4]
+			start = int(line[3])
+			stop = int(line[4])
 			strand = line[6]
 			fields = line[-1]
 
@@ -184,11 +184,9 @@ def create_dfs_gtf(gtf_file):
 				attributes = get_fields(fields)
 				tid = attributes['transcript_id']
 				gid = attributes['gene_id']
-				gname = attributes['gene_name']
 
 				# add transcript to dictionary 
 				transcript = {tid: {'gid': gid,
-									'gname': gname,
 									'tid': tid,
 									'strand': strand,
 									'exons': []}}
@@ -205,8 +203,8 @@ def create_dfs_gtf(gtf_file):
 				if eid not in exons:
 					edge = {eid: {'eid': eid,
 								  'chrom': chrom,
-								  'v1': int(start),
-								  'v2': int(stop),
+								  'v1': start,
+								  'v2': stop,
 								  'strand': strand}}
 					exons.update(edge)
 		   
@@ -289,7 +287,6 @@ def create_dfs_gtf(gtf_file):
 
 	transcripts = [{'tid': key,
 					'gid': item['gid'],
-					'gname': item['gname'],
 					'path': item['path']} for key, item in transcripts.items()]
 	t_df = pd.DataFrame(transcripts)
 
