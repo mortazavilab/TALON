@@ -49,7 +49,7 @@ setup(
     python_requires=">=3.6",
     install_requires=[
         "pandas",
-        "pysam=0.15.2",
+        "pysam==0.15.2",
         "pybedtools"
     ],
     entry_points={
