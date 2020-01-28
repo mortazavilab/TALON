@@ -7,7 +7,7 @@ python:
 
 install:
   - sudo apt update && sudo apt install bedtools
-  - pip install pysam
+  - pip install cython
   - pip install pybedtools
   - pip install tox
 
