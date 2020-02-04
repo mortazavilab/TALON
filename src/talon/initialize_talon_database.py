@@ -80,6 +80,8 @@ def init_run_info(database, idprefix, min_length, cutoff_5p, cutoff_3p):
     # Add rows
     cols = " (" + ", ".join([str_wrap_double(x) for x in ["item", "value"]]) + ") "
     c.execute('INSERT INTO run_info ' + cols + ' VALUES ' + '(?,?)',
+             ('schema_version', "v5.0"))
+    c.execute('INSERT INTO run_info ' + cols + ' VALUES ' + '(?,?)',
              ('idprefix', idprefix))
     c.execute('INSERT INTO run_info ' + cols + ' VALUES ' + '(?,?)', 
              ('cutoff_5p', cutoff_5p))

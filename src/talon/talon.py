@@ -1454,7 +1454,7 @@ def init_run_info(database, genome_build, min_coverage = 0.9, min_identity = 0,
         for info in cursor.fetchall():
             info_name = info['item']
             value = info['value']
-            if info_name != "idprefix":
+            if info_name not in ["idprefix", "schema_version"] :
                 value = int(value)
             run_info[info_name] = value
 
