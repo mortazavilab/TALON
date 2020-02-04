@@ -45,10 +45,10 @@ class TestDatabaseUpdates(object):
         conn, cursor = get_db_cursor()
         build = "toy_build"
 
-        observed = [ ( 1, 1, 1, "read1", "test", 1, 2, 1, 1, 0, 0, 100, 0.5),
-                     ( 2, 1, 1, "read2", "test", 1, 2, 1, 1, 0, 0, 100, None),
-                     ( 3, 1, 1, "read3", "test", 1, 2, 1, 1, 0, 0, 100, None),
-                     ( 4, 1, 8, "read4", "test", 35, 36, 32, 32,  None, None, 100, None) ]
+        observed = [ ( 1, 1, 1, "read1", "test", 1, 2, 1, 1, 0, 0, 100, 0.5, "yes", "paternal"),
+                     ( 2, 1, 1, "read2", "test", 1, 2, 1, 1, 0, 0, 100, None, None, None),
+                     ( 3, 1, 1, "read3", "test", 1, 2, 1, 1, 0, 0, 100, None, None, None),
+                     ( 4, 1, 8, "read4", "test", 35, 36, 32, 32,  None, None, 100, None, None, None) ]
 
         # Write observed to file
         os.system("mkdir -p scratch/db_updates/")
@@ -70,10 +70,14 @@ class TestDatabaseUpdates(object):
         for transcript in results:
             if transcript['read_name'] == "read1":
                 assert transcript['fraction_As'] == 0.5
+                assert transcript['custom_label'] == "yes"
+                assert transcript['allelic_label'] == "paternal"
             if transcript['read_name'] == "read4":
                 assert transcript['start_delta'] == None
                 assert transcript['end_delta'] == None
                 assert transcript['fraction_As'] == None
+                assert transcript['custom_label'] == None
+                assert transcript['allelic_label'] == None
         conn.close()
 
     def test_gene_annot(self):

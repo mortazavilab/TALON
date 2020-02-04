@@ -1980,6 +1980,10 @@ def batch_add_observed(cursor, observed_file, batch_size):
                     observed[10] = None
                 if observed[12] == "None":
                     observed[12] = None
+                if observed[13] == "None":
+                    observed[13] = None
+                if observed[14] == "None":
+                    observed[14] = None 
 
                 batch.append(tuple(observed))
 
@@ -2004,9 +2008,10 @@ def batch_add_observed(cursor, observed_file, batch_size):
                        ["obs_ID", "gene_ID", "transcript_ID", "read_name",
                         "dataset", "start_vertex", "end_vertex",
                         "start_exon", "end_exon", "start_delta", "end_delta", 
-                        "read_length", "fraction_As"]]) + ") "
+                        "read_length", "fraction_As", "custom_label", 
+                        "allelic_label"]]) + ") "
                 command = 'INSERT INTO "observed"' + cols + \
-                          "VALUES " + '(?,?,?,?,?,?,?,?,?,?,?,?,?)'
+                          "VALUES " + '(?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)'
                 cursor.executemany(command, batch)
 
             except Exception as e:
@@ -2197,6 +2202,28 @@ def parallel_talon(read_file, interval, database, run_info, queue):
  
     return
 
+def parse_custom_SAM_tags(sam_record: pysam.AlignedSegment):
+    """ Looks for the following tags in the read. Will be set to None if no tag
+        is found 
+            fA: fraction As in the 10-bp interval following the alignment end
+            lC: custom label (type = string)
+            lA: custom allele label (type = string)
+    """
+    try:
+        fraction_As = sam_record.get_tag("fA")
+    except:
+        fraction_As = None
+    try:
+        custom_label = sam_record.get_tag("lC")
+    except:
+        custom_label = None
+    try:
+        allelic_label = sam_record.get_tag("lA")
+    except:
+        allelic_label = None
+
+    return fraction_As, custom_label, allelic_label
+
 def annotate_read(sam_record: pysam.AlignedSegment, cursor, run_info, 
                   struct_collection, mode = 1):            
     """ Accepts a pysam-formatted read as input, and compares it to the 
@@ -2215,6 +2242,8 @@ def annotate_read(sam_record: pysam.AlignedSegment, cursor, run_info,
             start_delta
             end_delta 
             fraction_As (following the end of the alignment) 
+            custom_label
+            allelic_label
     """
     # Parse attributes to determine the chromosome, positions, and strand of the transcript
     read_ID = sam_record.query_name
@@ -2225,10 +2254,9 @@ def annotate_read(sam_record: pysam.AlignedSegment, cursor, run_info,
     sam_end = sam_record.reference_end
     read_length = sam_record.query_alignment_length 
     cigar = sam_record.cigarstring
-    try:
-        fraction_As = sam_record.get_tag("fA")
-    except:
-        fraction_As = None
+
+    # Parse custom TALON tags
+    fraction_As, custom_label, allelic_label = parse_custom_SAM_tags(sam_record)
 
     intron_list = tutils.get_introns(sam_record, sam_start, cigar)
 
@@ -2274,6 +2302,8 @@ def annotate_read(sam_record: pysam.AlignedSegment, cursor, run_info,
     annotation_info.read_length = read_length
     annotation_info.n_exons = n_exons
     annotation_info.fraction_As = fraction_As    
+    annotation_info.custom_label = custom_label
+    annotation_info.allelic_label = allelic_label
 
     return annotation_info
 
@@ -2288,7 +2318,8 @@ def unpack_observed(annotation_info, queue, obs_file):
                 annotation_info.start_vertex, annotation_info.end_vertex, 
                 annotation_info.start_exon, annotation_info.end_exon,
                 annotation_info.start_delta, annotation_info.end_delta, 
-                annotation_info.read_length, annotation_info.fraction_As)
+                annotation_info.read_length, annotation_info.fraction_As,
+                annotation_info.custom_label, annotation_info.allelic_label)
     msg = (obs_file, "\t".join([str(x) for x in observed]))
     queue.put(msg)
 

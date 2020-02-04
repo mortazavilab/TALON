@@ -313,6 +313,8 @@ def add_observed_table(database):
                      end_delta INTEGER,
                      read_length INTEGER,
                      fraction_As FLOAT,
+                     custom_label STRING,
+                     allelic_label STRING,
 
                      FOREIGN KEY(gene_ID) REFERENCES transcripts(gene_ID),
                      FOREIGN KEY(transcript_ID) REFERENCES transcripts(transcript_ID),
