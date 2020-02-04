@@ -74,8 +74,9 @@ class TestIdentifyFSM(object):
         conn.close()
 
     def test_NIC_instead_of_ISM(self):
-        """ Test case where the transcript looks like an ISM, but is NIC on
-            account of having known starts and ends """
+        """ Test case where the transcript looks like an ISM, but has known 
+            starts and ends. In past TALON versions, this was considered NIC,
+            but expected behavior is now ISM """
         conn, cursor = get_db_cursor()
         build = "toy_build"
         database = "scratch/toy.db"
@@ -102,7 +103,7 @@ class TestIdentifyFSM(object):
         correct_gene_ID = fetch_correct_ID("TG5", "gene", cursor)
         novelty_types = [ x[-2] for x in annotation['transcript_novelty']]
         assert annotation['gene_ID'] == correct_gene_ID
-        assert "NIC_transcript" in novelty_types
+        assert "ISM_transcript" in novelty_types
         conn.close()
 
     def test_ISM_suffix(self):

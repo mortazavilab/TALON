@@ -38,8 +38,7 @@ class TestAssignments(object):
 
     def test_prefix_ISM_of_Canx(self):
         """ m54284_180814_002203/18677911/ccs is an ISM transcript of Canx at 
-            first glance, but it has known 5' and 3' ends, so it should be 
-            called NIC. Comes from BC017 data. """
+            first glance that has known 5' and 3' ends. Comes from BC017 data. """
 
         conn = sqlite3.connect("scratch/chr11_and_Tcf3.db")
         conn.row_factory = sqlite3.Row
@@ -60,7 +59,7 @@ class TestAssignments(object):
 
         # Now make sure that the novel transcript was annotated correctly
         annot_dict = make_annot_dict(cursor, assignment['transcript_ID'])
-        assert annot_dict["NIC_transcript"] == "TRUE"
+        assert annot_dict["ISM_transcript"] == "TRUE"
         assert annot_dict["transcript_status"] == "NOVEL"
         conn.close()
 

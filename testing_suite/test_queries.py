@@ -153,7 +153,7 @@ class TestQueries(object):
 
         dataset = "PB65_B017"
         transcripts = qutils.fetch_all_ISM_transcripts(cursor, dataset)
-        assert len(transcripts) == 2
+        assert len(transcripts) == 3
 
         dataset = "D12"
         transcripts = qutils.fetch_all_ISM_transcripts(cursor, dataset)
@@ -168,7 +168,7 @@ class TestQueries(object):
 
         dataset = "PB65_B018"
         transcripts = qutils.fetch_prefix_ISM_transcripts(cursor, dataset)
-        assert len(transcripts) == 0
+        assert len(transcripts) == 1
         conn.close()
 
     def test_count_suffix_ISM_transcripts(self):
@@ -190,12 +190,12 @@ class TestQueries(object):
 
         dataset = "PB65_B018"
         transcripts = qutils.fetch_NIC_transcripts(cursor, dataset)
-        assert len(transcripts) == 2
+        assert len(transcripts) == 1
 
         # Now try all 3 datasets at once
         datasets = ["PB65_B017", "PB65_B018", "D12"]
         transcripts = qutils.fetch_NIC_transcripts(cursor, datasets)
-        assert len(transcripts) == 3
+        assert len(transcripts) == 1
         conn.close()
 
     def test_count_NNC_transcripts(self):

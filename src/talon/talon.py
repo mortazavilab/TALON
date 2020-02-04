@@ -822,14 +822,14 @@ def process_ISM(chrom, positions, strand, edge_IDs, vertex_IDs, all_matches, tra
         known_end = 0   
 
     # If the 5' and 3' vertex sites are known for this gene, return NIC
-    if known_start and known_end:
-        novel_transcript = create_transcript(chrom, positions[0], positions[-1],
-                                              gene_ID, edge_IDs, vertex_IDs,
-                                              transcript_dict)
-        transcript_ID = novel_transcript['transcript_ID']
-        novelty = [(transcript_ID, run_info.idprefix, "TALON",
-                        "NIC_transcript", "TRUE")]
-        return gene_ID, transcript_ID, novelty, start_end_info    
+    #if known_start and known_end:
+    #    novel_transcript = create_transcript(chrom, positions[0], positions[-1],
+    #                                          gene_ID, edge_IDs, vertex_IDs,
+    #                                          transcript_dict)
+    #    transcript_ID = novel_transcript['transcript_ID']
+    #    novelty = [(transcript_ID, run_info.idprefix, "TALON",
+    #                    "NIC_transcript", "TRUE")]
+    #    return gene_ID, transcript_ID, novelty, start_end_info    
 
     # Iterate over matches to characterize ISMs
     for match in all_matches:
