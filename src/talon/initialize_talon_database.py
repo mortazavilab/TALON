@@ -310,6 +310,7 @@ def add_observed_table(database):
                      start_delta INTEGER,
                      end_delta INTEGER,
                      read_length INTEGER,
+                     fraction_As FLOAT,
 
                      FOREIGN KEY(gene_ID) REFERENCES transcripts(gene_ID),
                      FOREIGN KEY(transcript_ID) REFERENCES transcripts(transcript_ID),

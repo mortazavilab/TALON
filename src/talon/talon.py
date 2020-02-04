@@ -821,16 +821,6 @@ def process_ISM(chrom, positions, strand, edge_IDs, vertex_IDs, all_matches, tra
         known_start = 0
         known_end = 0   
 
-    # If the 5' and 3' vertex sites are known for this gene, return NIC
-    #if known_start and known_end:
-    #    novel_transcript = create_transcript(chrom, positions[0], positions[-1],
-    #                                          gene_ID, edge_IDs, vertex_IDs,
-    #                                          transcript_dict)
-    #    transcript_ID = novel_transcript['transcript_ID']
-    #    novelty = [(transcript_ID, run_info.idprefix, "TALON",
-    #                    "NIC_transcript", "TRUE")]
-    #    return gene_ID, transcript_ID, novelty, start_end_info    
-
     # Iterate over matches to characterize ISMs
     for match in all_matches:
 
@@ -1983,11 +1973,13 @@ def batch_add_observed(cursor, observed_file, batch_size):
             for observed in islice(f, batch_size):
                 observed = observed.strip().split("\t")
                   
-                # Start and end delta values may be None
+                # Start/end delta and frac_A values may be None
                 if observed[9] == "None":
                     observed[9] = None
                 if observed[10] == "None":
                     observed[10] = None
+                if observed[12] == "None":
+                    observed[12] = None
 
                 batch.append(tuple(observed))
 
@@ -2011,10 +2003,10 @@ def batch_add_observed(cursor, observed_file, batch_size):
                 cols = " (" + ", ".join([str_wrap_double(x) for x in
                        ["obs_ID", "gene_ID", "transcript_ID", "read_name",
                         "dataset", "start_vertex", "end_vertex",
-                        "start_exon", "end_exon",
-                        "start_delta", "end_delta", "read_length"]]) + ") "
+                        "start_exon", "end_exon", "start_delta", "end_delta", 
+                        "read_length", "fraction_As"]]) + ") "
                 command = 'INSERT INTO "observed"' + cols + \
-                          "VALUES " + '(?,?,?,?,?,?,?,?,?,?,?,?)'
+                          "VALUES " + '(?,?,?,?,?,?,?,?,?,?,?,?,?)'
                 cursor.executemany(command, batch)
 
             except Exception as e:
@@ -2221,7 +2213,8 @@ def annotate_read(sam_record: pysam.AlignedSegment, cursor, run_info,
             start_exon
             end_exon
             start_delta
-            end_delta  
+            end_delta 
+            fraction_As (following the end of the alignment) 
     """
     # Parse attributes to determine the chromosome, positions, and strand of the transcript
     read_ID = sam_record.query_name
@@ -2232,6 +2225,10 @@ def annotate_read(sam_record: pysam.AlignedSegment, cursor, run_info,
     sam_end = sam_record.reference_end
     read_length = sam_record.query_alignment_length 
     cigar = sam_record.cigarstring
+    try:
+        fraction_As = sam_record.get_tag("fA")
+    except:
+        fraction_As = None
 
     intron_list = tutils.get_introns(sam_record, sam_start, cigar)
 
@@ -2276,7 +2273,8 @@ def annotate_read(sam_record: pysam.AlignedSegment, cursor, run_info,
     annotation_info.strand = strand
     annotation_info.read_length = read_length
     annotation_info.n_exons = n_exons
-    
+    annotation_info.fraction_As = fraction_As    
+
     return annotation_info
 
 def unpack_observed(annotation_info, queue, obs_file):
@@ -2290,7 +2288,7 @@ def unpack_observed(annotation_info, queue, obs_file):
                 annotation_info.start_vertex, annotation_info.end_vertex, 
                 annotation_info.start_exon, annotation_info.end_exon,
                 annotation_info.start_delta, annotation_info.end_delta, 
-                annotation_info.read_length)
+                annotation_info.read_length, annotation_info.fraction_As)
     msg = (obs_file, "\t".join([str(x) for x in observed]))
     queue.put(msg)
 
