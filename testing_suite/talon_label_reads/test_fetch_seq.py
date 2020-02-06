@@ -6,7 +6,7 @@ def test_firstbase_plus_strand():
             ACTGACTGACTGAAATAAGAAACTGACTG 
         The correct answer is A
     """
-    genome_file = "test_inputs/toy_genome.fa"
+    genome_file = "talon_label_reads/test_inputs/toy_genome.fa"
     genome = pyfaidx.Fasta(genome_file, sequence_always_upper=True,
                            one_based_attributes=False)
     assert tlr.fetch_seq("chrTest1", 0, 1, '+', genome) == 'A'
@@ -19,7 +19,7 @@ def test_firstbase_minus_strand():
             ACTGACTGACTGAAATAAGAAACTGACTG
         The correct answer is T
     """
-    genome_file = "test_inputs/toy_genome.fa"
+    genome_file = "talon_label_reads/test_inputs/toy_genome.fa"
     genome = pyfaidx.Fasta(genome_file, sequence_always_upper=True,
                            one_based_attributes=False)
     assert tlr.fetch_seq("chrTest1", 0, 1, '-', genome) == 'T'
@@ -35,7 +35,7 @@ def test_range():
           The goal here is to get sequence 'TGAAATAAGA'
           In 0-based coordinates, this is chrTest1:10-20.
     """
-    genome_file = "test_inputs/toy_genome.fa"
+    genome_file = "talon_label_reads/test_inputs/toy_genome.fa"
     genome = pyfaidx.Fasta(genome_file, sequence_always_upper=True,
                            one_based_attributes=False)
     assert tlr.fetch_seq("chrTest1", 10, 20, '+', genome) == 'TGAAATAAGA'
