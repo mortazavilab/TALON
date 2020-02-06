@@ -1525,10 +1525,6 @@ def prepare_data_structures(cursor, run_info, chrom = None, start = None,
                                           start = start, end = end, 
                                           tmp_tab = "temp_monoexon_" + tmp_id)
 
-    #query = "select name from sqlite_temp_master where type = 'table'; "
-    #cursor.execute(query)
-    #print([i["name"] for i in cursor.fetchall()])
-
     location_dict = init_refs.make_location_dict(build, cursor, chrom = chrom, 
                                                  start = start, end = end)
 
@@ -1542,11 +1538,16 @@ def prepare_data_structures(cursor, run_info, chrom = None, start = None,
                                                       chrom = chrom, 
                                                       start = start, end = end)
 
-    gene_starts, gene_ends = init_refs.make_gene_start_and_end_dict(cursor, 
-                                                                    build, 
-                                                                    chrom = chrom,
-                                                                    start = start,
-                                                                    end = end)   
+    gene_starts = init_refs.make_gene_start_or_end_dict(cursor, 
+                                                        build, "start",
+                                                        chrom = chrom,
+                                                        start = start,
+                                                        end = end)   
+    gene_ends = init_refs.make_gene_start_or_end_dict(cursor,
+                                                      build, "end",
+                                                      chrom = chrom,
+                                                      start = start,
+                                                      end = end)
 
     struct_collection.location_dict = location_dict
     struct_collection.edge_dict = edge_dict

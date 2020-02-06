@@ -18,7 +18,8 @@ class TestIdentifyNIC(object):
         run_info = talon.init_run_info(database, build)
         transcript_dict = init_refs.make_transcript_dict(cursor, build)
         vertex_2_gene = init_refs.make_vertex_2_gene_dict(cursor)
-        gene_starts, gene_ends = init_refs.make_gene_start_and_end_dict(cursor, build)
+        gene_starts = init_refs.make_gene_start_or_end_dict(cursor, build, "start")
+        gene_ends = init_refs.make_gene_start_or_end_dict(cursor, build, "end")
 
         chrom = "chr1"
         positions = [ 1, 100, 900, 1000]
@@ -54,7 +55,8 @@ class TestIdentifyNIC(object):
         run_info = talon.init_run_info(database, build)
         transcript_dict = init_refs.make_transcript_dict(cursor, build)
         vertex_2_gene = init_refs.make_vertex_2_gene_dict(cursor)
-        gene_starts, gene_ends = init_refs.make_gene_start_and_end_dict(cursor, build)
+        gene_starts = init_refs.make_gene_start_or_end_dict(cursor, build, "start")
+        gene_ends = init_refs.make_gene_start_or_end_dict(cursor, build, "end")
 
         # Construct temp novel gene db
         init_refs.make_temp_novel_gene_table(cursor, "toy_build")

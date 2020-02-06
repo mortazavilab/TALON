@@ -16,7 +16,8 @@ class TestIdentifyFSM(object):
         location_dict = init_refs.make_location_dict(build, cursor)
         run_info = talon.init_run_info(db, build)        
         transcript_dict = init_refs.make_transcript_dict(cursor, build)
-        gene_starts, gene_ends = init_refs.make_gene_start_and_end_dict(cursor, build)
+        gene_starts = init_refs.make_gene_start_or_end_dict(cursor, build, "start")
+        gene_ends = init_refs.make_gene_start_or_end_dict(cursor, build, "end")
 
         chrom = "chr1"
         positions = [1, 100, 500, 600, 900, 1010]
@@ -58,7 +59,8 @@ class TestIdentifyFSM(object):
         location_dict = init_refs.make_location_dict(build, cursor)
         run_info = talon.init_run_info(db, build)
         transcript_dict = init_refs.make_transcript_dict(cursor, build)
-        gene_starts, gene_ends = init_refs.make_gene_start_and_end_dict(cursor, build)
+        gene_starts = init_refs.make_gene_start_or_end_dict(cursor, build, "start")
+        gene_ends = init_refs.make_gene_start_or_end_dict(cursor, build, "end")
 
         chrom = "chr2"
         positions = [1, 100, 500, 600, 900, 1301] #Last position is > 300bp away
@@ -97,7 +99,8 @@ class TestIdentifyFSM(object):
         run_info = talon.init_run_info(db, build)
         transcript_dict = init_refs.make_transcript_dict(cursor, build)
         orig_vertices = talon.vertex_counter.value()
-        gene_starts, gene_ends = init_refs.make_gene_start_and_end_dict(cursor, build)
+        gene_starts = init_refs.make_gene_start_or_end_dict(cursor, build, "start")
+        gene_ends = init_refs.make_gene_start_or_end_dict(cursor, build, "end")
 
         chrom = "chr1"
         positions = [2501, 1500, 1000, 900] #First postion is > 500bp away
@@ -135,7 +138,8 @@ class TestIdentifyFSM(object):
         location_dict = init_refs.make_location_dict(build, cursor)
         run_info = talon.init_run_info(db, build)
         transcript_dict = init_refs.make_transcript_dict(cursor, build)
-        gene_starts, gene_ends = init_refs.make_gene_start_and_end_dict(cursor, build)
+        gene_starts = init_refs.make_gene_start_or_end_dict(cursor, build, "start")
+        gene_ends = init_refs.make_gene_start_or_end_dict(cursor, build, "end")
 
         chrom = "chr1"
         positions = [1, 100, 500, 600] 

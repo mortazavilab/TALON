@@ -54,7 +54,7 @@ class TestAssignments(object):
         correct_gene_ID = fetch_correct_ID("Canx", "gene", cursor)
         assert assignment['gene_ID'] == correct_gene_ID
         assert assignment['transcript_ID'] == 8462
-        assert assignment['start_delta'] == 64
+        assert assignment['start_delta'] == 30
         assert assignment['end_delta'] == -290 
 
         # Now make sure that the novel transcript was annotated correctly

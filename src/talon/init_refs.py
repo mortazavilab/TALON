@@ -291,79 +291,145 @@ def make_vertex_2_gene_dict(cursor, build = None, chrom = None, start = None, en
 
     return vertex_2_gene
 
-def make_gene_start_and_end_dict(cursor, build, chrom = None, start = None, end = None):
-    """ Format of dicts:
+def make_gene_start_or_end_dict(cursor, build, mode, chrom = None, start = None, end = None):
+    """ Select the starts (or ends) of known genes in the database and store 
+        in a dict. 
+        Format of dict:
             Key: gene ID from database
             Value: dict mapping positions to start vertices (or end vertices) of
                    KNOWN transcripts from that gene
     """
-    gene_starts = {}
-    gene_ends = {}
+    if mode not in ["start", "end"]:
+        raise ValueError(("Incorrect mode supplied to 'make_gene_start_or_end_dict'."
+                          " Expected 'start' or 'end'."))
+
+    output_dict = {}
     if any(val == None for val in [chrom, start,end]):
         query = """SELECT gene_ID,
-                          start_vertex,
-                          end_vertex,
-                          loc1.position as start,
-                          loc2.position as end
+                          %s_vertex as vertex,
+                          loc1.position as %s
                    FROM transcripts
                    LEFT JOIN transcript_annotations as ta
                        ON ta.ID = transcripts.transcript_ID
                    LEFT JOIN location as loc1
-                       ON transcripts.start_vertex = loc1.location_ID
-                   LEFT JOIN location as loc2
-                       ON transcripts.end_vertex = loc2.location_ID
+                       ON transcripts.%s_vertex = loc1.location_ID
                    WHERE ta.attribute = 'transcript_status'
                          AND ta.value = 'KNOWN'
-                         AND loc1.genome_build = '%s'
-                         AND loc2.genome_build = '%s'
-                  """
-        cursor.execute(query % (build, build))
+                         AND loc1.genome_build = '%s' """
+        cursor.execute(query % (mode, mode, mode, build))
+
     else:
         query = Template("""SELECT  gene_ID,
-                                    start_vertex,
-                                    end_vertex,
+                                    ${mode}_vertex as vertex,
                                     loc1.chromosome as chrom,
-                                    loc1.position as start,
-                                    loc2.position as end
+                                    loc1.position as $mode
 
                             FROM transcripts
                             LEFT JOIN transcript_annotations as ta
                                 ON ta.ID = transcripts.transcript_ID
                             LEFT JOIN location as loc1
-                                ON transcripts.start_vertex = loc1.location_ID
-                            LEFT JOIN location as loc2
-                                ON transcripts.end_vertex = loc2.location_ID
+                                ON transcripts.${mode}_vertex = loc1.location_ID
                             WHERE ta.attribute = 'transcript_status'
                                   AND ta.value = 'KNOWN'
                                   AND loc1.genome_build = '$build'
-                                  AND loc2.genome_build = '$build'
                                   AND chrom = '$chrom'
-                                  AND ((start <= $start AND end >= $end)
-                                     OR (start >= $start AND end <= $end)
-                                     OR (start >= $start AND start <= $end)
-                                     OR (end >= $start AND end <= $end))""")
+                                  AND ($mode >= $start AND $mode <= $end)""")
         query = query.substitute({'build':build, 'chrom':chrom,
-                                  'start':start, 'end':end})
+                                  'start':start, 'end':end, 'mode':mode})
         cursor.execute(query)
 
     for entry in cursor.fetchall():
         gene_ID = entry['gene_ID']
-        start_vertex = entry['start_vertex']
-        end_vertex = entry['end_vertex']
-        start_pos = entry['start']
-        end_pos = entry['end']
-        try:
-            gene_starts[gene_ID][start_pos] = start_vertex
-        except:
-            gene_starts[gene_ID] = {}
-            gene_starts[gene_ID][start_pos] = start_vertex
+        vertex = entry['vertex']
+        pos = entry[mode]
 
         try:
-            gene_ends[gene_ID][end_pos] = end_vertex
+            output_dict[gene_ID][pos] = vertex
         except:
-            gene_ends[gene_ID] = {}
-            gene_ends[gene_ID][end_pos] = end_vertex
+            output_dict[gene_ID] = {}
+            output_dict[gene_ID][pos] = vertex
 
-    return gene_starts, gene_ends
+    return output_dict
+
+#def make_gene_start_and_end_dict(cursor, build, chrom = None, start = None, end = None):
+#    """ Format of dicts:
+#            Key: gene ID from database
+#            Value: dict mapping positions to start vertices (or end vertices) of
+#                   KNOWN transcripts from that gene
+#    """
+#    gene_starts = {}
+#    gene_ends = {}
+#    if any(val == None for val in [chrom, start,end]):
+#        query = """SELECT gene_ID,
+#                          start_vertex,
+#                          end_vertex,
+#                          loc1.position as start,
+#                          loc2.position as end
+#                   FROM transcripts
+#                   LEFT JOIN transcript_annotations as ta
+#                       ON ta.ID = transcripts.transcript_ID
+#                   LEFT JOIN location as loc1
+#                       ON transcripts.start_vertex = loc1.location_ID
+#                   LEFT JOIN location as loc2
+#                       ON transcripts.end_vertex = loc2.location_ID
+#                   WHERE ta.attribute = 'transcript_status'
+#                         AND ta.value = 'KNOWN'
+#                         AND loc1.genome_build = '%s'
+#                         AND loc2.genome_build = '%s'
+#                  """
+#        cursor.execute(query % (build, build))
+#    else:
+#        query = Template("""SELECT  gene_ID,
+#                                    start_vertex,
+#                                    end_vertex,
+#                                    loc1.chromosome as chrom,
+#                                    loc1.position as start,
+#                                    loc2.position as end
+#
+#                            FROM transcripts
+#                            LEFT JOIN transcript_annotations as ta
+#                                ON ta.ID = transcripts.transcript_ID
+#                            LEFT JOIN location as loc1
+#                                ON transcripts.start_vertex = loc1.location_ID
+#                            LEFT JOIN location as loc2
+#                                ON transcripts.end_vertex = loc2.location_ID
+#                            WHERE ta.attribute = 'transcript_status'
+#                                  AND ta.value = 'KNOWN'
+#                                  AND loc1.genome_build = '$build'
+#                                  AND loc2.genome_build = '$build'
+#                                  AND chrom = '$chrom'
+#                                  AND ((start <= $start AND end >= $end)
+#                                     OR (start >= $start AND end <= $end)
+#                                     OR (start >= $start AND start <= $end)
+#                                     OR (end >= $start AND end <= $end))""")
+#        query = query.substitute({'build':build, 'chrom':chrom,
+#                                  'start':start, 'end':end})
+#        cursor.execute(query)
+#    
+#    for entry in cursor.fetchall():
+#        gene_ID = entry['gene_ID']
+#        start_vertex = entry['start_vertex']
+#        end_vertex = entry['end_vertex']
+#        start_pos = entry['start']
+#        end_pos = entry['end']
+#       
+#        # Make sure position is located inside the interval of interest
+#        if any(val == None for val in [chrom, start,end]) or \
+#           (start_pos >= start and start_pos <= end):
+#            try:
+#                gene_starts[gene_ID][start_pos] = start_vertex
+#            except:
+#                gene_starts[gene_ID] = {}
+#                gene_starts[gene_ID][start_pos] = start_vertex
+#
+#        if (end_pos >= start and end_pos <= end) or \
+#           any(val == None for val in [chrom, start,end]):
+#            try:
+#                gene_ends[gene_ID][end_pos] = end_vertex
+#            except:
+#                gene_ends[gene_ID] = {}
+#                gene_ends[gene_ID][end_pos] = end_vertex
+#
+#    return gene_starts, gene_ends
 
 
