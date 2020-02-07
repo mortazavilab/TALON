@@ -115,12 +115,10 @@ def compute_frac_as_after_transcript(chrom=str, transcript_end=int, strand=str,
     # Get fraction As in sequence
     return compute_frac_As(range_seq)
 
-def run_thread(options):
-    """ """
-    pass
   
 def split_reads_by_chrom(sam_file, tmp_dir = "tmp_label_reads", n_threads = 1):
-    """ Reads a SAM/BAM file and splits the reads into one file per chromosome"""
+    """ Reads a SAM/BAM file and splits the reads into one file per chromosome.
+        Returns a list of the resulting filenames."""
 
     tmp_dir = tmp_dir + "/raw"
     os.system("mkdir -p %s" %(tmp_dir))
@@ -144,6 +142,7 @@ def split_reads_by_chrom(sam_file, tmp_dir = "tmp_label_reads", n_threads = 1):
     # Open bam file
     tmp_dir += "/chroms"
     os.system("mkdir -p %s" %(tmp_dir))
+    read_files = []
     with pysam.AlignmentFile(bam_file, "rb") as bam:
         # Iterate over chromosomes and write a reads file for each
         chromosomes = [ x.contig for x in bam.get_index_statistics() \
@@ -154,9 +153,13 @@ def split_reads_by_chrom(sam_file, tmp_dir = "tmp_label_reads", n_threads = 1):
            with pysam.AlignmentFile(fname, "w", template = bam) as o: 
                for record in records:
                    o.write(record)
+           read_files.append(fname)
 
-    return
+    return read_files
 
+def run_thread(options):
+    """ """
+    pass
 
 def main(options=None):
     if options == None:
@@ -168,7 +171,6 @@ def main(options=None):
     #    ts = time.strftime("%Y-%m-%d %H:%M:%S", time.gmtime())
     #    print("[ %s ] Started talon_label_reads run" % (ts))
 
-    #    # TODO: Partition the reads
 
     genome = pyfaidx.Fasta(options.genome_file, sequence_always_upper=True,
                            one_based_attributes=False)
@@ -178,17 +180,12 @@ def main(options=None):
     o_afrac = open(frac_A_outfile, 'w')
     o_afrac.write("\t".join(["read_name", "fraction_As"]) + '\n')
 
-    #read_groups, intervals, header_file = procsams.partition_reads([options.sam_file], ["test"])
-    #read_files = procsams.write_reads_to_file(read_groups, intervals, header_file)
-    #print(read_files)
-    #exit()
-    split_reads_by_chrom(options.sam_file)
-    exit()
+    # Partition reads by chromosome
+    read_files = split_reads_by_chrom(options.sam_file)#tmp_dir = "tmp_label_reads", n_threads = 1)
+
     # Iterate over reads
     with pysam.AlignmentFile(options.sam_file) as sam:
         out_sam = pysam.AlignmentFile("test.sam", "ws", template=sam)
-        chromosomes(sam.references)
-        exit()
 
         for record in sam:  # type: pysam.AlignedSegment
             if record.is_secondary == True or record.is_unmapped == True:
