@@ -8,7 +8,12 @@
 
 import pyfaidx
 import pysam
+import multiprocessing as mp
+from datetime import datetime, timedelta
+import time
+import os
 from optparse import OptionParser
+from talon import process_sams as procsams
 
 def get_options():
     """ Read input args """
@@ -18,10 +23,11 @@ def get_options():
                       help = "SAM file of transcripts")
     parser.add_option("--g", dest = "genome_file",
                       help = "Reference genome fasta file")
+    parser.add_option("--t", dest = "threads", type = int,
+                      help = "Number of threads to run", default = 2)
     parser.add_option("--ar", dest = "fracA_range_size", type = int,
                       help = ("Size of post-transcript interval to compute "
                               "fraction As on. Default = 10"), default = 10)
-    
     parser.add_option("--o", dest = "outprefix",
                       help = "Prefix for outfiles")
 
@@ -109,9 +115,60 @@ def compute_frac_as_after_transcript(chrom=str, transcript_end=int, strand=str,
     # Get fraction As in sequence
     return compute_frac_As(range_seq)
 
+def run_thread(options):
+    """ """
+    pass
+  
+def split_reads_by_chrom(sam_file, tmp_dir = "tmp_label_reads", n_threads = 1):
+    """ Reads a SAM/BAM file and splits the reads into one file per chromosome"""
+
+    tmp_dir = tmp_dir + "/raw"
+    os.system("mkdir -p %s" %(tmp_dir))
+
+    if sam_file.endswith(".sam"):
+        # Convert to bam
+        bam_file = tmp_dir + "/all_reads.bam"
+        procsams.convert_to_bam(sam_file, bam_file)    
+    elif sam_file.endswith(".bam"):
+        bam_file = sam_file
+    else:
+        raise ValueError("Please provide a .sam or .bam file")
+
+    # Index the file if no index exists
+    if not os.path.isfile(bam_file + ".bai"):
+        sorted_bam = tmp_dir + "/all_reads.sorted.bam"
+        pysam.sort("-@", str(n_threads), "-o", sorted_bam, bam_file)
+        bam_file = sorted_bam
+        pysam.index(bam_file)
+        
+    # Open bam file
+    tmp_dir += "/chroms"
+    os.system("mkdir -p %s" %(tmp_dir))
+    with pysam.AlignmentFile(bam_file, "rb") as bam:
+        # Iterate over chromosomes and write a reads file for each
+        chromosomes = [ x.contig for x in bam.get_index_statistics() \
+                        if x.mapped > 0 ]
+        for chrom in chromosomes:
+           records = bam.fetch(chrom)
+           fname = tmp_dir + "/" + chrom + ".sam"
+           with pysam.AlignmentFile(fname, "w", template = bam) as o: 
+               for record in records:
+                   o.write(record)
+
+    return
+
+
 def main(options=None):
     if options == None:
         options = get_options()
+
+    # Initialize worker pool
+    #with mp.Pool(processes=options.threads) as pool:
+        # Print start message
+    #    ts = time.strftime("%Y-%m-%d %H:%M:%S", time.gmtime())
+    #    print("[ %s ] Started talon_label_reads run" % (ts))
+
+    #    # TODO: Partition the reads
 
     genome = pyfaidx.Fasta(options.genome_file, sequence_always_upper=True,
                            one_based_attributes=False)
@@ -120,7 +177,19 @@ def main(options=None):
                      % (options.fracA_range_size)
     o_afrac = open(frac_A_outfile, 'w')
     o_afrac.write("\t".join(["read_name", "fraction_As"]) + '\n')
+
+    #read_groups, intervals, header_file = procsams.partition_reads([options.sam_file], ["test"])
+    #read_files = procsams.write_reads_to_file(read_groups, intervals, header_file)
+    #print(read_files)
+    #exit()
+    split_reads_by_chrom(options.sam_file)
+    exit()
+    # Iterate over reads
     with pysam.AlignmentFile(options.sam_file) as sam:
+        out_sam = pysam.AlignmentFile("test.sam", "ws", template=sam)
+        chromosomes(sam.references)
+        exit()
+
         for record in sam:  # type: pysam.AlignedSegment
             if record.is_secondary == True or record.is_unmapped == True:
                 continue
@@ -131,8 +200,15 @@ def main(options=None):
             frac_As = compute_frac_as_after_transcript(chrom, transcript_end, strand,
                                                        options.fracA_range_size,
                                                        genome)
+
+            # Add custom fraction A tag to the read
+            record.tags += [('fA', round(frac_As,3))]
+
+            # Write to output files
+            out_sam.write(record)
             o_afrac.write("\t".join([read_id, str(frac_As)]) + '\n')
 
+        out_sam.close()
     o_afrac.close()
 
 if __name__ == '__main__':
