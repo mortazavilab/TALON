@@ -29,7 +29,7 @@ def get_options():
     parser.add_option("--g", dest = "genome_file",
                       help = "Reference genome fasta file")
     parser.add_option("--t", dest = "threads", type = int,
-                      help = "Number of threads to run", default = 2)
+                      help = "Number of threads to run", default = 1)
     parser.add_option("--ar", dest = "fracA_range_size", type = int,
                       help = ("Size of post-transcript interval to compute "
                               "fraction As on. Default = 10"), default = 10)
@@ -134,6 +134,9 @@ def split_reads_by_chrom(sam_file, tmp_dir = "tmp_label_reads", n_threads = 1):
     """ Reads a SAM/BAM file and splits the reads into one file per chromosome.
         Returns a list of the resulting filenames."""
 
+    ts = time.strftime("%Y-%m-%d %H:%M:%S", time.gmtime())
+    print("[ %s ] Splitting SAM by chromosome..." % (ts))
+
     tmp_dir = tmp_dir + "/raw"
     os.system("mkdir -p %s" %(tmp_dir))
 
@@ -184,6 +187,7 @@ def run_chrom_thread(sam_file, options):
 
     # Iterate over reads
     out_log = open(out_log_fname, 'w')
+    pos_seen_fracA = {} # Store fraction As for previously seen positions
     with pysam.AlignmentFile(sam_file) as sam:
         out_sam = pysam.AlignmentFile(out_sam_fname, "w", template=sam)
 
@@ -196,9 +200,17 @@ def run_chrom_thread(sam_file, options):
             transcript_end = compute_transcript_end(record)
 
             # Add custom fraction A tag to the read
-            frac_As = compute_frac_as_after_transcript(chrom, transcript_end, strand,
-                                                       options.fracA_range_size,
-                                                       genome)
+            # TODO: check if this makes a difference in terms of speed
+            location_str = "_".join([chrom, str(transcript_end), strand])
+            if location_str in pos_seen_fracA:
+                frac_As = pos_seen_fracA[location_str]
+            else:
+                frac_As = compute_frac_as_after_transcript(chrom, transcript_end, 
+                                                           strand,
+                                                           options.fracA_range_size,
+                                                           genome)
+                pos_seen_fracA[location_str] = frac_As
+
             record.tags += [('fA', round(frac_As,3))]
 
             # TODO: Add other labels to the read, i.e. CAGE, canonical polyA
@@ -218,51 +230,25 @@ def main(options=None):
         options = get_options()
 
     # Initialize worker pool
-    #with mp.Pool(processes=options.threads) as pool:
+    with mp.Pool(processes=options.threads) as pool:
         # Print start message
-    #    ts = time.strftime("%Y-%m-%d %H:%M:%S", time.gmtime())
-    #    print("[ %s ] Started talon_label_reads run" % (ts))
+        ts = time.strftime("%Y-%m-%d %H:%M:%S", time.gmtime())
+        print("[ %s ] Started talon_label_reads run." % (ts))
 
+        # Partition reads by chromosome
+        read_files = split_reads_by_chrom(options.sam_file, tmp_dir = options.tmp_dir, 
+                                          n_threads = options.threads)
 
-    genome = pyfaidx.Fasta(options.genome_file, sequence_always_upper=True,
-                           one_based_attributes=False)
+        # Now launch the parallel TALON read label jobs
+        ts = time.strftime("%Y-%m-%d %H:%M:%S", time.gmtime())
+        print("[ %s ] Launching parallel jobs..." % (ts))
+        jobs = [(sam, options) for sam in read_files]
+        pool.starmap(run_chrom_thread, jobs)
 
-    frac_A_outfile = options.outprefix + "_fraction_As_%dbp_after_transcript.tsv" \
-                     % (options.fracA_range_size)
-    o_afrac = open(frac_A_outfile, 'w')
-    o_afrac.write("\t".join(["read_name", "fraction_As"]) + '\n')
-
-    # Partition reads by chromosome
-    read_files = split_reads_by_chrom(options.sam_file)#tmp_dir = "tmp_label_reads", n_threads = 1)
-    for sam in read_files:
-        run_chrom_thread(sam, options)
-
-    # Iterate over reads
-   # with pysam.AlignmentFile(options.sam_file) as sam:
-   #     out_sam = pysam.AlignmentFile("test.sam", "w", template=sam)
-
-   #     for record in sam:  # type: pysam.AlignedSegment
-   #         print(str(record))
-   #         exit()
-   #         if record.is_secondary == True or record.is_unmapped == True:
-   #             continue
-   #         read_id = record.query_name
-   #         chrom = record.reference_name
-   #         strand = "-" if record.is_reverse else "+"
-   #         transcript_end = compute_transcript_end(record)
-   #         frac_As = compute_frac_as_after_transcript(chrom, transcript_end, strand,
-   #                                                    options.fracA_range_size,
-   #                                                    genome)
-
-   #         # Add custom fraction A tag to the read
-   #         record.tags += [('fA', round(frac_As,3))]
-
-   #         # Write to output files
-   #         out_sam.write(record)
-   #         o_afrac.write("\t".join([read_id, str(frac_As)]) + '\n')
-
-   #     out_sam.close()
-   # o_afrac.close()
+        pool.close()
+        pool.join()
+    # TODO: pool together output files
+    #o_afrac.write("\t".join(["read_name", "fraction_As"]) + '\n')
 
 if __name__ == '__main__':
     options = get_options()
