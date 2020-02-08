@@ -13,7 +13,7 @@ from datetime import datetime, timedelta
 import time
 import os
 from optparse import OptionParser
-from talon import process_sams as procsams
+#from talon import process_sams as procsams
 
 def get_options():
     """ Read input args """
@@ -142,8 +142,11 @@ def split_reads_by_chrom(sam_file, tmp_dir = "tmp_label_reads", n_threads = 1):
 
     if sam_file.endswith(".sam"):
         # Convert to bam
+        ts = time.strftime("%Y-%m-%d %H:%M:%S", time.gmtime())
+        print("[ %s ] -----Converting to bam...." % (ts))
         bam_file = tmp_dir + "/all_reads.bam"
-        procsams.convert_to_bam(sam_file, bam_file)    
+        pysam.view("-b", "-S", "-@", str(n_threads), "-o", bam_file, sam_file, 
+                   catch_stdout=False)
     elif sam_file.endswith(".bam"):
         bam_file = sam_file
     else:
@@ -151,6 +154,8 @@ def split_reads_by_chrom(sam_file, tmp_dir = "tmp_label_reads", n_threads = 1):
 
     # Index the file if no index exists
     if not os.path.isfile(bam_file + ".bai"):
+        ts = time.strftime("%Y-%m-%d %H:%M:%S", time.gmtime())
+        print("[ %s ] -----Sorting and indexing..." % (ts))
         sorted_bam = tmp_dir + "/all_reads.sorted.bam"
         pysam.sort("-@", str(n_threads), "-o", sorted_bam, bam_file)
         bam_file = sorted_bam
@@ -160,6 +165,8 @@ def split_reads_by_chrom(sam_file, tmp_dir = "tmp_label_reads", n_threads = 1):
     tmp_dir += "/chroms"
     os.system("mkdir -p %s" %(tmp_dir))
     read_files = []
+    ts = time.strftime("%Y-%m-%d %H:%M:%S", time.gmtime())
+    print("[ %s ] -----Writing chrom files..." % (ts))
     with pysam.AlignmentFile(bam_file, "rb") as bam:
         # Iterate over chromosomes and write a reads file for each
         chromosomes = [ x.contig for x in bam.get_index_statistics() \
