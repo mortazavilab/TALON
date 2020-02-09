@@ -14,7 +14,6 @@ import time
 import os
 import glob
 from optparse import OptionParser
-#from talon import process_sams as procsams
 
 def get_options():
     """ Read input args """
