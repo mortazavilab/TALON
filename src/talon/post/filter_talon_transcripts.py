@@ -10,6 +10,25 @@ from optparse import OptionParser
 import sqlite3
 from pathlib import Path
 from .. import query_utils as qutils
+import pandas as pd
+
+def get_known_transcripts(database, annot, datasets = None):
+    """ Fetch gene ID and transcript ID of all known transcripts detected in
+        the specified datasets """
+
+    with sqlite3.connect(database) as conn:
+        query = """SELECT DISTINCT gene_ID, transcript_ID FROM observed
+                       LEFT JOIN transcript_annotations AS ta 
+                           ON ta.ID = observed.transcript_ID
+                       WHERE (ta.attribute = 'transcript_status' 
+                              AND ta.value = 'KNOWN'
+                              AND ta.annot_name = '%s')""" % (annot)
+        if datasets != None:
+            datasets = qutils.format_for_IN(datasets)
+            query += " AND observed.dataset IN " + datasets
+        known = pd.read_sql_query(query, conn)
+
+    return known
 
 def filter_talon_transcripts(database, annot, dataset_pairings = None,
                                               known_filtered = False,
