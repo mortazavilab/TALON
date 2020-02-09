@@ -1,21 +1,22 @@
 from talon import talon_label_reads as tlr
+import optparse_mock
 import os
 import pytest
 import pysam
 import pandas as pd
 
-class OptParseMock(object):
-     """Class to mimic option parser for talon_label_reads.py"""
-     def __init__(self, sam_file, genome_file, threads = 2, fracA_range_size = 10,
-                  tmp_dir = "tmp_label_reads", delete_tmp = False,
-                  outprefix = "talon_prelabels"):
-         self.sam_file = sam_file
-         self.genome_file = genome_file
-         self.threads = threads
-         self.fracA_range_size = fracA_range_size
-         self.tmp_dir = tmp_dir
-         self.delete_tmp = delete_tmp
-         self.outprefix = outprefix
+#class OptParseMock(object):
+#     """Class to mimic option parser for talon_label_reads.py"""
+#     def __init__(self, sam_file, genome_file, threads = 2, fracA_range_size = 10,
+#                  tmp_dir = "tmp_label_reads", delete_tmp = False,
+#                  outprefix = "talon_prelabels"):
+#         self.sam_file = sam_file
+#         self.genome_file = genome_file
+#         self.threads = threads
+#         self.fracA_range_size = fracA_range_size
+#         self.tmp_dir = tmp_dir
+#         self.delete_tmp = delete_tmp
+#         self.outprefix = outprefix
 
 def test_run_chrom_thread():
     """ There is already a test to look at the correctness of 
@@ -26,7 +27,7 @@ def test_run_chrom_thread():
     sam_file = "talon_label_reads/test_inputs/plus_strand_read.sam"
     genome_file = "talon_label_reads/test_inputs/toy_genome.fa"
     tmp_dir = "scratch/test_run_chrom_thread"
-    options = OptParseMock(sam_file, genome_file, 
+    options = optparse_mock.OptParseMock(sam_file, genome_file, 
                            tmp_dir = tmp_dir)
 
     tlr.run_chrom_thread(sam_file, options)
