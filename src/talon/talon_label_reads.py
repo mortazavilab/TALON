@@ -12,6 +12,7 @@ import multiprocessing as mp
 from datetime import datetime, timedelta
 import time
 import os
+import glob
 from optparse import OptionParser
 #from talon import process_sams as procsams
 
@@ -207,7 +208,6 @@ def run_chrom_thread(sam_file, options):
             transcript_end = compute_transcript_end(record)
 
             # Add custom fraction A tag to the read
-            # TODO: check if this makes a difference in terms of speed
             location_str = "_".join([chrom, str(transcript_end), strand])
             if location_str in pos_seen_fracA:
                 frac_As = pos_seen_fracA[location_str]
@@ -230,7 +230,31 @@ def run_chrom_thread(sam_file, options):
     out_log.close()
     return
 
- 
+def pool_outputs(indir, outprefix):
+    """ Given an input directory containing SAM files and log files,
+        concatenate them to form the final output. """
+
+    sam_fname = outprefix + "_labeled.sam"
+    log_fname = outprefix + "_read_labels.tsv" 
+    
+    # Get list of files to combine
+    sam_files = glob.glob(indir + "/*.sam")
+    log_files = glob.glob(indir + "/*_read_labels.tsv")
+
+    # Add headers
+    with open(log_fname, 'w') as f:
+        f.write("\t".join(["read_name", "fraction_As"]) + '\n')
+
+    os.system('cp %s %s' % (sam_files[0], sam_fname))
+
+    # Concatenate 
+    for sam in sam_files[1:]:
+        os.system('grep -v "^@" %s >> %s' % (sam, sam_fname))
+
+    for logfile in log_files:
+        os.system('cat %s >> %s' % (logfile, log_fname))
+
+    return
 
 def main(options=None):
     if options == None:
@@ -241,6 +265,10 @@ def main(options=None):
         # Print start message
         ts = time.strftime("%Y-%m-%d %H:%M:%S", time.gmtime())
         print("[ %s ] Started talon_label_reads run." % (ts))
+
+        # Remove tmp dir if it exists
+        if os.path.exists(options.tmp_dir):
+            os.system("rm -r %s" % (options.tmp_dir))
 
         # Partition reads by chromosome
         read_files = split_reads_by_chrom(options.sam_file, tmp_dir = options.tmp_dir, 
@@ -254,8 +282,18 @@ def main(options=None):
 
         pool.close()
         pool.join()
-    # TODO: pool together output files
-    #o_afrac.write("\t".join(["read_name", "fraction_As"]) + '\n')
+
+    # Pool together output files
+    ts = time.strftime("%Y-%m-%d %H:%M:%S", time.gmtime())
+    print("[ %s ] Pooling output files..." % (ts))
+    pool_outputs(options.tmp_dir + "/labeled", options.outprefix)
+
+    # Delete tmp_dir if desired
+    if options.delete_tmp:
+        os.system("rm -r %s" % (options.tmp_dir))
+ 
+    ts = time.strftime("%Y-%m-%d %H:%M:%S", time.gmtime())
+    print("[ %s ] Run complete" % (ts))
 
 if __name__ == '__main__':
     options = get_options()

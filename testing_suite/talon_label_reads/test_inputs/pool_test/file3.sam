@@ -1,0 +1,4 @@
+@HD	VN:1.6
+@SQ	SN:chrTest1	LN:30
+read_5	0	chrTest1	4	40	10M	*	0	0	ACTGACTGAA	*
+read_6  0       chrTest1        4       40      10M     *       0       0       ACTGACTGAA      *
