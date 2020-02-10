@@ -10,6 +10,7 @@ from optparse import OptionParser
 import sqlite3
 from pathlib import Path
 from .. import query_utils as qutils
+from talon.post import get_read_annotations as read_annot
 import pandas as pd
 import os
 import warnings
@@ -35,11 +36,11 @@ def getOptions():
                               "a novel transcript (helps to filter out internal "
                               "priming artifacts). Default = 0.5"), type = float)
     parser.add_option("--minCount", dest = "min_count", default = 5,
-                      type = integer,
+                      type = int,
                       help = ("Number of minimum occurrences required for a "
                               "novel transcript PER dataset. Default = 5"))
     parser.add_option("--minDatasets", dest = "min_datasets", default = None,
-                      type = integer,
+                      type = int,
                       help = ("Minimum number of datasets novel transcripts"
                               "must be found in. Default = all datasets provided"))
 
@@ -204,10 +205,29 @@ def parse_datasets(dataset_option, database):
                   (", ".join(datasets)))
     return datasets
 
+def get_novelty_df(database):
+    """ Get the novelty category assignment of each transcript and 
+        store in a data frame """
+    
+    transcript_novelty_dict = read_annot.get_transcript_novelty(database)
+    transcript_novelty = pd.DataFrame.from_dict(transcript_novelty_dict,
+                                                orient='index')
+    transcript_novelty = transcript_novelty.reset_index()
+    transcript_novelty.columns = ['transcript_ID', 'transcript_novelty']
+    print(transcript_novelty)
+    return transcript_novelty
+
 def filter_talon_transcripts(database, datasets, options):
     """ """
-    # get_known_transcripts(database, annot, datasets = datasets)
-    pass 
+    # Known transcripts automatically pass the filter
+    known = get_known_transcripts(database, annot, datasets = datasets)
+
+    # Get reads that pass fraction A cutoff
+    reads = fetch_reads_in_datasets_fracA_cutoff(database, datasets, 
+                                                 options.max_frac_A)
+
+    # Fetch novelty information
+    transcript_novelty = get_novelty_df(database)
 
 def main():
     options = getOptions()
