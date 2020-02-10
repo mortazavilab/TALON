@@ -12,6 +12,43 @@ from pathlib import Path
 from .. import query_utils as qutils
 import pandas as pd
 import os
+import warnings
+
+def getOptions():
+    parser = OptionParser()
+    parser.add_option("--db", dest = "database",
+        help = "TALON database", metavar = "FILE", type = str)
+    parser.add_option("--annot", "-a", dest = "annot",
+        help = """Which annotation version to use. Will determine which
+                  annotation transcripts are considered known or novel
+                  relative to. Note: must be in the TALON database.""",
+        type = "string")
+    parser.add_option("--datasets", dest = "datasets", default = None,
+                      help = ("Datasets to include. Can be provided as a "
+                              "comma-delimited list on the command line, "
+                              "or as a file with one dataset per line. "
+                              "If this option is omitted, all datasets will "
+                              "be included."))
+    parser.add_option("--maxFracA", dest = "min_frac_A", default = 0.5,
+                      help = ("Maximum fraction of As to allow in the window "
+                              "located immediately after any read assigned to "
+                              "a novel transcript (helps to filter out internal "
+                              "priming artifacts). Default = 0.5"), type = float)
+    parser.add_option("--minCount", dest = "min_count", default = 5,
+                      type = integer,
+                      help = ("Number of minimum occurrences required for a "
+                              "novel transcript PER dataset. Default = 5"))
+    parser.add_option("--minDatasets", dest = "min_datasets", default = None,
+                      type = integer,
+                      help = ("Minimum number of datasets novel transcripts"
+                              "must be found in. Default = all datasets provided"))
+
+    parser.add_option("--o", dest = "outfile", help = "Outfile name",
+        metavar = "FILE", type = "string")
+
+
+    (options, args) = parser.parse_args()
+    return options
 
 def get_known_transcripts(database, annot, datasets = None):
     """ Fetch gene ID and transcript ID of all known transcripts detected in
@@ -31,92 +68,74 @@ def get_known_transcripts(database, annot, datasets = None):
 
     return known
 
-def filter_talon_transcripts(database, annot, dataset_pairings = None,
-                                              known_filtered = False,
-                                              novel_filtered = True,
-                                              novel_multiexon_reqmt = True):
+def fetch_reads_in_datasets_fracA_cutoff(database, datasets, max_frac_A):
+    """ Selects reads from the database that are from the specified datasets
+        and which pass the following cutoffs:
+            - fraction_As <= max_frac_A 
+        If datasets == None, then all datasets are permitted"""
+    
+    with sqlite3.connect(database) as conn:
+        query = """SELECT read_name, gene_ID, transcript_ID, dataset, fraction_As
+                       FROM observed 
+                       WHERE fraction_As <= %f""" % (max_frac_A)
+        if datasets != None:
+            datasets = qutils.format_for_IN(datasets)
+            query += " AND dataset IN " + datasets
+
+        data = pd.read_sql_query(query, conn)
+        print(query)
+
+    return data
+
+#def filter_talon_transcripts(database, annot, dataset_pairings = None,
+#                                              known_filtered = False,
+#                                              novel_filtered = True,
+#                                              novel_multiexon_reqmt = True):
     # Create a set to keep track of whitelisted transcripts
     # Each entry is a gene-transcript tuple
-    transcript_whitelist = set()
+#    transcript_whitelist = set()
 
     # Connect to the database
-    conn = sqlite3.connect(database)
-    cursor = conn.cursor()
+#    conn = sqlite3.connect(database)
+#    cursor = conn.cursor()
 
     # If dataset pairings are not provided, simply make the pairing set
     # a list of every dataset in the database
-    if dataset_pairings == None:
-        cursor.execute("SELECT dataset_name FROM dataset")
-        datasets = [str(x[0]) for x in cursor.fetchall()]
-        pairing_list = [datasets]
-    else:
-        pairing_list = dataset_pairings
+#    if dataset_pairings == None:
+#        cursor.execute("SELECT dataset_name FROM dataset")
+#        datasets = [str(x[0]) for x in cursor.fetchall()]
+#        pairing_list = [datasets]
+#    else:
+#        pairing_list = dataset_pairings
 
     # Filter transcripts separately for each dataset group
-    for datasets in pairing_list:
-        if len(datasets) <= 1 and novel_filtered == True:
-            print("""Warning: Only one dataset in group. This means that
-                   "only known transcripts will pass the filter 
-                    for this group.""")
-        else:
-            print("Group: %s" % ", ".join([str(x) for x in datasets]))
+#    for datasets in pairing_list:
+#        if len(datasets) <= 1 and novel_filtered == True:
+#            print("""Warning: Only one dataset in group. This means that
+#                   "only known transcripts will pass the filter 
+#                    for this group.""")
+#        else:
+#            print("Group: %s" % ", ".join([str(x) for x in datasets]))
 
         # First, accept all known transcripts and all NICs
-        known_transcripts = qutils.fetch_known_transcripts_with_gene_label(cursor, datasets) 
-        transcript_whitelist.update(known_transcripts)
+#        known_transcripts = qutils.fetch_known_transcripts_with_gene_label(cursor, datasets) 
+#        transcript_whitelist.update(known_transcripts)
         
         # Now, conditionally accept ISM, NNC, antisense, and intergenic transcripts 
         # (must be reproducible)
-        NIC_transcripts = qutils.fetch_reproducible_NICs(cursor, datasets)
-        reproducible_ISMs = qutils.fetch_reproducible_ISMs(cursor, datasets)
-        reproducible_NNCs = qutils.fetch_reproducible_NNCs(cursor, datasets)
-        reproducible_antisense = qutils.fetch_reproducible_antisense(cursor, datasets)
-        reproducible_intergenic = qutils.fetch_reproducible_intergenic(cursor, datasets)
-        transcript_whitelist.update(NIC_transcripts)
-        transcript_whitelist.update(reproducible_ISMs)
-        transcript_whitelist.update(reproducible_NNCs)
-        transcript_whitelist.update(reproducible_antisense)
-        transcript_whitelist.update(reproducible_intergenic)
+#        NIC_transcripts = qutils.fetch_reproducible_NICs(cursor, datasets)
+#        reproducible_ISMs = qutils.fetch_reproducible_ISMs(cursor, datasets)
+#        reproducible_NNCs = qutils.fetch_reproducible_NNCs(cursor, datasets)
+#        reproducible_antisense = qutils.fetch_reproducible_antisense(cursor, datasets)
+#        reproducible_intergenic = qutils.fetch_reproducible_intergenic(cursor, datasets)
+#        transcript_whitelist.update(NIC_transcripts)
+#        transcript_whitelist.update(reproducible_ISMs)
+#        transcript_whitelist.update(reproducible_NNCs)
+#        transcript_whitelist.update(reproducible_antisense)
+#        transcript_whitelist.update(reproducible_intergenic)
 
-    return transcript_whitelist
+#    return transcript_whitelist
 
-
-def process_pairings(pairings_file):
-    """ Reads in pairings from the comma-delimited pairings file and creates 
-        a list of lists """
-
-    pairings = []
-    with open(pairings_file, 'r') as f:
-        for group in f:
-            group = group.strip().split(',')
-            pairings.append(group)
-    return pairings
-
-def getOptions():
-    parser = OptionParser()
-    parser.add_option("--db", dest = "database",
-        help = "TALON database", metavar = "FILE", type = "string")
-    parser.add_option("--annot", "-a", dest = "annot",
-        help = """Which annotation version to use. Will determine which 
-                  annotation transcripts are considered known or novel 
-                  relative to. Note: must be in the TALON database.""", 
-        type = "string")
-    parser.add_option("--pairings", "-p",  dest = "pairings_file",
-        help = """Optional: A file indicating which datasets should be 
-                  considered together when filtering novel transcripts 
-                  (i.e. biological replicates). 
-                  Format: Each line of the file constitutes a group, with 
-                  member datasets separated by commas. 
-                  If no file is provided, then novel transcripts appearing in 
-                  any two datasets will be accepted.""", 
-        metavar = "FILE", type = "string", default = None)
-
-    parser.add_option("--o", dest = "outfile", help = "Outfile name",
-        metavar = "FILE", type = "string")
-
-
-    (options, args) = parser.parse_args()
-    return options
 
 def check_annot_validity(annot, database):
     """ Make sure that the user has entered a correct annotation name """
@@ -185,6 +204,11 @@ def parse_datasets(dataset_option, database):
                   (", ".join(datasets)))
     return datasets
 
+def filter_talon_transcripts(database, datasets, options):
+    """ """
+    # get_known_transcripts(database, annot, datasets = datasets)
+    pass 
+
 def main():
     options = getOptions()
     database = options.database
@@ -198,9 +222,13 @@ def main():
     check_annot_validity(annot, database)
  
     # Parse datasets
-    datasets = process_datasets(options.datasets, database)
+    datasets = parse_datasets(options.datasets, database)
+    if datasets != None and len(datasets) == 1:
+        warnings.warn("Only one dataset provided. For best performance, please "
+                      "run TALON with at least 2 biological replicates if possible.")
 
-    # get_known_transcripts(database, annot, datasets = 
+    # Perform the filtering
+    filter_talon_transcripts(database, datasets, options)
 
     # Write transcript IDs to file
     o = open(options.outfile, 'w')

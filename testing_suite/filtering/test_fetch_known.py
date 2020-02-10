@@ -78,8 +78,8 @@ def init_mock_db(db_file):
     # Annotations
     annotations = [(1, "toy", "", "transcript_status", "KNOWN"),
                    (2, "toy", "", "transcript_status", "KNOWN"),
-                   (3, "talon", "", "transcript_status", "NOVEL"),
-                   (3, "talon", "", "genomic_transcript", "TRUE")]
+                   (3, "TALON", "", "transcript_status", "NOVEL"),
+                   (3, "TALON", "", "genomic_transcript", "TRUE")]
 
     mmdb.make_minimal_db_for_filtering(db_file, reads, datasets, annotations)
 
