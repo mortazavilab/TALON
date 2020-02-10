@@ -83,7 +83,8 @@ def get_known_transcripts(database, annot, datasets = None):
 def fetch_reads_in_datasets_fracA_cutoff(database, datasets, max_frac_A):
     """ Selects reads from the database that are from the specified datasets
         and which pass the following cutoffs:
-            - fraction_As <= max_frac_A 
+            - fraction_As <= max_frac_A
+        Reads with fraction_As value of None will not be included. 
         If datasets == None, then all datasets are permitted"""
     
     with sqlite3.connect(database) as conn:

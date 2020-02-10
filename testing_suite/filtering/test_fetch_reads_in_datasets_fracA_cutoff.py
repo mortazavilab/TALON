@@ -16,3 +16,11 @@ def test_fetch_reads_dataset2():
     reads = filt.fetch_reads_in_datasets_fracA_cutoff(database, ["dataset_2"], 0.5)
 
     assert list(reads.read_name) == ["read_4"]
+
+def test_fetch_reads_null_fraction_As():
+    """ In the provided database, all fraction_As values are None, so no reads 
+        should be returned. """
+
+    database = "scratch/toy_mod.db"
+    reads = filt.fetch_reads_in_datasets_fracA_cutoff(database, None, 1)
+    assert len(reads) == 0
