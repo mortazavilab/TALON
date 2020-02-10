@@ -214,10 +214,18 @@ def get_novelty_df(database):
                                                 orient='index')
     transcript_novelty = transcript_novelty.reset_index()
     transcript_novelty.columns = ['transcript_ID', 'transcript_novelty']
-    print(transcript_novelty)
+
     return transcript_novelty
 
-def filter_talon_transcripts(database, datasets, options):
+def merge_reads_with_novelty(reads, novelty):
+    """ Given a data frame of reads and a transcript novelty data frame,
+        perform a left merge to annotate the reads with their novelty status.
+    """
+
+    merged = pd.merge(reads, novelty, on = "transcript_ID", how = "left")
+    return merged 
+
+def filter_talon_transcripts(database, annot, datasets, options):
     """ """
     # Known transcripts automatically pass the filter
     known = get_known_transcripts(database, annot, datasets = datasets)
@@ -226,8 +234,8 @@ def filter_talon_transcripts(database, datasets, options):
     reads = fetch_reads_in_datasets_fracA_cutoff(database, datasets, 
                                                  options.max_frac_A)
 
-    # Fetch novelty information
-    transcript_novelty = get_novelty_df(database)
+    # Fetch novelty information and merge with reads
+    reads = merge_reads_with_novelty(reads, get_novelty_df(database))
 
 def main():
     options = getOptions()
@@ -248,7 +256,7 @@ def main():
                       "run TALON with at least 2 biological replicates if possible.")
 
     # Perform the filtering
-    filter_talon_transcripts(database, datasets, options)
+    filter_talon_transcripts(database, annot, datasets, options)
 
     # Write transcript IDs to file
     o = open(options.outfile, 'w')
