@@ -225,6 +225,20 @@ def merge_reads_with_novelty(reads, novelty):
     merged = pd.merge(reads, novelty, on = "transcript_ID", how = "left")
     return merged 
 
+def filter_on_min_count(reads, min_count):
+    """ Given a reads data frame, compute the number of times that each
+        transcript ID occurs per dataset.
+        Keep the rows that meet the min_count threshold and return them. """
+
+    cols = ['gene_ID', 'transcript_ID', 'dataset']
+    
+    counts_df = reads[cols].groupby(cols).size()
+    counts_df = counts_df.reset_index()
+    counts_df.columns = cols + ["count"]
+
+    filtered = counts_df.loc[counts_df['count'] >= min_count]
+    return filtered
+
 def filter_talon_transcripts(database, annot, datasets, options):
     """ """
     # Known transcripts automatically pass the filter
@@ -236,6 +250,12 @@ def filter_talon_transcripts(database, annot, datasets, options):
 
     # Fetch novelty information and merge with reads
     reads = merge_reads_with_novelty(reads, get_novelty_df(database))
+
+    # Drop genomic transcripts if desired
+    if options.allow_genomic == False:
+        reads = reads.loc[reads.transcript_novelty != 'Genomic']
+
+    # Perform counts-based filtering    
 
 def main():
     options = getOptions()
