@@ -31,4 +31,4 @@ def test_parse_datasets_crash():
     print(e)
     assert str(e.value) == ("Problem parsing datasets. The following names are "
                             "not in the database: 'crash'. \nValid dataset names: "
-                            "'dataset_1, dataset_2, dataset_3'")
+                            "'dataset_1, dataset_2, dataset_3, dataset_4, dataset_5'")

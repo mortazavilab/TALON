@@ -7,6 +7,7 @@ def test_get_novelty_df():
               1               Known
               2               Known
               3               Genomic
+              4               ISM
     """
 
     database = "scratch/filter/test.db"
@@ -14,7 +15,8 @@ def test_get_novelty_df():
  
     assert list(novelty.iloc[0]) == [ 1, "Known"]
     assert list(novelty.iloc[1]) == [ 2, "Known"]
-    assert list(novelty.iloc[2]) == [ 3, "Genomic"]
+    assert list(novelty.iloc[2]) == [ 4, "ISM"]
+    assert list(novelty.iloc[3]) == [ 3, "Genomic"]
    
 def test_merge_reads_with_novelty():
     """ Should return a data frame like this:
@@ -33,6 +35,7 @@ def test_merge_reads_with_novelty():
   
     novelty = filt.get_novelty_df(database)
     merged = filt.merge_reads_with_novelty(reads, novelty) 
+    print(merged)
 
     assert len(merged) == 5
     assert list(merged.iloc[0]) == [ 'read_1', 1, "Known"]

@@ -53,7 +53,10 @@ def init_mock_db(db_file):
          3. A genomic transcript (id = 3) (dataset 1) with low fracA
          4. A genomic transcript (id = 3) (dataset 2) with low fracA
          5. A genomic transcript (id = 3) (dataset 3) with low fracA
-
+        For testing inclusion of Novel transcripts with high FracA
+         6. An ISM transcript (id = 4) (dataset 4) with high fracA
+         7. An ISM transcript (id = 4) (dataset 4) with high fracA
+         8. An ISM transcript (id = 4) (dataset 5) with high fracA
     """
 
     # Add reads. Fields that are not relevant for this purpose are set to None
@@ -67,19 +70,29 @@ def init_mock_db(db_file):
                None, 0.2, None, None),
                (5, 1, 3, "read_5", "dataset_3", None, None, None, None, None, None,
               None, 0.2, None, None)]
+    ISM = [(6, 1, 4, "read_6", "dataset_4", None, None, None, None, None, None,
+                None, 0.7, None, None),
+               (7, 1, 4, "read_7", "dataset_4", None, None, None, None, None, None,
+               None, 0.8, None, None),
+               (8, 1, 4, "read_8", "dataset_5", None, None, None, None, None, None,
+              None, 0.9, None, None)]
+    
 
-    reads = known + genomic
+    reads = known + genomic + ISM
 
     # Datasets
     datasets = [(1, "dataset_1", "test", "test"),
                 (2, "dataset_2", "test", "test"),
-                (3, "dataset_3", "test", "test")] 
+                (3, "dataset_3", "test", "test"), 
+                (4, "dataset_4", "test", "test"),
+                (5, "dataset_5", "test", "test")]
 
     # Annotations
     annotations = [(1, "toy", "", "transcript_status", "KNOWN"),
                    (2, "toy", "", "transcript_status", "KNOWN"),
                    (3, "TALON", "", "transcript_status", "NOVEL"),
-                   (3, "TALON", "", "genomic_transcript", "TRUE")]
+                   (3, "TALON", "", "genomic_transcript", "TRUE"),
+                   (4, "TALON", "", "ISM_transcript", "TRUE")]
 
     mmdb.make_minimal_db_for_filtering(db_file, reads, datasets, annotations)
 

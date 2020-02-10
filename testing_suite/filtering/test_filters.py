@@ -26,4 +26,26 @@ def test_filter_on_min_count():
     assert len(filtered) == 1
     assert list(filtered.iloc[0]) == [ 1, 1, "dataset_1", 2 ]
 
+def test_filter_on_n_datasets():
+    """ If we start with this df and apply a min_dataset threshold of 2:
+        gene_ID  transcript_ID           dataset       count
+            1          1                dataset_1        2
+            2          3                dataset_1        1
+            2          3                dataset_2        1
+            2          3                dataset_3        1
 
+        Then the final df should look like this:
+
+        gene_ID     transcript_ID    n_datasets   
+           2               3             3
+    """
+
+    counts = pd.DataFrame([[1, 1, 'dataset_1', 2], [2, 3, 'dataset_1', 1], 
+                          [2, 3, 'dataset_2', 1],
+                          [2, 3, 'dataset_3', 1]],
+                          columns = ['gene_ID', 'transcript_ID', 'dataset', 'count'])
+
+    filtered = filt.filter_on_n_datasets(counts, 2)
+
+    assert len(filtered) == 1
+    assert list(filtered.iloc[0]) == [ 2, 3, 3 ]

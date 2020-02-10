@@ -16,7 +16,12 @@ import os
 import warnings
 
 def getOptions():
-    parser = OptionParser()
+    parser = OptionParser(description = ("filter_talon_transcripts.py is a "
+                          "utility that filters the transcripts inside "
+                          "a TALON database to produce a transcript whitelist. "
+                          "This list can then be used by downstream analysis "
+                          "tools to determine which transcripts and other "
+                          "features should be reported (for example in a GTF file)"))
     parser.add_option("--db", dest = "database",
         help = "TALON database", metavar = "FILE", type = str)
     parser.add_option("--annot", "-a", dest = "annot",
@@ -30,7 +35,7 @@ def getOptions():
                               "or as a file with one dataset per line. "
                               "If this option is omitted, all datasets will "
                               "be included."))
-    parser.add_option("--maxFracA", dest = "min_frac_A", default = 0.5,
+    parser.add_option("--maxFracA", dest = "max_frac_A", default = 0.5,
                       help = ("Maximum fraction of As to allow in the window "
                               "located immediately after any read assigned to "
                               "a novel transcript (helps to filter out internal "
@@ -43,6 +48,7 @@ def getOptions():
                       type = int,
                       help = ("Minimum number of datasets novel transcripts"
                               "must be found in. Default = all datasets provided"))
+    # TODO: add allow genomic option
 
     parser.add_option("--o", dest = "outfile", help = "Outfile name",
         metavar = "FILE", type = "string")
@@ -84,7 +90,6 @@ def fetch_reads_in_datasets_fracA_cutoff(database, datasets, max_frac_A):
             query += " AND dataset IN " + datasets
 
         data = pd.read_sql_query(query, conn)
-        print(query)
 
     return data
 
@@ -239,8 +244,38 @@ def filter_on_min_count(reads, min_count):
     filtered = counts_df.loc[counts_df['count'] >= min_count]
     return filtered
 
+def filter_on_n_datasets(counts_in_datasets, min_datasets):
+    """ Given a data frame with columns gene_ID, transcript_ID, dataset,
+        and count (in that dataset), count the number of datasets that each
+        transcript appears in. Then, filter the data such that only transcripts
+        found in at least 'min_datasets' remain. """
+    
+    cols = ['gene_ID', 'transcript_ID']
+    dataset_count_df = counts_in_datasets[cols].groupby(cols).size()
+    dataset_count_df = dataset_count_df.reset_index()
+    dataset_count_df.columns = cols + ["n_datasets"]
+
+    filtered = dataset_count_df.loc[dataset_count_df['n_datasets'] >= min_datasets]
+    return filtered
+
 def filter_talon_transcripts(database, annot, datasets, options):
-    """ """
+    """ Filter transcripts belonging to the specified datasets in a TALON
+        database. The 'annot' parameter specifies which annotation transcripts
+        are known relative to. Can be tuned with the following options:
+        - options.max_frac_A: maximum allowable fraction of As recorded for 
+                              region after the read (0-1)
+        - options.allow_genomic: Removes genomic transcripts if set to True
+        - options.min_count: Transcripts must appear at least this many times
+                             to count as present in a dataset
+        - options.min_datasets: After the min_count threshold has been 
+                                applied, the transcript must be found in at 
+                                least this many datasets to pass the filter.
+                                If this option is set to None, then it will
+                                default to the total number of datasets in the
+                                reads.
+        Please note that known transcripts are allowed through independently
+        of these parameters.
+        """
     # Known transcripts automatically pass the filter
     known = get_known_transcripts(database, annot, datasets = datasets)
 
@@ -256,6 +291,18 @@ def filter_talon_transcripts(database, annot, datasets, options):
         reads = reads.loc[reads.transcript_novelty != 'Genomic']
 
     # Perform counts-based filtering    
+    filtered_counts = filter_on_min_count(reads, options.min_count)
+
+    # Perform n-dataset based filtering
+    if options.min_datasets == None:
+        options.min_datasets = len(set(list(reads.dataset)))
+    dataset_filtered = filter_on_n_datasets(filtered_counts, options.min_datasets)
+
+    # Join the known transcripts with the filtered ones and return
+    final_filtered = pd.concat([known[["gene_ID", "transcript_ID"]],
+                     dataset_filtered[["gene_ID", "transcript_ID"]]]).drop_duplicates()
+
+    return final_filtered
 
 def main():
     options = getOptions()
