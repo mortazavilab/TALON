@@ -97,6 +97,12 @@ def fetch_reads_in_datasets_fracA_cutoff(database, datasets, max_frac_A):
 
         data = pd.read_sql_query(query, conn)
 
+    # TODO: Check number of reads in each dataset. If the number is zero,
+    # print a warning to the user because this can result from all of the 
+    # fraction_As being None
+    #if len(data) == 0:
+    #    warnings.warn
+
     return data
 
 

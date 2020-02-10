@@ -65,7 +65,9 @@ def fetch_reads(database, build, tmp_file = None, datasets = None):
                            os.end_delta as TTS_diff,
                            os.fraction_As,
                            os.custom_label,
-                           os.allelic_label
+                           os.allelic_label,
+                           os.start_support, 
+                           os.end_support
                     FROM observed as os
                     LEFT JOIN location as loc1 ON 
                         loc1.location_ID = os.start_vertex 
@@ -118,7 +120,8 @@ def fetch_reads(database, build, tmp_file = None, datasets = None):
                         entry["transcript_ID"], entry["chrom"], 
                         read_start, read_end, strand, entry["n_exons"],
                         entry["read_length"], entry["fraction_As"],
-                        entry["custom_label"], entry["allelic_label"],)
+                        entry["custom_label"], entry["allelic_label"],
+                        entry["start_support"], entry["end_support"])
            
             if tmp_file != None:
                 o.write("\t".join([ str(x) for x in out_read ]) + "\n")
@@ -341,6 +344,8 @@ def make_read_annot_file(database, build, outprefix, datasets = "all"):
             19. Fraction As (following the alignment)
             20. Custom label
             21. Allelic label
+            22. Start support (external assay)
+            23. End support (external assay)
 
         By default, reads from all datasets in the database are included, but 
         this can be modified by supplying a list/tuple of dataset names to the 
@@ -365,7 +370,7 @@ def make_read_annot_file(database, build, outprefix, datasets = "all"):
                  "gene_ID", "transcript_ID", "annot_gene_id", "annot_transcript_id",
                  "annot_gene_name", "annot_transcript_name", "gene_novelty", 
                  "transcript_novelty", "ISM_subtype", "fraction_As", "custom_label",
-                 "allelic_label"]
+                 "allelic_label", "start_support", "end_support"]
     o.write("\t".join(colnames) + "\n")
 
     with open(tmp_read_file, 'r') as f:
@@ -373,7 +378,7 @@ def make_read_annot_file(database, build, outprefix, datasets = "all"):
             read_name, dataset, genome_build, gene_ID, \
             transcript_ID, chrom, read_start, read_end, \
             strand, n_exons, read_length, fraction_As, custom_label, \
-            allelic_label = read_entry.strip().split("\t")
+            allelic_label, start_support, end_support = read_entry.strip().split("\t")
 
             gene_ID = int(gene_ID)
             transcript_ID = int(transcript_ID)
@@ -420,7 +425,7 @@ def make_read_annot_file(database, build, outprefix, datasets = "all"):
                                annot_gene_name, annot_transcript_name, 
                                curr_gene_novelty, curr_transcript_novelty, 
                                curr_ISM_novelty, fraction_As, custom_label,
-                               allelic_label]) + "\n")
+                               allelic_label, start_support, end_support]) + "\n")
 
     o.close()
     os.system("rm " + tmp_read_file)

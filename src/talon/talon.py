@@ -1984,7 +1984,11 @@ def batch_add_observed(cursor, observed_file, batch_size):
                 if observed[13] == "None":
                     observed[13] = None
                 if observed[14] == "None":
-                    observed[14] = None 
+                    observed[14] = None
+                if observed[15] == "None":
+                    observed[15] = None
+                if observed[16] == "None":
+                    observed[16] = None 
 
                 batch.append(tuple(observed))
 
@@ -2010,9 +2014,9 @@ def batch_add_observed(cursor, observed_file, batch_size):
                         "dataset", "start_vertex", "end_vertex",
                         "start_exon", "end_exon", "start_delta", "end_delta", 
                         "read_length", "fraction_As", "custom_label", 
-                        "allelic_label"]]) + ") "
+                        "allelic_label", "start_support", "end_support"]]) + ") "
                 command = 'INSERT INTO "observed"' + cols + \
-                          "VALUES " + '(?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)'
+                          "VALUES " + '(?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)'
                 cursor.executemany(command, batch)
 
             except Exception as e:
@@ -2209,6 +2213,8 @@ def parse_custom_SAM_tags(sam_record: pysam.AlignedSegment):
             fA: fraction As in the 10-bp interval following the alignment end
             lC: custom label (type = string)
             lA: custom allele label (type = string)
+            tS: flag indicating start site support (type = string)
+            tE: flag indicating end site support (typ = string)
     """
     try:
         fraction_As = sam_record.get_tag("fA")
@@ -2222,8 +2228,16 @@ def parse_custom_SAM_tags(sam_record: pysam.AlignedSegment):
         allelic_label = sam_record.get_tag("lA")
     except:
         allelic_label = None
+    try:
+        start_support = sam_record.get_tag("tS")
+    except:
+        start_support = None
+    try:
+        end_support = sam_record.get_tag("tE")
+    except:
+        end_support = None
 
-    return fraction_As, custom_label, allelic_label
+    return fraction_As, custom_label, allelic_label, start_support, end_support
 
 def annotate_read(sam_record: pysam.AlignedSegment, cursor, run_info, 
                   struct_collection, mode = 1):            
@@ -2245,6 +2259,8 @@ def annotate_read(sam_record: pysam.AlignedSegment, cursor, run_info,
             fraction_As (following the end of the alignment) 
             custom_label
             allelic_label
+            start_support
+            end_support
     """
     # Parse attributes to determine the chromosome, positions, and strand of the transcript
     read_ID = sam_record.query_name
@@ -2257,7 +2273,8 @@ def annotate_read(sam_record: pysam.AlignedSegment, cursor, run_info,
     cigar = sam_record.cigarstring
 
     # Parse custom TALON tags
-    fraction_As, custom_label, allelic_label = parse_custom_SAM_tags(sam_record)
+    fraction_As, custom_label, allelic_label, start_support, \
+    end_support = parse_custom_SAM_tags(sam_record)
 
     intron_list = tutils.get_introns(sam_record, sam_start, cigar)
 
@@ -2305,6 +2322,8 @@ def annotate_read(sam_record: pysam.AlignedSegment, cursor, run_info,
     annotation_info.fraction_As = fraction_As    
     annotation_info.custom_label = custom_label
     annotation_info.allelic_label = allelic_label
+    annotation_info.start_support = start_support
+    annotation_info.end_support = end_support
 
     return annotation_info
 
@@ -2320,7 +2339,8 @@ def unpack_observed(annotation_info, queue, obs_file):
                 annotation_info.start_exon, annotation_info.end_exon,
                 annotation_info.start_delta, annotation_info.end_delta, 
                 annotation_info.read_length, annotation_info.fraction_As,
-                annotation_info.custom_label, annotation_info.allelic_label)
+                annotation_info.custom_label, annotation_info.allelic_label,
+                annotation_info.start_support, annotation_info.end_support)
     msg = (obs_file, "\t".join([str(x) for x in observed]))
     queue.put(msg)
 

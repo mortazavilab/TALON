@@ -315,6 +315,8 @@ def add_observed_table(database):
                      fraction_As FLOAT,
                      custom_label STRING,
                      allelic_label STRING,
+                     start_support STRING,
+                     end_support STRING,
 
                      FOREIGN KEY(gene_ID) REFERENCES transcripts(gene_ID),
                      FOREIGN KEY(transcript_ID) REFERENCES transcripts(transcript_ID),
