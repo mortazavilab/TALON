@@ -11,6 +11,7 @@ import sqlite3
 from pathlib import Path
 from .. import query_utils as qutils
 import pandas as pd
+import os
 
 def get_known_transcripts(database, annot, datasets = None):
     """ Fetch gene ID and transcript ID of all known transcripts detected in
@@ -144,6 +145,46 @@ def check_annot_validity(annot, database):
 
     return
 
+def parse_datasets(dataset_option, database):
+    """ Parses dataset names from command line. Valid forms of input:
+            - None (returns None)
+            - Comma-delimited list of names
+            - File of names (One per line)
+        Also checks to make sure that the datasets are in the database. 
+    """
+    if dataset_option == None:
+        print(("No dataset names specified, so filtering process will use all "
+               "datasets present in the database."))
+        return None
+
+    elif os.path.isfile(dataset_option):
+        print("Parsing datasets from file %s..." % (dataset_option))
+        datasets = []
+        with open(dataset_option) as f:
+            for line in f:
+                line = line.strip()
+                datasets.append(line)
+    else:
+        datasets = dataset_option.split(",")
+
+    # Now validate the datasets
+    with sqlite3.connect(database) as conn:
+        cursor = conn.cursor()
+        valid_datasets = qutils.fetch_all_datasets(cursor)
+        invalid_datasets = []
+        for dset in datasets:
+            if dset not in valid_datasets:
+                invalid_datasets.append(dset)
+        if len(invalid_datasets) > 0:
+            raise ValueError(("Problem parsing datasets. The following names are "
+                              "not in the database: '%s'. \nValid dataset names: '%s'")
+                              % (", ".join(invalid_datasets), 
+                                 ", ".join(valid_datasets)))
+        else:
+            print("Parsed the following dataset names successfully: %s" % \
+                  (", ".join(datasets)))
+    return datasets
+
 def main():
     options = getOptions()
     database = options.database
@@ -155,13 +196,11 @@ def main():
 
     # Make sure that the provided annotation name is valid
     check_annot_validity(annot, database)
+ 
+    # Parse datasets
+    datasets = process_datasets(options.datasets, database)
 
-    if options.pairings_file != None:
-        pairings = process_pairings(options.pairings_file)
-        whitelist = filter_talon_transcripts(database, annot,
-                                             dataset_pairings = pairings)
-    else:
-        whitelist = filter_talon_transcripts(options.database, options.annot)
+    # get_known_transcripts(database, annot, datasets = 
 
     # Write transcript IDs to file
     o = open(options.outfile, 'w')
