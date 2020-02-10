@@ -16,7 +16,7 @@ import os
 import warnings
 
 def getOptions():
-    parser = OptionParser(description = ("filter_talon_transcripts.py is a "
+    parser = OptionParser(description = ("talon_filter_transcripts is a "
                           "utility that filters the transcripts inside "
                           "a TALON database to produce a transcript whitelist. "
                           "This list can then be used by downstream analysis "
@@ -25,10 +25,10 @@ def getOptions():
     parser.add_option("--db", dest = "database",
         help = "TALON database", metavar = "FILE", type = str)
     parser.add_option("--annot", "-a", dest = "annot",
-        help = """Which annotation version to use. Will determine which
-                  annotation transcripts are considered known or novel
-                  relative to. Note: must be in the TALON database.""",
-        type = "string")
+                    help = """Which annotation version to use. Will determine which
+                              annotation transcripts are considered known or novel
+                              relative to. Note: must be in the TALON database.""",
+                    type = "string")
     parser.add_option("--datasets", dest = "datasets", default = None,
                       help = ("Datasets to include. Can be provided as a "
                               "comma-delimited list on the command line, "
@@ -46,10 +46,15 @@ def getOptions():
                               "novel transcript PER dataset. Default = 5"))
     parser.add_option("--minDatasets", dest = "min_datasets", default = None,
                       type = int,
-                      help = ("Minimum number of datasets novel transcripts"
+                      help = ("Minimum number of datasets novel transcripts "
                               "must be found in. Default = all datasets provided"))
-    # TODO: add allow genomic option
-
+    parser.add_option("--allowGenomic", dest ="allow_genomic", action='store_true',
+                  help = ("If this option is set, transcripts from the Genomic "
+                          "novelty category will be permitted in the output "
+                          "(provided they pass the thresholds). Default "
+                          "behavior is to filter out genomic transcripts "
+                          "since they are unlikely to be real novel isoforms."),
+                   default = False)
     parser.add_option("--o", dest = "outfile", help = "Outfile name",
         metavar = "FILE", type = "string")
 
@@ -92,55 +97,6 @@ def fetch_reads_in_datasets_fracA_cutoff(database, datasets, max_frac_A):
         data = pd.read_sql_query(query, conn)
 
     return data
-
-#def filter_talon_transcripts(database, annot, dataset_pairings = None,
-#                                              known_filtered = False,
-#                                              novel_filtered = True,
-#                                              novel_multiexon_reqmt = True):
-    # Create a set to keep track of whitelisted transcripts
-    # Each entry is a gene-transcript tuple
-#    transcript_whitelist = set()
-
-    # Connect to the database
-#    conn = sqlite3.connect(database)
-#    cursor = conn.cursor()
-
-    # If dataset pairings are not provided, simply make the pairing set
-    # a list of every dataset in the database
-#    if dataset_pairings == None:
-#        cursor.execute("SELECT dataset_name FROM dataset")
-#        datasets = [str(x[0]) for x in cursor.fetchall()]
-#        pairing_list = [datasets]
-#    else:
-#        pairing_list = dataset_pairings
-
-    # Filter transcripts separately for each dataset group
-#    for datasets in pairing_list:
-#        if len(datasets) <= 1 and novel_filtered == True:
-#            print("""Warning: Only one dataset in group. This means that
-#                   "only known transcripts will pass the filter 
-#                    for this group.""")
-#        else:
-#            print("Group: %s" % ", ".join([str(x) for x in datasets]))
-
-        # First, accept all known transcripts and all NICs
-#        known_transcripts = qutils.fetch_known_transcripts_with_gene_label(cursor, datasets) 
-#        transcript_whitelist.update(known_transcripts)
-        
-        # Now, conditionally accept ISM, NNC, antisense, and intergenic transcripts 
-        # (must be reproducible)
-#        NIC_transcripts = qutils.fetch_reproducible_NICs(cursor, datasets)
-#        reproducible_ISMs = qutils.fetch_reproducible_ISMs(cursor, datasets)
-#        reproducible_NNCs = qutils.fetch_reproducible_NNCs(cursor, datasets)
-#        reproducible_antisense = qutils.fetch_reproducible_antisense(cursor, datasets)
-#        reproducible_intergenic = qutils.fetch_reproducible_intergenic(cursor, datasets)
-#        transcript_whitelist.update(NIC_transcripts)
-#        transcript_whitelist.update(reproducible_ISMs)
-#        transcript_whitelist.update(reproducible_NNCs)
-#        transcript_whitelist.update(reproducible_antisense)
-#        transcript_whitelist.update(reproducible_intergenic)
-
-#    return transcript_whitelist
 
 
 def check_annot_validity(annot, database):
@@ -323,14 +279,11 @@ def main():
                       "run TALON with at least 2 biological replicates if possible.")
 
     # Perform the filtering
-    filter_talon_transcripts(database, annot, datasets, options)
+    filtered = filter_talon_transcripts(database, annot, datasets, options)
 
-    # Write transcript IDs to file
-    o = open(options.outfile, 'w')
-    print("Writing whitelisted gene-transcript-category pairs to " + options.outfile + "...")
-    for transcript in whitelist:
-        o.write(",".join([str(x) for x in transcript]) + "\n")
-    o.close()
+    # Write gene and transcript IDs to file
+    print("Writing whitelisted gene-transcript TALON ID pairs to " + options.outfile + "...")
+    filtered.to_csv(options.outfile, sep = ",", header = False, index = False)
     
 
 if __name__ == '__main__':

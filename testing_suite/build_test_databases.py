@@ -3,6 +3,8 @@
 import os
 import subprocess
 import sys
+sys.path.append("filtering")
+import make_minimal_db_for_filtering as mmdb
 
 try:
    subprocess.check_output(
@@ -169,7 +171,11 @@ try:
        ["talon_filter_transcripts",
         "--db", "scratch/chr11_and_Tcf3.db",
         "-a", "gencode_vM7",
-        "-p", "input_files/chr11_and_Tcf3/pairings.csv",
+        "--datasets", "PB65_B017,PB65_B018,D12",
+        "--maxFracA", "1",
+        "--minCount", "1",
+        "--minDatasets", "2",
+        "--allowGenomic",
         "--o", "scratch/chr11_and_Tcf3_whitelist.csv" ])
 except Exception as e:
     print(e)
@@ -188,3 +194,11 @@ except Exception as e:
     print(e)
     sys.exit("Post-TALON GTF script failed on chr11_and_Tcf3")
 
+# Create mock database for filtering tests
+try:
+    database = "scratch/filter/test.db"
+    os.system("mkdir -p scratch/filter/")
+    mmdb.init_mock_db(database)
+except Exception as e:
+    print(e)
+    sys.exit("Problem creating mock database for filtering tests")
