@@ -70,6 +70,10 @@ def get_counters(database):
         global observed_counter
         observed_counter = Counter(initval = cursor.fetchone()['count'])
 
+        cursor.execute("SELECT * FROM counters WHERE category == 'dataset'")
+        global dataset_counter
+        dataset_counter = Counter(initval = cursor.fetchone()['count'])
+
     return 
 
 def get_args():
@@ -1462,7 +1466,7 @@ def init_run_info(database, genome_build, min_coverage = 0.9, min_identity = 0,
         query = "SELECT * FROM counters WHERE category == 'dataset'"
         cursor.execute(query)
         run_info.dataset = cursor.fetchone()['count']
-
+    
     return run_info
 
 def init_outfiles(outprefix, tmp_dir = "talon_tmp/"):
@@ -1768,7 +1772,7 @@ def update_database(database, batch_size, outfiles, datasets):
     batch_add_vertex2gene(cursor, outfiles.v2g, batch_size)
     add_datasets(cursor, datasets)  
     batch_add_observed(cursor, outfiles.observed, batch_size)
-    update_counter(cursor, len(datasets))
+    update_counter(cursor)
     batch_add_annotations(cursor, outfiles.gene_annot, "gene", batch_size)
     batch_add_annotations(cursor, outfiles.transcript_annot, "transcript",
                           batch_size)
@@ -1780,8 +1784,8 @@ def update_database(database, batch_size, outfiles, datasets):
 
     return
  
-def update_counter(cursor, n_datasets):
-    """ Update the database counter usign the global counter variables """
+def update_counter(cursor): #, n_datasets):
+    """ Update the database counter using the global counter variables """
     
     update_g = 'UPDATE "counters" SET "count" = ? WHERE "category" = "genes"'
     cursor.execute(update_g,[gene_counter.value()])
@@ -1796,7 +1800,8 @@ def update_counter(cursor, n_datasets):
     cursor.execute(update_v,[vertex_counter.value()])
 
     update_d = 'UPDATE "counters" SET "count" = ? WHERE "category" = "dataset"'
-    cursor.execute(update_d,[n_datasets])
+    cursor.execute(update_d,[dataset_counter.value()])
+    #cursor.execute(update_d,[n_datasets])
 
     update_o = 'UPDATE "counters" SET "count" = ? WHERE "category" = "observed"'
     cursor.execute(update_o,[observed_counter.value()])
@@ -2073,10 +2078,6 @@ def check_database_integrity(cursor):
         if table_name == "vertex":
             table_name = "location"
 
-        # Skip dataset counter because it is not necessarily expected to be the same
-        if table_name == "dataset":
-            continue            
- 
         query = "select COUNT(*) from " + table_name
         cursor.execute(query)
         actual_count = int(cursor.fetchone()[0])
@@ -2112,7 +2113,6 @@ def parallel_talon(read_file, interval, database, run_info, queue):
         conn.row_factory = sqlite3.Row
         cursor = conn.cursor()
 
-        #print("Processing annotation for interval %s:%d-%d..." % interval)
         tmp_id = str(os.getpid())
         struct_collection = prepare_data_structures(cursor, run_info,
                                                     chrom = interval[0], 
@@ -2420,8 +2420,9 @@ def main():
         datasets = []
         dataset_db_entries = []
         for d_name, description, platform in dset_metadata:
-            run_info['dataset'] += 1
-            d_id = run_info['dataset']
+            #run_info['dataset'] += 1
+            d_id = dataset_counter.increment()
+            #d_id = run_info['dataset']
             datasets.append(d_name)
             dataset_db_entries.append((d_id, d_name, description, platform))
 
