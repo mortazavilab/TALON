@@ -87,10 +87,14 @@ def format_to_write(line):
 	return ''.join('\t'.join([str(i) for i in line])+'\n')
 
 def main():
+
+	print('hello world')
 	args = get_args()
 	gtffile = args.gtf
 
 	(missing_gene, missing_transcript) = is_bad_gtf(gtffile)
+
+	print('Missing transcript :  {}'.format(missing_transcript))
 
 	# if nothing is missing, you good!
 	if not missing_gene and not missing_transcript: 
@@ -203,10 +207,10 @@ def main():
 		if missing_gene:
 			new_entry = construct_new_entry(
 				prev_line, curr_gid_coords, 'gene')
-			gene_list = new_entry+''.join(gene_list)
 
-			outfile.write(gene_list)
-			gene_list = ''
+		gene_list = new_entry+''.join(gene_list)
+		outfile.write(gene_list)
+		gene_list = ''
 
 
 		infile.close()
