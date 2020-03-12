@@ -203,10 +203,10 @@ def main():
 		if missing_gene:
 			new_entry = construct_new_entry(
 				prev_line, curr_gid_coords, 'gene')
-			gene_list = new_entry+''.join(gene_list)
-
-			outfile.write(gene_list)
-			gene_list = ''
+		
+		gene_list = new_entry+''.join(gene_list)
+		outfile.write(gene_list)
+		gene_list = ''
 
 
 		infile.close()
