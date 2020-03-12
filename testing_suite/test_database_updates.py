@@ -345,11 +345,11 @@ class TestDatabaseUpdates(object):
         for i in range(20): talon.transcript_counter.increment()
         for i in range(2): talon.edge_counter.increment()
         for i in range(5): talon.vertex_counter.increment()
-        n_datasets = 30
+        for i in range(30): talon.dataset_counter.increment()
         for i in range(6): talon.observed_counter.increment()
 
         # Now try the update
-        talon.update_counter(cursor, n_datasets)
+        talon.update_counter(cursor)
 
         # Check results with queries
         cursor.execute("""SELECT * FROM counters""")
