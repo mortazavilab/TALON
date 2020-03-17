@@ -55,6 +55,17 @@ except Exception as e:
 try:
     subprocess.check_output(
        ["talon_initialize_database",
+        "--f", "input_files/Canx_example/Canx_refseq.gtf",
+        "--a",  "gencode_vM7",
+        "--l", "0",
+        "--g",  "mm10", "--o", "scratch/Canx_refseq"])
+except Exception as e:
+    print(e)
+    sys.exit("Database initialization failed on Canx RefSeq annotation")
+
+try:
+    subprocess.check_output(
+       ["talon_initialize_database",
         "--f", "input_files/Map2k4_example/Map2k4.gtf",
         "--a",  "gencode_vM7",
         "--l", "0",
