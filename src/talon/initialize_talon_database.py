@@ -417,7 +417,10 @@ def add_annotation_table(database, table_name, key_table, fk_id):
     c = conn.cursor()
 
     # Add table
-    fk_statement = "FOREIGN KEY (ID) REFERENCES "+ key_table + "(" + fk_id + ")"
+    if key_table == "exon":
+        fk_statement = ""
+    else:
+        fk_statement = ", FOREIGN KEY (ID) REFERENCES "+ key_table + "(" + fk_id + ")"
     command = " CREATE TABLE IF NOT EXISTS " + table_name + \
                 """ (ID INTEGER,
                   annot_name text,
@@ -425,7 +428,7 @@ def add_annotation_table(database, table_name, key_table, fk_id):
                   attribute text,
                   value text,
                    
-                  PRIMARY KEY (ID, source, attribute), """ + fk_statement + """); """
+                  PRIMARY KEY (ID, source, attribute)""" + fk_statement + """); """
     c.execute(command)
     conn.commit()
     conn.close()
@@ -453,8 +456,7 @@ def add_location_table(database):
                   position INTEGER,
 
                   PRIMARY KEY(location_ID, genome_build),
-                  FOREIGN KEY(genome_build) REFERENCES genome_build(build_ID),
-                  FOREIGN KEY(location_ID) REFERENCES vertex(vertex_ID)
+                  FOREIGN KEY(genome_build) REFERENCES genome_build(build_ID)
                   ); """
     c.execute(command)
 
