@@ -39,7 +39,7 @@ NOTE: Talon versions 4.2 and lower are not installable. Check the README of thos
 For a small, self-contained example with all necessary files included, see https://github.com/mortazavilab/TALON/tree/master/example
 
 ## <a name="label_reads"></a>Flagging reads for internal priming
-Current long-read platforms that rely on poly-(A) selection are prone to internal priming artifacts. These occur when the oligo-dT primer binds off-target to A-rich sequences inside an RNA transcript rather than at the end. Therefore, we recommend running the `talon_label_reads` utility on each of your SAM files separately to record the fraction of As in the n-sized window immediately following each read alignment (reference genome sequence). The default n value is 20 bp, but you can adjust this to match the length of the T sequence in your primer if desired. The output of talon_label_reads is a SAM file with the fraction As recorded in the fA:f custom SAM tag. Non-primary alignments are omitted. This SAM file can now be used as your input to the TALON annotator.
+Current long-read platforms that rely on poly-(A) selection are prone to internal priming artifacts. These occur when the oligo-dT primer binds off-target to A-rich sequences inside an RNA transcript rather than at the end. Therefore, we recommend running the **`talon_label_reads`** utility on each of your SAM files separately to record the fraction of As in the n-sized window immediately following each read alignment (reference genome sequence). The default n value is 20 bp, but you can adjust this to match the length of the T sequence in your primer if desired. The output of talon_label_reads is a SAM file with the fraction As recorded in the fA:f custom SAM tag. Non-primary alignments are omitted. This SAM file can now be used as your input to the TALON annotator.
 ```
 Usage: talon_label_reads [options]
 
@@ -62,7 +62,7 @@ Options:
 ## <a name="db_init"></a>Initializing a TALON database
 For documentation of TALON versions 4.4.2 and lower, see https://github.com/mortazavilab/TALON/wiki/Archived-TALON-documentation.
 
-The first step in using TALON is to initialize a SQLite database from the GTF annotation of your choice (i.e. GENCODE). This step is done using talon_initialize_database, and only needs to be performed once for your analysis. Keep track of the build and annotation names you choose, as these will be used downstream when running TALON and its utilities.
+The first step in using TALON is to initialize a SQLite database from the GTF annotation of your choice (i.e. GENCODE). This step is done using **`talon_initialize_database`**, and only needs to be performed once for your analysis. Keep track of the build and annotation names you choose, as these will be used downstream when running TALON and its utilities.
 
 NOTE: The GTF file you use must contain genes, transcripts, and exons. If the file does not contain explicit gene and/or transcript entries, key tables of the database will be empty and you will experience problems in the downstream analysis. Please see our [GTF troubleshooting section](https://github.com/mortazavilab/TALON/wiki/Formatting-a-GTF-annotation-to-work-with-TALON) for help.
 
@@ -83,9 +83,9 @@ Options:
 
 ## <a name="run_talon"></a>Running TALON
 Now that you've initialized your database and checked your reads for evidence of internal priming, you're ready to annotate them. The input database is modified in place to track and quantify transcripts in the provided dataset(s). In a talon run, each input SAM read is compared to known and previously observed novel transcript models on the basis of its splice junctions. This allows us to not only assign a novel gene or transcript identity where appropriate, but to track new transcript models and characterize how they differ from known ones. The types of novelty assigned are shown in this diagram.
-<img align="left" width="450" src="figs/novelty.png">
+<img align="left" width="350" src="figs/novelty.png">
 
-To run the annotator, create a comma-delimited configuration file with the following four columns: name, sample description, platform, sam file (full path). There should be one line for each dataset, and dataset names must be unique. If you decide later to add more datasets to an existing analysis, you can do so by creating a new config file for this data and running TALON again on the existing database.
+To run the **`talon`** annotator, create a comma-delimited configuration file with the following four columns: name, sample description, platform, sam file (full path). There should be one line for each dataset, and dataset names must be unique. If you decide later to add more datasets to an existing analysis, you can do so by creating a new config file for this data and running TALON again on the existing database.
 
 Please note that TALON versions 4.4+ can be run in multithreaded fashion for a much faster runtime. 
 
@@ -113,7 +113,7 @@ optional arguments:
   --o OUTPREFIX         Prefix for output files
 
 ```
-TALON generates two output files in the course of a run. The QC log (file with suffix 'QC.log') is useful for tracking why a particular read was or was not included in the TALON analysis. 
+TALON generates two output files in the course of a run. The QC log (file with suffix **`'QC.log'`**) is useful for tracking why a particular read was or was not included in the TALON analysis. 
 <details>
 <summary>QC log format</summary>  
 	
@@ -128,7 +128,7 @@ Columns:
 
 </details>
 
-The second output file (suffix 'read_annot.tsv') appears at the very end of the run and contains a line for every read that was successfully annotated. 
+The second output file (suffix **`'read_annot.tsv'`**) appears at the very end of the run and contains a line for every read that was successfully annotated. 
 <details>
 <summary>Read annotation file format</summary>
 	
@@ -159,7 +159,7 @@ Columns:
 
 </details>
 
-It is also possible to obtain this file from a TALON database at any time by running the *talon_fetch_reads* utility.
+It is also possible to obtain this file from a TALON database at any time by running the **`talon_fetch_reads`** utility.
 ```
 Usage: talon_fetch_reads [-h] [--db FILE,] [--build STRING,]
                          [--datasets STRING,] [--o OUTPREFIX]
@@ -179,7 +179,7 @@ optional arguments:
 
 ## <a name="talon_abundance"></a>Accessing abundance information
 
-The *talon_abundance* module can be used to extract a raw or filtered transcript count matrix from your TALON database. Each row of this file represents a transcript detected by TALON in one or more of your datasets. To generate a file suitable for gene expression analysis, skip the --whitelist option (i.e. make an unfiltered abundance file). To generate a file for isoform-level analysis, please see the next section to generate a whitelist file to use.
+The **`talon_abundance`** module can be used to extract a raw or filtered transcript count matrix from your TALON database. Each row of this file represents a transcript detected by TALON in one or more of your datasets. To generate a file suitable for gene expression analysis, skip the --whitelist option (i.e. make an unfiltered abundance file). To generate a file for isoform-level analysis, please see the next section to generate a whitelist file to use.
 ```
 Usage: talon_abundance [options]
 
@@ -227,7 +227,7 @@ One column per dataset, with a count indicating how many times the current trans
 
 Before quantifying your results on the isoform level, it is important to filter the novel transcript models because long-read platforms are prone to several forms of artifacts. The most effective experimental design for filtering is to use biological replicates. Some limited filtering is possible even for singlet datasets, but keep in mind that this is likely to be far less effective. 
 
-The *talon_filter_transcripts* module generates a whitelist of transcripts that are either:  
+The **`talon_filter_transcripts`** module generates a whitelist of transcripts that are either:  
 a) Known  
 b) Observed at least n times in each of k datasets.  
 The default value for n is 5 and the default for k is the total number of datasets you provide for filtering. In addition, the filter requires that all n reads used to support a novel transcript must not have evidence of internal priming (default: internal priming defined as > 0.5 fraction As).  
@@ -269,7 +269,7 @@ The columns in the resulting output file are:
 
 ## Obtaining a custom GTF transcriptome annotation from a TALON database
 
-You can use the *talon_create_GTF* utility to extract a GTF-formatted annotation from the TALON database. 
+You can use the **`talon_create_GTF`** utility to extract a GTF-formatted annotation from the TALON database. 
 ```
 Usage: talon_create_GTF [options]
 
