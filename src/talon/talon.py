@@ -94,13 +94,13 @@ def get_args():
         help='Genome build (i.e. hg38) to use. Must be in the database.')
     parser.add_argument("--threads", "-t", dest = "threads",
         help = "Number of threads to run program with.",
-        type = str, default = 2)
+        type = int, default = 2)
     parser.add_argument("--cov", "-c", dest = "min_coverage",
         help = "Minimum alignment coverage in order to use a SAM entry. Default = 0.9",
-        type = str, default = 0.9)
+        type = float, default = 0.9)
     parser.add_argument("--identity", "-i", dest = "min_identity",
-        help = "Minimum alignment identity in order to use a SAM entry. Default = 0",
-        type = str, default = 0)
+        help = "Minimum alignment identity in order to use a SAM entry. Default = 0.8",
+        type = float, default = 0.8)
     parser.add_argument("--o", dest = "outprefix", help = "Prefix for output files",
         type = str)
 
