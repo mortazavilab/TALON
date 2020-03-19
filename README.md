@@ -15,7 +15,6 @@ works from mapped SAM files, allowing data from different sequencing platforms
 * [Post-TALON utilities](#talon_utils)
 	* [Accessing abundance information](#talon_abundance)
 	* [Filtering transcript models](#talon_filter)
-* [Archived documentation](#talon_archive)
 * [Citing TALON](#talon_cite)
 
 Reads must be aligned to the reference genome prior to using TALON. We recommend the Minimap2 aligner - please see their GitHub page [here](https://github.com/lh3/minimap2) for recommended long-read parameters by technology. Please note that TALON requires the SAM MD tag, so Minimap2 should be run with the --MD flag enabled. In principle, you can use any other long-read alignment software provided that an MD tag is generated.
@@ -297,9 +296,6 @@ Options:
   --o=FILE              Prefix for output GTF
 ```
 
-
-# <a name="talon_archive"></a>Documentation for TALON versions < 5.0
-To view the documentation and examples associated with earlier TALON versions, please see the [wiki](https://github.com/mortazavilab/TALON/wiki).
 
 # <a name="talon_cite"></a>Citing TALON
 Please cite our preprint when using TALON:  
