@@ -230,7 +230,7 @@ Before quantifying your results on the isoform level, it is important to filter 
 The **`talon_filter_transcripts`** module generates a whitelist of transcripts that are either:  
 a) Known  
 b) Observed at least n times in each of k datasets.  
-The default value for n is 5 and the default for k is the total number of datasets you provide for filtering. In addition, the filter requires that all n reads used to support a novel transcript must not have evidence of internal priming (default: internal priming defined as > 0.5 fraction As).  
+The default value for n is 5 and the default for k is the total number of datasets you provide for filtering. In addition, the filter requires that all n reads used to support a novel transcript must not have evidence of internal priming (default: internal priming defined as > 0.5 fraction As). If you wish to disregard internal priming, set --maxFracA to 1 (not generally recommended).
 ```
 Usage: talon_filter_transcripts [options]
 
