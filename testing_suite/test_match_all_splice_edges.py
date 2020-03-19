@@ -14,6 +14,7 @@ class TestMatchAllEdges(object):
         database = "scratch/toy.db"
         talon.get_counters(database)
         edge_dict = init_refs.make_edge_dict(cursor)
+        print(len(edge_dict))
         run_info = talon.init_run_info(database, build)
         conn.close()
 

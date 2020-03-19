@@ -45,10 +45,10 @@ class TestDatabaseUpdates(object):
         conn, cursor = get_db_cursor()
         build = "toy_build"
 
-        observed = [ ( 1, 1, 1, "read1", "test", 1, 2, 1, 1, 0, 0, 100),
-                     ( 2, 1, 1, "read2", "test", 1, 2, 1, 1, 0, 0, 100),
-                     ( 3, 1, 1, "read3", "test", 1, 2, 1, 1, 0, 0, 100),
-                     ( 4, 1, 8, "read4", "test", 35, 36, 32, 32,  None, None, 100) ]
+        observed = [ ( 1, 1, 1, "read1", "test", 1, 2, 1, 1, 0, 0, 100, 0.5, "yes", "paternal", "yes", "no"),
+                     ( 2, 1, 1, "read2", "test", 1, 2, 1, 1, 0, 0, 100, None, None, None, None, None),
+                     ( 3, 1, 1, "read3", "test", 1, 2, 1, 1, 0, 0, 100, None, None, None, None, None),
+                     ( 4, 1, 8, "read4", "test", 35, 36, 32, 32,  None, None, 100, None, None, None, None, None) ]
 
         # Write observed to file
         os.system("mkdir -p scratch/db_updates/")
@@ -68,9 +68,20 @@ class TestDatabaseUpdates(object):
 
         # Test that the 'None' values are properly recorded
         for transcript in results:
+            if transcript['read_name'] == "read1":
+                assert transcript['fraction_As'] == 0.5
+                assert transcript['custom_label'] == "yes"
+                assert transcript['allelic_label'] == "paternal"
+                assert transcript['start_support'] == "yes"
+                assert transcript['end_support'] == "no"
             if transcript['read_name'] == "read4":
                 assert transcript['start_delta'] == None
                 assert transcript['end_delta'] == None
+                assert transcript['fraction_As'] == None
+                assert transcript['custom_label'] == None
+                assert transcript['allelic_label'] == None
+                assert transcript['start_support'] == None
+                assert transcript['end_support'] == None
         conn.close()
 
     def test_gene_annot(self):
@@ -334,11 +345,11 @@ class TestDatabaseUpdates(object):
         for i in range(20): talon.transcript_counter.increment()
         for i in range(2): talon.edge_counter.increment()
         for i in range(5): talon.vertex_counter.increment()
-        n_datasets = 30
+        for i in range(30): talon.dataset_counter.increment()
         for i in range(6): talon.observed_counter.increment()
 
         # Now try the update
-        talon.update_counter(cursor, n_datasets)
+        talon.update_counter(cursor)
 
         # Check results with queries
         cursor.execute("""SELECT * FROM counters""")

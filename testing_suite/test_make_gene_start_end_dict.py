@@ -11,8 +11,9 @@ class TestGeneStartEnd(object):
         conn, cursor = get_db_cursor()
         build = "toy_build"
 
-        starts, ends = init_refs.make_gene_start_and_end_dict(cursor, build)
-     
+        starts = init_refs.make_gene_start_or_end_dict(cursor, build, "start")
+        ends = init_refs.make_gene_start_or_end_dict(cursor, build, "end")
+
         conn.close()
 
         # Check starts. Field 1: Gene ID, Field 2: start pos, Field 3: vertex ID 
@@ -37,10 +38,36 @@ class TestGeneStartEnd(object):
         conn, cursor = get_db_cursor()
         build = "toy_build"
 
-        starts, ends = init_refs.make_gene_start_and_end_dict(cursor, build,
+        starts = init_refs.make_gene_start_or_end_dict(cursor, build, "start",
                                                           chrom = "chr1",
                                                           start = 1,
                                                           end = 1000)
+        ends = init_refs.make_gene_start_or_end_dict(cursor, build, "end",
+                                                          chrom = "chr1",
+                                                          start = 1,
+                                                          end = 1000)
+
+        conn.close()
+
+        assert starts == {1: {1: 1}}
+
+        assert ends == {1: {1000: 6},
+                        2: {900: 5}}
+
+    def test_interval_1_2000(self):
+        """ Get starts and ends for genes in the database that overlap the
+            interval chr1:1-2000 """
+        conn, cursor = get_db_cursor()
+        build = "toy_build"
+
+        starts = init_refs.make_gene_start_or_end_dict(cursor, build, "start",
+                                                          chrom = "chr1",
+                                                          start = 1,
+                                                          end = 2000)
+        ends = init_refs.make_gene_start_or_end_dict(cursor, build, "end",
+                                                          chrom = "chr1",
+                                                          start = 1,
+                                                          end = 2000)
 
         conn.close()
 
@@ -49,4 +76,3 @@ class TestGeneStartEnd(object):
 
         assert ends == {1: {1000: 6},
                         2: {900: 5}}
-

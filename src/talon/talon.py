@@ -70,6 +70,10 @@ def get_counters(database):
         global observed_counter
         observed_counter = Counter(initval = cursor.fetchone()['count'])
 
+        cursor.execute("SELECT * FROM counters WHERE category == 'dataset'")
+        global dataset_counter
+        dataset_counter = Counter(initval = cursor.fetchone()['count'])
+
     return 
 
 def get_args():
@@ -85,18 +89,18 @@ def get_args():
         help = "Dataset config file: dataset name, sample description, " + \
                "platform, sam file (comma-delimited)", type = str)
     parser.add_argument('--db', dest = 'database', metavar='FILE,', type = str,
-        help='TALON database. Created using build_talon_annotation.py')
+        help='TALON database. Created using talon_initialize_database')
     parser.add_argument('--build', dest = 'build', metavar='STRING,', type = str,
         help='Genome build (i.e. hg38) to use. Must be in the database.')
     parser.add_argument("--threads", "-t", dest = "threads",
         help = "Number of threads to run program with.",
-        type = str, default = 2)
+        type = int, default = 2)
     parser.add_argument("--cov", "-c", dest = "min_coverage",
         help = "Minimum alignment coverage in order to use a SAM entry. Default = 0.9",
-        type = str, default = 0.9)
+        type = float, default = 0.9)
     parser.add_argument("--identity", "-i", dest = "min_identity",
-        help = "Minimum alignment identity in order to use a SAM entry. Default = 0",
-        type = str, default = 0)
+        help = "Minimum alignment identity in order to use a SAM entry. Default = 0.8",
+        type = float, default = 0.8)
     parser.add_argument("--o", dest = "outprefix", help = "Prefix for output files",
         type = str)
 
@@ -821,16 +825,6 @@ def process_ISM(chrom, positions, strand, edge_IDs, vertex_IDs, all_matches, tra
         known_start = 0
         known_end = 0   
 
-    # If the 5' and 3' vertex sites are known for this gene, return NIC
-    if known_start and known_end:
-        novel_transcript = create_transcript(chrom, positions[0], positions[-1],
-                                              gene_ID, edge_IDs, vertex_IDs,
-                                              transcript_dict)
-        transcript_ID = novel_transcript['transcript_ID']
-        novelty = [(transcript_ID, run_info.idprefix, "TALON",
-                        "NIC_transcript", "TRUE")]
-        return gene_ID, transcript_ID, novelty, start_end_info    
-
     # Iterate over matches to characterize ISMs
     for match in all_matches:
 
@@ -1464,7 +1458,7 @@ def init_run_info(database, genome_build, min_coverage = 0.9, min_identity = 0,
         for info in cursor.fetchall():
             info_name = info['item']
             value = info['value']
-            if info_name != "idprefix":
+            if info_name not in ["idprefix", "schema_version"] :
                 value = int(value)
             run_info[info_name] = value
 
@@ -1472,7 +1466,7 @@ def init_run_info(database, genome_build, min_coverage = 0.9, min_identity = 0,
         query = "SELECT * FROM counters WHERE category == 'dataset'"
         cursor.execute(query)
         run_info.dataset = cursor.fetchone()['count']
-
+    
     return run_info
 
 def init_outfiles(outprefix, tmp_dir = "talon_tmp/"):
@@ -1535,10 +1529,6 @@ def prepare_data_structures(cursor, run_info, chrom = None, start = None,
                                           start = start, end = end, 
                                           tmp_tab = "temp_monoexon_" + tmp_id)
 
-    #query = "select name from sqlite_temp_master where type = 'table'; "
-    #cursor.execute(query)
-    #print([i["name"] for i in cursor.fetchall()])
-
     location_dict = init_refs.make_location_dict(build, cursor, chrom = chrom, 
                                                  start = start, end = end)
 
@@ -1552,11 +1542,16 @@ def prepare_data_structures(cursor, run_info, chrom = None, start = None,
                                                       chrom = chrom, 
                                                       start = start, end = end)
 
-    gene_starts, gene_ends = init_refs.make_gene_start_and_end_dict(cursor, 
-                                                                    build, 
-                                                                    chrom = chrom,
-                                                                    start = start,
-                                                                    end = end)   
+    gene_starts = init_refs.make_gene_start_or_end_dict(cursor, 
+                                                        build, "start",
+                                                        chrom = chrom,
+                                                        start = start,
+                                                        end = end)   
+    gene_ends = init_refs.make_gene_start_or_end_dict(cursor,
+                                                      build, "end",
+                                                      chrom = chrom,
+                                                      start = start,
+                                                      end = end)
 
     struct_collection.location_dict = location_dict
     struct_collection.edge_dict = edge_dict
@@ -1777,7 +1772,7 @@ def update_database(database, batch_size, outfiles, datasets):
     batch_add_vertex2gene(cursor, outfiles.v2g, batch_size)
     add_datasets(cursor, datasets)  
     batch_add_observed(cursor, outfiles.observed, batch_size)
-    update_counter(cursor, len(datasets))
+    update_counter(cursor)
     batch_add_annotations(cursor, outfiles.gene_annot, "gene", batch_size)
     batch_add_annotations(cursor, outfiles.transcript_annot, "transcript",
                           batch_size)
@@ -1789,8 +1784,8 @@ def update_database(database, batch_size, outfiles, datasets):
 
     return
  
-def update_counter(cursor, n_datasets):
-    """ Update the database counter usign the global counter variables """
+def update_counter(cursor): #, n_datasets):
+    """ Update the database counter using the global counter variables """
     
     update_g = 'UPDATE "counters" SET "count" = ? WHERE "category" = "genes"'
     cursor.execute(update_g,[gene_counter.value()])
@@ -1805,7 +1800,8 @@ def update_counter(cursor, n_datasets):
     cursor.execute(update_v,[vertex_counter.value()])
 
     update_d = 'UPDATE "counters" SET "count" = ? WHERE "category" = "dataset"'
-    cursor.execute(update_d,[n_datasets])
+    cursor.execute(update_d,[dataset_counter.value()])
+    #cursor.execute(update_d,[n_datasets])
 
     update_o = 'UPDATE "counters" SET "count" = ? WHERE "category" = "observed"'
     cursor.execute(update_o,[observed_counter.value()])
@@ -1983,11 +1979,21 @@ def batch_add_observed(cursor, observed_file, batch_size):
             for observed in islice(f, batch_size):
                 observed = observed.strip().split("\t")
                   
-                # Start and end delta values may be None
+                # Start/end delta and frac_A values may be None
                 if observed[9] == "None":
                     observed[9] = None
                 if observed[10] == "None":
                     observed[10] = None
+                if observed[12] == "None":
+                    observed[12] = None
+                if observed[13] == "None":
+                    observed[13] = None
+                if observed[14] == "None":
+                    observed[14] = None
+                if observed[15] == "None":
+                    observed[15] = None
+                if observed[16] == "None":
+                    observed[16] = None 
 
                 batch.append(tuple(observed))
 
@@ -2011,10 +2017,11 @@ def batch_add_observed(cursor, observed_file, batch_size):
                 cols = " (" + ", ".join([str_wrap_double(x) for x in
                        ["obs_ID", "gene_ID", "transcript_ID", "read_name",
                         "dataset", "start_vertex", "end_vertex",
-                        "start_exon", "end_exon",
-                        "start_delta", "end_delta", "read_length"]]) + ") "
+                        "start_exon", "end_exon", "start_delta", "end_delta", 
+                        "read_length", "fraction_As", "custom_label", 
+                        "allelic_label", "start_support", "end_support"]]) + ") "
                 command = 'INSERT INTO "observed"' + cols + \
-                          "VALUES " + '(?,?,?,?,?,?,?,?,?,?,?,?)'
+                          "VALUES " + '(?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)'
                 cursor.executemany(command, batch)
 
             except Exception as e:
@@ -2071,10 +2078,6 @@ def check_database_integrity(cursor):
         if table_name == "vertex":
             table_name = "location"
 
-        # Skip dataset counter because it is not necessarily expected to be the same
-        if table_name == "dataset":
-            continue            
- 
         query = "select COUNT(*) from " + table_name
         cursor.execute(query)
         actual_count = int(cursor.fetchone()[0])
@@ -2110,7 +2113,6 @@ def parallel_talon(read_file, interval, database, run_info, queue):
         conn.row_factory = sqlite3.Row
         cursor = conn.cursor()
 
-        #print("Processing annotation for interval %s:%d-%d..." % interval)
         tmp_id = str(os.getpid())
         struct_collection = prepare_data_structures(cursor, run_info,
                                                     chrom = interval[0], 
@@ -2205,6 +2207,38 @@ def parallel_talon(read_file, interval, database, run_info, queue):
  
     return
 
+def parse_custom_SAM_tags(sam_record: pysam.AlignedSegment):
+    """ Looks for the following tags in the read. Will be set to None if no tag
+        is found 
+            fA: fraction As in the 10-bp interval following the alignment end
+            lC: custom label (type = string)
+            lA: custom allele label (type = string)
+            tS: flag indicating start site support (type = string)
+            tE: flag indicating end site support (typ = string)
+    """
+    try:
+        fraction_As = sam_record.get_tag("fA")
+    except:
+        fraction_As = None
+    try:
+        custom_label = sam_record.get_tag("lC")
+    except:
+        custom_label = None
+    try:
+        allelic_label = sam_record.get_tag("lA")
+    except:
+        allelic_label = None
+    try:
+        start_support = sam_record.get_tag("tS")
+    except:
+        start_support = None
+    try:
+        end_support = sam_record.get_tag("tE")
+    except:
+        end_support = None
+
+    return fraction_As, custom_label, allelic_label, start_support, end_support
+
 def annotate_read(sam_record: pysam.AlignedSegment, cursor, run_info, 
                   struct_collection, mode = 1):            
     """ Accepts a pysam-formatted read as input, and compares it to the 
@@ -2221,7 +2255,12 @@ def annotate_read(sam_record: pysam.AlignedSegment, cursor, run_info,
             start_exon
             end_exon
             start_delta
-            end_delta  
+            end_delta 
+            fraction_As (following the end of the alignment) 
+            custom_label
+            allelic_label
+            start_support
+            end_support
     """
     # Parse attributes to determine the chromosome, positions, and strand of the transcript
     read_ID = sam_record.query_name
@@ -2232,6 +2271,10 @@ def annotate_read(sam_record: pysam.AlignedSegment, cursor, run_info,
     sam_end = sam_record.reference_end
     read_length = sam_record.query_alignment_length 
     cigar = sam_record.cigarstring
+
+    # Parse custom TALON tags
+    fraction_As, custom_label, allelic_label, start_support, \
+    end_support = parse_custom_SAM_tags(sam_record)
 
     intron_list = tutils.get_introns(sam_record, sam_start, cigar)
 
@@ -2276,7 +2319,12 @@ def annotate_read(sam_record: pysam.AlignedSegment, cursor, run_info,
     annotation_info.strand = strand
     annotation_info.read_length = read_length
     annotation_info.n_exons = n_exons
-    
+    annotation_info.fraction_As = fraction_As    
+    annotation_info.custom_label = custom_label
+    annotation_info.allelic_label = allelic_label
+    annotation_info.start_support = start_support
+    annotation_info.end_support = end_support
+
     return annotation_info
 
 def unpack_observed(annotation_info, queue, obs_file):
@@ -2290,7 +2338,9 @@ def unpack_observed(annotation_info, queue, obs_file):
                 annotation_info.start_vertex, annotation_info.end_vertex, 
                 annotation_info.start_exon, annotation_info.end_exon,
                 annotation_info.start_delta, annotation_info.end_delta, 
-                annotation_info.read_length)
+                annotation_info.read_length, annotation_info.fraction_As,
+                annotation_info.custom_label, annotation_info.allelic_label,
+                annotation_info.start_support, annotation_info.end_support)
     msg = (obs_file, "\t".join([str(x) for x in observed]))
     queue.put(msg)
 
@@ -2370,8 +2420,7 @@ def main():
         datasets = []
         dataset_db_entries = []
         for d_name, description, platform in dset_metadata:
-            run_info['dataset'] += 1
-            d_id = run_info['dataset']
+            d_id = dataset_counter.increment()
             datasets.append(d_name)
             dataset_db_entries.append((d_id, d_name, description, platform))
 

@@ -17,7 +17,8 @@ class TestIdentifyISM(object):
         edge_dict = init_refs.make_edge_dict(cursor)
         location_dict = init_refs.make_location_dict(build, cursor)
         transcript_dict = init_refs.make_transcript_dict(cursor, build)
-        gene_starts, gene_ends = init_refs.make_gene_start_and_end_dict(cursor, build)
+        gene_starts = init_refs.make_gene_start_or_end_dict(cursor, build, "start")
+        gene_ends = init_refs.make_gene_start_or_end_dict(cursor, build, "end")
 
         chrom = "chr1"
         strand = "+"
@@ -59,7 +60,8 @@ class TestIdentifyISM(object):
         edge_dict = init_refs.make_edge_dict(cursor)
         location_dict = init_refs.make_location_dict(build, cursor)
         transcript_dict = init_refs.make_transcript_dict(cursor, build)
-        gene_starts, gene_ends = init_refs.make_gene_start_and_end_dict(cursor, build)
+        gene_starts = init_refs.make_gene_start_or_end_dict(cursor, build, "start")
+        gene_ends = init_refs.make_gene_start_or_end_dict(cursor, build, "end")
 
         chrom = "chr1"
         strand = "+"
@@ -98,7 +100,8 @@ class TestIdentifyISM(object):
         edge_dict = init_refs.make_edge_dict(cursor)
         location_dict = init_refs.make_location_dict(build, cursor)
         transcript_dict = init_refs.make_transcript_dict(cursor, build)
-        gene_starts, gene_ends = init_refs.make_gene_start_and_end_dict(cursor, build)
+        gene_starts = init_refs.make_gene_start_or_end_dict(cursor, build, "start")
+        gene_ends = init_refs.make_gene_start_or_end_dict(cursor, build, "end")
 
         chrom = "chr1"
         strand = "+"

@@ -284,6 +284,8 @@ def get_transcript_from_gtf(transcript_info):
     if "transcript_id" not in transcript_info[-1]:
             raise ValueError('GTF entry lacks a transcript_id field')
     annotations = extract_transcript_annotations_from_GTF(transcript_info)
+
+
     gene_id = annotations['gene_id']
     transcript_id = annotations['transcript_id']
 
@@ -295,15 +297,22 @@ def get_transcript_from_gtf(transcript_info):
 def extract_transcript_annotations_from_GTF(tab_fields):
     """ Extracts key-value annotations from the GTF description field
     """
+
     attributes = {}
 
-    description = tab_fields[-1].strip()
-    # Parse description
-    for pair in [x.strip() for x in description.split(";")]:
-        if pair == "": continue
+    # remove trailing newline and split by semicolon
+    description = tab_fields[-1].strip('\n')
+    description = description.split(';')
 
-        pair = pair.replace('"', '')
-        key, val = pair.split()
+    # Parse description
+    for fields in description:
+        if fields == "" or fields == " ": continue
+        fields = fields.split()
+        if fields[0] == '': fields = fields[1:]
+
+        key = fields[0].replace('"', '')
+        val = ' '.join(fields[1:]).replace('"', '')
+
         attributes[key] = val
 
     # Put in placeholders for important attributes (such as gene_id) if they

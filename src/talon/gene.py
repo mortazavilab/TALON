@@ -130,20 +130,27 @@ def extract_gene_annotations_from_GTF(tab_fields):
     """Parses the description field of a gene GTF in order to organize the 
        information therein into a dictionary.
     """
+
     attributes = {}
 
-    description = tab_fields[-1].strip()
-    # Parse description
-    for pair in [x.strip() for x in description.split(";")]:
-        if pair == "": continue
+    # remove trailing newline and split by semicolon
+    description = tab_fields[-1].strip('\n')
+    description = description.split(';')
 
-        pair = pair.replace('"', '')
-        key, val = pair.split()
+    # Parse description
+    for fields in description:
+        if fields == "" or fields == " ": continue
+        fields = fields.split()
+        if fields[0] == '': fields = fields[1:]
+
+        key = fields[0].replace('"', '')
+        val = ' '.join(fields[1:]).replace('"', '')
+        
         attributes[key] = val
 
     attributes["source"] = tab_fields[1]
-    return attributes  
 
+    return attributes  
 
 def get_gene_from_exon(exon, gene_id):
     """ In rare cases, GTF exons are listed with gene and transcript IDs that

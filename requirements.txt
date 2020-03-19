@@ -1,3 +1,4 @@
 pandas
+pyfaidx
 pysam==0.15.2
 pybedtools

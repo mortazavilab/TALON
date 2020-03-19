@@ -36,19 +36,25 @@ def get_args():
 
 # creates a dictionary of the last field of a gtf
 # adapted from Dana Wyman
-def get_fields(fields):
+def get_fields(tab_fields):
     attributes = {}
 
-    description = fields.strip()
-    description = [x.strip() for x in description.split(";")]
-    for pair in description:
-        if pair == "": continue
+    # remove trailing newline and split by semicolon
+    description = tab_fields[-1].strip('\n')
+    description = description.split(';')
 
-        pair = pair.replace('"', '')
-        key, val = pair.split()
+    # Parse description
+    for fields in description:
+        if fields == "" or fields == " ": continue
+        fields = fields.split()
+        if fields[0] == '': fields = fields[1:]
+
+        key = fields[0].replace('"', '')
+        val = ' '.join(fields[1:]).replace('"', '')
+
         attributes[key] = val
 
-    # put in placeholders for important attributes (such as gene_id) if they
+    # Put in placeholders for important attributes (such as gene_id) if they
     # are absent
     if "gene_id" not in attributes:
         attributes["gene_id"] = "NULL"
@@ -181,7 +187,7 @@ def create_dfs_gtf(gtf_file):
 
 			# transcript entry 
 			if entry_type == "transcript":
-				attributes = get_fields(fields)
+				attributes = get_fields(line)
 				tid = attributes['transcript_id']
 				gid = attributes['gene_id']
 
@@ -194,7 +200,7 @@ def create_dfs_gtf(gtf_file):
 				
 			# exon entry
 			elif entry_type == "exon":
-				attributes = get_fields(fields)
+				attributes = get_fields(line)
 				start, stop = find_edge_start_stop(start, stop, strand)
 				eid = '{}_{}_{}_{}_exon'.format(chrom, start, stop, strand)
 				tid = attributes['transcript_id']	

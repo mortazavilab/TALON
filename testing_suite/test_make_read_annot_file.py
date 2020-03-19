@@ -17,7 +17,8 @@ class TestGetReadAnnot(object):
         for r in reads:
             read_name, dataset, genome_build, gene_ID, \
             transcript_ID, chrom, read_start, read_end, \
-            strand, n_exons, read_length = r
+            strand, n_exons, read_length, fraction_As, custom_label, \
+            allelic_label, start_support, end_support = r
            
             if read_name == "read_1":
                 assert read_start == 1 
