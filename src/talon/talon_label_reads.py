@@ -32,7 +32,7 @@ def get_options():
                       help = "Number of threads to run", default = 1)
     parser.add_option("--ar", dest = "fracA_range_size", type = int,
                       help = ("Size of post-transcript interval to compute "
-                              "fraction As on. Default = 10"), default = 10)
+                              "fraction As on. Default = 20"), default = 20)
     parser.add_option("--tmpDir", dest = "tmp_dir",
                       help = ("Path to directory for tmp files. "
                               "Default = tmp_label_reads"), 
