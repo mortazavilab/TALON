@@ -48,7 +48,7 @@ talon \
 ```
 The file 'example_talon_QC.log' contains a record of each input transcript along with the computed coverage and identity of the alignment. During a longer TALON run, you can count the number of lines in the file in order to track how many reads have been processed so far. You can also specify the number of threads to run in parallel with the --t option.
 
-## Abundance and filtering
+### Abundance and filtering
 Now, we can explore the results of the run. To summarize how many of each transxcript were found (prior to any filtering), run:
 ```
 talon_summarize \
