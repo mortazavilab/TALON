@@ -39,16 +39,22 @@ def get_args():
 def get_fields(fields):
     attributes = {}
 
-    description = fields.strip()
-    description = [x.strip() for x in description.split(";")]
-    for pair in description:
-        if pair == "": continue
+    # remove trailing newline and split by semicolon
+    description = tab_fields[-1].strip('\n')
+    description = description.split(';')
 
-        pair = pair.replace('"', '')
-        key, val = pair.split()
+    # Parse description
+    for fields in description:
+        if fields == "" or fields == " ": continue
+        fields = fields.split()
+        if fields[0] == '': fields = fields[1:]
+
+        key = fields[0].replace('"', '')
+        val = ' '.join(fields[1:]).replace('"', '')
+
         attributes[key] = val
 
-    # put in placeholders for important attributes (such as gene_id) if they
+    # Put in placeholders for important attributes (such as gene_id) if they
     # are absent
     if "gene_id" not in attributes:
         attributes["gene_id"] = "NULL"
