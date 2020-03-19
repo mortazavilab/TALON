@@ -36,7 +36,7 @@ def get_args():
 
 # creates a dictionary of the last field of a gtf
 # adapted from Dana Wyman
-def get_fields(fields):
+def get_fields(tab_fields):
     attributes = {}
 
     # remove trailing newline and split by semicolon
@@ -187,7 +187,7 @@ def create_dfs_gtf(gtf_file):
 
 			# transcript entry 
 			if entry_type == "transcript":
-				attributes = get_fields(fields)
+				attributes = get_fields(line)
 				tid = attributes['transcript_id']
 				gid = attributes['gene_id']
 
@@ -200,7 +200,7 @@ def create_dfs_gtf(gtf_file):
 				
 			# exon entry
 			elif entry_type == "exon":
-				attributes = get_fields(fields)
+				attributes = get_fields(line)
 				start, stop = find_edge_start_stop(start, stop, strand)
 				eid = '{}_{}_{}_{}_exon'.format(chrom, start, stop, strand)
 				tid = attributes['transcript_id']	
