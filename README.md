@@ -1,6 +1,11 @@
 # TALON
 <img align="left" width="450" src="figs/TALON.png">
 
+TALON is a Python program for identifying and quantifying known and novel genes/isoforms
+in long-read transcriptome data sets. TALON is technology-agnostic in that it
+works from mapped SAM files, allowing data from different sequencing platforms
+(i.e. PacBio and Oxford Nanopore) to be analyzed side by side.
+
 # Table of contents
 * [Installation](#installation)
 * [Running TALON](#how_to_run)
@@ -12,12 +17,6 @@
 	*[Filtering transcript models](#talon_filter)
 * [Archived documentation](#talon_archive)
 * [Citing TALON](#talon_cite)
-
-
-TALON is a Python program for identifying and quantifying known and novel genes/isoforms
-in long-read transcriptome data sets. TALON is technology-agnostic in that it
-works from mapped SAM files, allowing data from different sequencing platforms
-(i.e. PacBio and Oxford Nanopore) to be analyzed side by side.
 
 Reads must be aligned to the reference genome prior to using TALON. We recommend the Minimap2 aligner - please see their GitHub page [here](https://github.com/lh3/minimap2) for recommended long-read parameters by technology. Please note that TALON requires the SAM MD tag, so Minimap2 should be run with the --MD flag enabled. In principle, you can use any other long-read alignment software provided that an MD tag is generated.
 
