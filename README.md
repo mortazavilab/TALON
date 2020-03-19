@@ -9,12 +9,12 @@ works from mapped SAM files, allowing data from different sequencing platforms
 ## Table of contents
 * [Installation](#installation)
 * [Running TALON](#how_to_run)
-	* [Flagging reads for internal priming](#label_reads)
-	* [Initializing a TALON database](#db_init)
-	* [Running TALON](#run_talon)
+..* [Flagging reads for internal priming](#label_reads)
+..* [Initializing a TALON database](#db_init)
+..* [Running TALON](#run_talon)
 * [Post-TALON utilities](#talon_utils)
-	* [Accessing abundance information](#talon_abundance)
-	* [Filtering transcript models](#talon_filter)
+..* [Accessing abundance information](#talon_abundance)
+..* [Filtering transcript models](#talon_filter)
 * [Citing TALON](#talon_cite)
 
 Reads must be aligned to the reference genome prior to using TALON. We recommend the Minimap2 aligner - please see their GitHub page [here](https://github.com/lh3/minimap2) for recommended long-read parameters by technology. Please note that TALON requires the SAM MD tag, so Minimap2 should be run with the --MD flag enabled. In principle, you can use any other long-read alignment software provided that an MD tag is generated.
