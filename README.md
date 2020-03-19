@@ -1,7 +1,7 @@
 # TALON
 <img align="left" width="450" src="figs/TALON.png">
 
-TALON is a Python program for identifying and quantifying known and novel genes/isoforms
+TALON is a Python package for identifying and quantifying known and novel genes/isoforms
 in long-read transcriptome data sets. TALON is technology-agnostic in that it
 works from mapped SAM files, allowing data from different sequencing platforms
 (i.e. PacBio and Oxford Nanopore) to be analyzed side by side.
@@ -39,7 +39,7 @@ NOTE: Talon versions 4.2 and lower are not installable. Check the README of thos
 For a small, self-contained example with all necessary files included, see https://github.com/mortazavilab/TALON/tree/master/example
 
 ## <a name="label_reads"></a>Flagging reads for internal priming
-Current long-read platforms that rely on poly-(A) selection are prone to internal priming artifacts. These occur when the oligo-dT primer binds off-target to A-rich sequences inside an RNA transcript rather than at the end. Therefore, we recommend running the talon_label_reads utility on each of your SAM files separately to record the fraction of As in the n-sized window immediately following each read alignment (reference genome sequence). The default n value is 20 bp, but you can adjust this to match the length of the T sequence in your primer if desired. The output of talon_label_reads is a SAM file with the fraction As recorded in the fA:f custom SAM tag. Non-primary alignments are omitted. This SAM file can now be used as your input to the TALON annotator.
+Current long-read platforms that rely on poly-(A) selection are prone to internal priming artifacts. These occur when the oligo-dT primer binds off-target to A-rich sequences inside an RNA transcript rather than at the end. Therefore, we recommend running the **talon_label_reads** utility on each of your SAM files separately to record the fraction of As in the n-sized window immediately following each read alignment (reference genome sequence). The default n value is 20 bp, but you can adjust this to match the length of the T sequence in your primer if desired. The output of talon_label_reads is a SAM file with the fraction As recorded in the fA:f custom SAM tag. Non-primary alignments are omitted. This SAM file can now be used as your input to the TALON annotator.
 ```
 Usage: talon_label_reads [options]
 
