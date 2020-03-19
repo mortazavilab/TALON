@@ -300,7 +300,9 @@ Options:
 # <a name="talon_cite"></a>Citing TALON
 Please cite our preprint when using TALON:  
 
-<add citation for new preprint>
+A technology-agnostic long-read analysis pipeline for transcriptome discovery and quantification
+Dana Wyman, Gabriela Balderrama-Gutierrez, Fairlie Reese, Shan Jiang, Sorena Rahmanian, Weihua Zeng, Brian Williams, Diane Trout, Whitney England, Sophie Chu, Robert C. Spitale, Andrea Tenner, Barbara Wold, Ali Mortazavi
+bioRxiv 672931; doi: https://doi.org/10.1101/672931
 
 # License
 MIT, see LICENSE
