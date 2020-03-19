@@ -14,7 +14,7 @@ works from mapped SAM files, allowing data from different sequencing platforms
 	* [Running TALON](#run_talon)
 * [Post-TALON utilities](#talon_utils)
 	* [Accessing abundance information](#talon_abundance)
-	*[Filtering transcript models](#talon_filter)
+	* [Filtering transcript models](#talon_filter)
 * [Archived documentation](#talon_archive)
 * [Citing TALON](#talon_cite)
 
