@@ -89,7 +89,7 @@ def get_args():
         help = "Dataset config file: dataset name, sample description, " + \
                "platform, sam file (comma-delimited)", type = str)
     parser.add_argument('--db', dest = 'database', metavar='FILE,', type = str,
-        help='TALON database. Created using build_talon_annotation.py')
+        help='TALON database. Created using talon_initialize_database')
     parser.add_argument('--build', dest = 'build', metavar='STRING,', type = str,
         help='Genome build (i.e. hg38) to use. Must be in the database.')
     parser.add_argument("--threads", "-t", dest = "threads",
