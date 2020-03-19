@@ -8,7 +8,7 @@ works from mapped SAM files, allowing data from different sequencing platforms
 
 ## Table of contents
 * [Installation](#installation)
-* [Running TALON](#how_to_run)
+* [TALON](#how_to_run)
   * [Flagging reads for internal priming](#label_reads)
   * [Initializing a TALON database](#db_init)
   * [Running TALON](#run_talon)
