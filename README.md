@@ -116,12 +116,12 @@ optional arguments:
 ```
 TALON generates two output files in the course of a run. The QC log (file with suffix 'QC.log') is useful for tracking why a particular read was or was not included in the TALON analysis. 
 <details>
-<summary>QC log format</summary>
+<summary>*QC log format*</summary>  
 Columns:  
-1. dataset	
-2. read_ID	
-3. passed_QC (1/0)	
-4. primary_mapped	(1/0)
+1. dataset  	
+2. read_ID  	
+3. passed_QC (1/0)  	
+4. primary_mapped (1/0)  
 5. read_length	
 6. fraction_aligned	
 7. Identity
