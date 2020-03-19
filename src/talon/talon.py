@@ -2420,9 +2420,7 @@ def main():
         datasets = []
         dataset_db_entries = []
         for d_name, description, platform in dset_metadata:
-            #run_info['dataset'] += 1
             d_id = dataset_counter.increment()
-            #d_id = run_info['dataset']
             datasets.append(d_name)
             dataset_db_entries.append((d_id, d_name, description, platform))
 
