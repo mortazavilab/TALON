@@ -6,7 +6,7 @@ in long-read transcriptome data sets. TALON is technology-agnostic in that it
 works from mapped SAM files, allowing data from different sequencing platforms
 (i.e. PacBio and Oxford Nanopore) to be analyzed side by side.
 
-# Table of contents
+## Table of contents
 * [Installation](#installation)
 * [Running TALON](#how_to_run)
 	* [Flagging reads for internal priming](#label_reads)
@@ -116,7 +116,8 @@ optional arguments:
 ```
 TALON generates two output files in the course of a run. The QC log (file with suffix 'QC.log') is useful for tracking why a particular read was or was not included in the TALON analysis. 
 <details>
-<summary>*QC log format*</summary>  
+<summary>QC log format</summary>  
+	
 Columns:  
 1. dataset  	
 2. read_ID  	
@@ -125,35 +126,38 @@ Columns:
 5. read_length	
 6. fraction_aligned	
 7. Identity
+
 </details>
 
 The second output file (suffix 'read_annot.tsv') appears at the very end of the run and contains a line for every read that was successfully annotated. 
 <details>
 <summary>Read annotation file format</summary>
+	
 Columns:  
-1. Name of individual read
-2. Name of dataset the read belongs to
-3. Name of genome build used in TALON run
-4. Chromosome
-5. Read start position (1-based). This refers to the 5' end start, so for reads on the - strand, this number will be larger than the read end (col 6).
-6. Read end position (1-based). This refers to the 3' end stop, so for reads on the - strand, this will be smaller than the read start (col 5).
-7. Strand (+ or -)
-8. Number of exons in the transcript
-9. Read length (soft-clipped bases not included)
-10. Gene ID (issued by TALON, integer)
-11. Transcript ID (issued by TALON, integer)
+1. Name of individual read  
+2. Name of dataset the read belongs to  
+3. Name of genome build used in TALON run  
+4. Chromosome  
+5. Read start position (1-based). This refers to the 5' end start, so for reads on the - strand, this number will be larger than the read end (col 6).  
+6. Read end position (1-based). This refers to the 3' end stop, so for reads on the - strand, this will be smaller than the read start (col 5).  
+7. Strand (+ or -)  
+8. Number of exons in the transcript  
+9. Read length (soft-clipped bases not included)  
+10. Gene ID (issued by TALON, integer)  
+11. Transcript ID (issued by TALON, integer)  
 12. Annotation gene ID 
 13. Annotation transcript ID 
-14. Annotation gene name (human-readable gene symbol)
-15. Annotation transcript name (human-readable transcript symbol)
-16. Gene novelty: one of "Known", "Antisense", or "Intergenic". 
-17. Transcript novelty: one of "Known", "ISM", "NIC", "NNC", "Antisense", "Intergenic", or "Genomic". 
-18. ISM subtype. If transcript novelty is not ISM, this field will be 'None'. If the transcript is an ISM, then this field can be 'Prefix', 'Suffix', 'Both', or 'None'.  
-19. fraction_As: From the talon_label_reads step. Records the fraction of As present in the n bases after the read alignment.
-20. Custom_label: If the user provided a custom SAM flag (lC:Z), the value will be shown here.  
-21. Allelic_label: If the user provided a custom SAM flag (lA:Z) to denote which allele a read came from, the value will be shown here.  	
-22. Start_support: If the user provided a custom SAM flag (tS:Z) to denote external evidence for the start site of a read, the value will be shown here. 
-23. End_support: If the user provided a custom SAM flag (tE:Z to denote external evidence for the end site of a read, the value will be shown here. 
+14. Annotation gene name (human-readable gene symbol)  
+15. Annotation transcript name (human-readable transcript symbol)  
+16. Gene novelty: one of "Known", "Antisense", or "Intergenic".   
+17. Transcript novelty: one of "Known", "ISM", "NIC", "NNC", "Antisense", "Intergenic", or "Genomic".   
+18. ISM subtype. If transcript novelty is not ISM, this field will be 'None'. If the transcript is an ISM, then this field can be 'Prefix', 'Suffix', 'Both', or 'None'.    
+19. fraction_As: From the talon_label_reads step. Records the fraction of As present in the n bases after the read alignment.  
+20. Custom_label: If the user provided a custom SAM flag (lC:Z), the value will be shown here.    
+21. Allelic_label: If the user provided a custom SAM flag (lA:Z) to denote which allele a read came from, the value will be shown here.    	
+22. Start_support: If the user provided a custom SAM flag (tS:Z) to denote external evidence for the start site of a read, the value will be shown here.   
+23. End_support: If the user provided a custom SAM flag (tE:Z to denote external evidence for the end site of a read, the value will be shown here.  
+
 </details>
 
 It is also possible to obtain this file from a TALON database at any time by running the *talon_fetch_reads* utility.
@@ -202,6 +206,7 @@ Options:
 
 <details>
 <summary>Abundance file format</summary>
+	
 The columns in the abundance file are as follows:
 1. TALON gene ID
 2. TALON transcript ID
@@ -216,6 +221,7 @@ The columns in the abundance file are as follows:
 11. ISM subtype (Both, Prefix, Suffix, None)  
 **---------------------------- Remaining columns -----------------------------**  
 One column per dataset, with a count indicating how many times the current transcript was observed in that dataset.
+
 </details>
 
 ## <a name="talon_filter"></a>Filtering your transcriptome for isoform-level analysis
