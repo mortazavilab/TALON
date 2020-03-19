@@ -25,7 +25,7 @@ with open("README.md", "r") as readme_file:
 
 setup(
     name="talon",
-    version="5.0-beta",
+    version="5.0",
     description="TALON is a Python program for identifying known and novel "
                 "genes/isoforms in long read transcriptome data sets",
     author="Dana Wyman",
@@ -49,7 +49,7 @@ setup(
     python_requires=">=3.6",
     install_requires=[
         "pandas",
-        "pysam==0.15.2",
+        "pysam==0.15.4",
         "pybedtools",
         "pyfaidx"
     ],
