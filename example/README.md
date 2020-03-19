@@ -6,6 +6,7 @@ This example was initially constructed for TALON v4.2. In the packaged versions 
 ## Tutorial
 Use the provided files to try TALON out on spike-in RNA variant (SIRV) reads sequenced on the PacBio Sequel II platform. 
 
+### Database initialization
 First, initialize the TALON database from the provided SIRV GTF annotation:
 
 ```
@@ -16,6 +17,7 @@ talon_initialize_database \
         --o example_talon
 ```
 
+### Internal priming check
 Before annotating the reads, we run talon_label_reads on each file in order to compute how likely each read is to be an internal priming product. Since this is a labeling step, no reads are removed- the script simply annotates each SAM read with the fraction of As present in the 20 bases immediately after the end of the alignment. This is why we need the reference genome fasta that the reads were aligned to. 
 ```
 mkdir -p labeled
@@ -35,6 +37,7 @@ talon_label_reads --f aligned_reads/SIRV_rep2.sam \
 ```
 Note: for bigger files, we use the --t option to specify the number of threads for parallelized processing. Here, it should not make a big difference.
 
+### Run TALON annotator
 Now, use the provided config file and the newly initialized database to annotate and quantify the reads. The database is modified in place.
 ```
 talon \
@@ -45,6 +48,7 @@ talon \
 ```
 The file 'example_talon_QC.log' contains a record of each input transcript along with the computed coverage and identity of the alignment. During a longer TALON run, you can count the number of lines in the file in order to track how many reads have been processed so far. You can also specify the number of threads to run in parallel with the --t option.
 
+## Abundance and filtering
 Now, we can explore the results of the run. To summarize how many of each transxcript were found (prior to any filtering), run:
 ```
 talon_summarize \
