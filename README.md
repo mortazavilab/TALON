@@ -8,10 +8,10 @@ works from mapped SAM files, allowing data from different sequencing platforms
 
 ## Table of contents
 * [Installation](#installation)
-* [TALON](#how_to_run)
+* [Running TALON](#how_to_run)
   * [Flagging reads for internal priming](#label_reads)
   * [Initializing a TALON database](#db_init)
-  * [Running TALON](#run_talon)
+  * [Annotating reads with TALON](#run_talon)
 * [Post-TALON utilities](#talon_utils)
   * [Accessing abundance information](#talon_abundance)
   * [Filtering transcript models](#talon_filter)
