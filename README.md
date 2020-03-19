@@ -83,7 +83,7 @@ Options:
 
 ## <a name="run_talon"></a>Running TALON
 Now that you've initialized your database and checked your reads for evidence of internal priming, you're ready to annotate them. The input database is modified in place to track and quantify transcripts in the provided dataset(s). In a talon run, each input SAM read is compared to known and previously observed novel transcript models on the basis of its splice junctions. This allows us to not only assign a novel gene or transcript identity where appropriate, but to track new transcript models and characterize how they differ from known ones. The types of novelty assigned are shown in this diagram.
-<img align="left" width="350" src="figs/novelty.png">
+<img align="left" width="425" src="figs/novelty.png">
 
 To run the **`talon`** annotator, create a comma-delimited configuration file with the following four columns: name, sample description, platform, sam file (full path). There should be one line for each dataset, and dataset names must be unique. If you decide later to add more datasets to an existing analysis, you can do so by creating a new config file for this data and running TALON again on the existing database.
 
