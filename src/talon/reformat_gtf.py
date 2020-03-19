@@ -88,7 +88,6 @@ def format_to_write(line):
 
 def main():
 
-	print('hello world')
 	args = get_args()
 	gtffile = args.gtf
 
@@ -130,7 +129,7 @@ def main():
 		for line in infile: 
 
 			# skip the dumb header lines
-			if '##' in line:
+			if line.startswith('#'):
 				continue
 
 			line = line.strip().split('\t')
