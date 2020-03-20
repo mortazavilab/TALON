@@ -11,8 +11,8 @@ works from mapped SAM files, allowing data from different sequencing platforms
 * [Running TALON](#how_to_run)
   * [Flagging reads for internal priming](#label_reads)
   * [Initializing a TALON database](#db_init)
-  * [Running TALON](#run_talon)
-* [Post-TALON utilities](#talon_utils)
+  * [Annotating reads with TALON](#run_talon)
+* [Working with the TALON results](#talon_utils)
   * [Accessing abundance information](#talon_abundance)
   * [Filtering transcript models](#talon_filter)
 * [Citing TALON](#talon_cite)
@@ -60,8 +60,6 @@ Options:
 ```
 
 ## <a name="db_init"></a>Initializing a TALON database
-For documentation of TALON versions 4.4.2 and lower, see https://github.com/mortazavilab/TALON/wiki/Archived-TALON-documentation.
-
 The first step in using TALON is to initialize a SQLite database from the GTF annotation of your choice (i.e. GENCODE). This step is done using **`talon_initialize_database`**, and only needs to be performed once for your analysis. Keep track of the build and annotation names you choose, as these will be used downstream when running TALON and its utilities.
 
 NOTE: The GTF file you use must contain genes, transcripts, and exons. If the file does not contain explicit gene and/or transcript entries, key tables of the database will be empty and you will experience problems in the downstream analysis. Please see our [GTF troubleshooting section](https://github.com/mortazavilab/TALON/wiki/Formatting-a-GTF-annotation-to-work-with-TALON) for help.
@@ -74,7 +72,7 @@ Options:
   --f                  GTF annotation file
   --g                  The name of the reference genome build that the annotation describes. Use a short and memorable name since you will need to specify the genome build when you run TALON later.
   --a                  The name of the annotation (for metadata purposes)
-  --l                  Minimum required transcript length (default = 300 bp)
+  --l                  Minimum required transcript length (default = 0 bp)
   --idprefix           Prefix for naming novel discoveries in eventual TALON runs (default = 'TALON')
   --5p                 Maximum allowable distance (bp) at the 5' end during annotation (default = 500 bp)
   --3p                 Maximum allowable distance (bp) at the 3' end during annotation (default = 300 bp)
@@ -230,7 +228,7 @@ Before quantifying your results on the isoform level, it is important to filter 
 The **`talon_filter_transcripts`** module generates a whitelist of transcripts that are either:  
 a) Known  
 b) Observed at least n times in each of k datasets.  
-The default value for n is 5 and the default for k is the total number of datasets you provide for filtering. In addition, the filter requires that all n reads used to support a novel transcript must not have evidence of internal priming (default: internal priming defined as > 0.5 fraction As).  
+The default value for n is 5 and the default for k is the total number of datasets you provide for filtering. In addition, the filter requires that all n reads used to support a novel transcript must not have evidence of internal priming (default: internal priming defined as > 0.5 fraction As). If you wish to disregard internal priming, set --maxFracA to 1 (not generally recommended).
 ```
 Usage: talon_filter_transcripts [options]
 
@@ -300,7 +298,9 @@ Options:
 # <a name="talon_cite"></a>Citing TALON
 Please cite our preprint when using TALON:  
 
-<add citation for new preprint>
+*A technology-agnostic long-read analysis pipeline for transcriptome discovery and quantification.*
+Dana Wyman, Gabriela Balderrama-Gutierrez, Fairlie Reese, Shan Jiang, Sorena Rahmanian, Weihua Zeng, Brian Williams, Diane Trout, Whitney England, Sophie Chu, Robert C. Spitale, Andrea J. Tenner, Barbara J. Wold, Ali Mortazavi
+bioRxiv 672931; doi: https://doi.org/10.1101/672931
 
 # License
 MIT, see LICENSE

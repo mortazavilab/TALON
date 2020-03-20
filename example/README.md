@@ -1,7 +1,7 @@
 # TALON example
 
 ## User note
-This example was initially constructed for TALON v4.2. In the packaged versions since, the commands have changed since TALON does not need to be run from a specific path. If you are using a TALON version below 4.3, please see the archived documentation [here](https://github.com/mortazavilab/TALON/wiki/Archived-TALON-Example-Instructions-(v4.2)) for the correct commands. In addition, the full tutorial as of v4.4.2 is available [here]().
+This example was initially constructed for TALON v4.2. In the packaged versions since, the commands have changed since TALON does not need to be run from a specific path. If you are using a TALON version below 4.3, please see the archived documentation [here](https://github.com/mortazavilab/TALON/wiki/Archived-TALON-Example-Instructions-(v4.2)) for the correct commands. In addition, the full tutorial as of v4.4.2 is available [here](https://github.com/mortazavilab/TALON/wiki/Archived-TALON-Example-Instructions-(v4.4)).
 
 ## Tutorial
 Use the provided files to try TALON out on spike-in RNA variant (SIRV) reads sequenced on the PacBio Sequel II platform. 
