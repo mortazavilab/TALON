@@ -12,7 +12,7 @@ works from mapped SAM files, allowing data from different sequencing platforms
   * [Flagging reads for internal priming](#label_reads)
   * [Initializing a TALON database](#db_init)
   * [Annotating reads with TALON](#run_talon)
-* [Post-TALON utilities](#talon_utils)
+* [Working with the TALON results](#talon_utils)
   * [Accessing abundance information](#talon_abundance)
   * [Filtering transcript models](#talon_filter)
 * [Citing TALON](#talon_cite)
