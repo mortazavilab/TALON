@@ -19,25 +19,25 @@ def getOptions():
     parser = OptionParser()
     parser.add_option("--f", dest = "gtf",
         help = "GTF annotation containing genes, transcripts, and edges.",
-        metavar = "FILE", type = "string")
+        metavar = "FILE", type = str)
     parser.add_option("--g", dest = "genome_build",
         help = "Name of genome build that the GTF file is based on (ie hg38)",
-        type = "string")
+        type = str)
     parser.add_option("--a", dest = "annot_name",
         help = "Name of supplied annotation (will be used to label data)",
-        type = "string")
+        type = str)
     parser.add_option("--l", dest = "min_length",
-        help = "Minimum required transcript length (default = 300 bp) ",
-        type = "int", default = 300)
+        help = "Minimum required transcript length (default = 0 bp) ",
+        type = int, default = 0)
     parser.add_option("--idprefix", dest = "idprefix",
         help = "Prefix for naming novel discoveries in eventual TALON runs",
-        type = "string", default = "TALON")
+        type = str, default = "TALON")
     parser.add_option("--5p", dest = "cutoff_5p",
         help = "Maximum allowable distance (bp) at the 5' end during annotation",
-        type = "int", default = "500")
+        type = int, default = "500")
     parser.add_option("--3p", dest = "cutoff_3p",
         help = "Maximum allowable distance (bp) at the 3' end during annotation",
-        type = "int", default = "300")
+        type = int, default = "300")
 
     parser.add_option("--o", dest = "outprefix",
         help = "Outprefix for the annotation files",
