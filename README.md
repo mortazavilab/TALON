@@ -72,7 +72,7 @@ Options:
   --f                  GTF annotation file
   --g                  The name of the reference genome build that the annotation describes. Use a short and memorable name since you will need to specify the genome build when you run TALON later.
   --a                  The name of the annotation (for metadata purposes)
-  --l                  Minimum required transcript length (default = 300 bp)
+  --l                  Minimum required transcript length (default = 0 bp)
   --idprefix           Prefix for naming novel discoveries in eventual TALON runs (default = 'TALON')
   --5p                 Maximum allowable distance (bp) at the 5' end during annotation (default = 500 bp)
   --3p                 Maximum allowable distance (bp) at the 3' end during annotation (default = 300 bp)
