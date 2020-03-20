@@ -60,8 +60,6 @@ Options:
 ```
 
 ## <a name="db_init"></a>Initializing a TALON database
-For documentation of TALON versions 4.4.2 and lower, see https://github.com/mortazavilab/TALON/wiki/Archived-TALON-documentation.
-
 The first step in using TALON is to initialize a SQLite database from the GTF annotation of your choice (i.e. GENCODE). This step is done using **`talon_initialize_database`**, and only needs to be performed once for your analysis. Keep track of the build and annotation names you choose, as these will be used downstream when running TALON and its utilities.
 
 NOTE: The GTF file you use must contain genes, transcripts, and exons. If the file does not contain explicit gene and/or transcript entries, key tables of the database will be empty and you will experience problems in the downstream analysis. Please see our [GTF troubleshooting section](https://github.com/mortazavilab/TALON/wiki/Formatting-a-GTF-annotation-to-work-with-TALON) for help.
