@@ -249,7 +249,8 @@ Options:
                         Maximum fraction of As to allow in the window located
                         immediately after any read assigned to a novel
                         transcript (helps to filter out internal priming
-                        artifacts). Default = 0.5
+                        artifacts). Default = 0.5. Use 1 if you prefer to not
+                        filter out internal priming.
   --minCount=MIN_COUNT  Number of minimum occurrences required for a novel
                         transcript PER dataset. Default = 5
   --minDatasets=MIN_DATASETS
