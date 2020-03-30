@@ -201,6 +201,8 @@ Options:
   --o=FILE              Prefix for output file
 ```
 
+Please note to run this utility, you must provide genome build (-b) and annotation (-a) names that match those provided for the talon_initialize_database, otherwise it will not run.
+
 <details>
 <summary>Abundance file format</summary>
 	
@@ -294,6 +296,7 @@ Options:
   --o=FILE              Prefix for output GTF
 ```
 
+Please note to run this utility, you must provide genome build (-b) and annotation (-a) names that match those provided for the talon_initialize_database, otherwise it will not run.
 
 # <a name="talon_cite"></a>Citing TALON
 Please cite our preprint when using TALON:  
