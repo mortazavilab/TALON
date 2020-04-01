@@ -88,7 +88,32 @@ def fetch_reads_in_datasets_fracA_cutoff(database, datasets, max_frac_A):
             - fraction_As <= max_frac_A
         Reads with fraction_As value of None will not be included. 
         If datasets == None, then all datasets are permitted"""
-    
+
+    # convert non-iterable datasets to an iterable
+    if datasets == None:
+       with sqlite3.connect(database) as conn:
+        query = """SELECT dataset_name
+                       FROM dataset"""           
+        iter_datasets = pd.read_sql_query(query, conn).dataset_name.tolist()
+    else:
+      iter_datasets = datasets
+
+    # first check if we have non-null fraction_As columns at all
+    # (one dataset at a time)
+    for dataset in iter_datasets:
+      with sqlite3.connect(database) as conn:
+          query = """SELECT read_name, gene_ID, transcript_ID, dataset, fraction_As
+                         FROM observed WHERE dataset='{}' LIMIT 0, 10""".format(dataset)
+
+          data = pd.read_sql_query(query, conn)
+          print(data)
+          nans = all(data.fraction_As.isna().tolist())
+          print(nans)
+
+          if nans and max_frac_A != 1:
+            print("Reads in dataset {} appear to be unlabelled. "
+              "Only known transcripts will pass the filter.".format(dataset))
+
     with sqlite3.connect(database) as conn:
         query = """SELECT read_name, gene_ID, transcript_ID, dataset, fraction_As
                        FROM observed 
@@ -99,11 +124,9 @@ def fetch_reads_in_datasets_fracA_cutoff(database, datasets, max_frac_A):
 
         data = pd.read_sql_query(query, conn)
 
-    # TODO: Check number of reads in each dataset. If the number is zero,
-    # print a warning to the user because this can result from all of the 
-    # fraction_As being None
-    #if len(data) == 0:
-    #    warnings.warn
+    # warn the user if no novel models passed filtering
+    if len(data.index) == 0:
+      print('No reads passed maxFracA cutoff. Is this expected?')
 
     return data
 
@@ -134,6 +157,21 @@ def check_annot_validity(annot, database):
         raise ValueError(message)
 
     return
+
+def check_db_version(database):
+    """ Make sure the user is using a v5 database """
+    conn = sqlite3.connect(database)
+    cursor = conn.cursor()
+
+    with sqlite3.connect(database) as conn:
+        query = """SELECT value
+                       FROM run_info
+                       WHERE item='schema_version'"""
+        ver = pd.read_sql_query(query, conn)
+
+        if ver.empty:
+          message = "Database version is not compatible with v5.0 filtering."
+          raise ValueError(message)
 
 def parse_datasets(dataset_option, database):
     """ Parses dataset names from command line. Valid forms of input:
@@ -264,8 +302,10 @@ def filter_talon_transcripts(database, annot, datasets, options):
     dataset_filtered = filter_on_n_datasets(filtered_counts, options.min_datasets)
 
     # Join the known transcripts with the filtered ones and return
-    final_filtered = pd.concat([known[["gene_ID", "transcript_ID"]],
-                     dataset_filtered[["gene_ID", "transcript_ID"]]]).drop_duplicates()
+    if len(dataset_filtered.index) != 0:
+      final_filtered = pd.concat([known[["gene_ID", "transcript_ID"]],
+                       dataset_filtered[["gene_ID", "transcript_ID"]]]).drop_duplicates()
+    else: final_filtered = known
 
     return final_filtered
 
@@ -277,6 +317,9 @@ def main():
     # Make sure that the input database exists!
     if not Path(database).exists():
         raise ValueError("Database file '%s' does not exist!" % database)    
+
+    # Make sure the database is of the v5 schema
+    check_db_version(database)
 
     # Make sure that the provided annotation name is valid
     check_annot_validity(annot, database)
