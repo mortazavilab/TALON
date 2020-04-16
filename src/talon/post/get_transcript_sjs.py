@@ -171,7 +171,7 @@ def create_dfs_gtf(gtf_file):
 		for line in gtf:
 
 			# ignore header lines
-			if '##' in line:
+			if line.startswith('#'):
 				continue
 
 			# split each entry
