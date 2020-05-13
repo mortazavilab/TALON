@@ -9,8 +9,12 @@ def test_compute_alignment_coverage():
     cigar = "5S90M5H"
     assert tu.compute_alignment_coverage(cigar) == 0.9
 
+    cigar = "5S90=5H"
+    assert tu.compute_alignment_coverage(cigar) == 0.9
+
+
 def test_compute_coverage_with_introns():
     """ Make sure that intron portion of alignment is not being counted """
 
-    cigar = "5S45M1000N45M5H"
+    cigar = "5S45M1000N45=5H"
     assert tu.compute_alignment_coverage(cigar) == 0.9

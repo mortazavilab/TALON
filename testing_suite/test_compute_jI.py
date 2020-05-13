@@ -13,6 +13,6 @@ class TestComputejI(object):
                    "1091471,1091566,1091990,1092104,1116059"
         start = 1081827
         cigar = "2557M97N26M1371N135M1126N66M297N96M2755N" + \
-                "76M1043N94M425N113M23956N38M"
+                "76M1043N94M425N113=23956N38="
         assert tu.compute_jI(start, cigar) == jI
 
