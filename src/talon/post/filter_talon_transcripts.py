@@ -106,9 +106,7 @@ def fetch_reads_in_datasets_fracA_cutoff(database, datasets, max_frac_A):
                          FROM observed WHERE dataset='{}' LIMIT 0, 10""".format(dataset)
 
           data = pd.read_sql_query(query, conn)
-          print(data)
           nans = all(data.fraction_As.isna().tolist())
-          print(nans)
 
           if nans and max_frac_A != 1:
             print("Reads in dataset {} appear to be unlabelled. "
