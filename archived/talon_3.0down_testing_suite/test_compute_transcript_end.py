@@ -13,7 +13,7 @@ class TestComputeTranscriptEnd(object):
         """
         start = 1081827
         cigar = "2557M97N26M1371N135M1126N66M297N96M2755N" + \
-                "76M1043N94M425N113M23956N38M"
+                "76=1043N94=425N113=23956N38="
         assert compute_transcript_end(start, cigar) == 1116097
 
     def test_deletion(self):
@@ -34,7 +34,7 @@ class TestComputeTranscriptEnd(object):
         start = 167936402
         cigar = "136S114M15291N55M14767N93M8108N186M12479N114M3595N136M" + \
                 "1886N215M9041N94M1294N120M543N261M33577N118M4536N116M" + \
-                "1444N87M228N328M18393N139M1830N157M630N89M1892N106M6907N420M"
+                "1444N87=228N328=18393N139=1830N157=630N89=1892N106=6907N420="
         
         assert compute_transcript_end(start, cigar) == 168075790
 
@@ -44,6 +44,6 @@ class TestComputeTranscriptEnd(object):
             minus strand and contains soft clipping at the end"""
 
         start = 152673671
-        cigar = "36M2698N375M671N25M1580N54M242N121M1753N111M9625N6M45I3581N81M21372N133M1810S"
+        cigar = "36M2698N375M671N25M1580N54M242N121M1753N111=9625N6=45I3581N81=21372N133=1810S"
 
         assert compute_transcript_end(start, cigar) == 152716134 

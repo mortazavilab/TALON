@@ -108,7 +108,7 @@ def split_cigar(cigar):
         the number of bases that each operation applies to. """
 
     alignTypes = re.sub('[0-9]', " ", cigar).split()
-    counts = re.sub('[A-Z]', " ", cigar).split()
+    counts = re.sub('[=A-Z]', " ", cigar).split()
     counts = [int(i) for i in counts]
 
     return alignTypes, counts
@@ -130,7 +130,7 @@ def compute_transcript_end(start, cigar):
 
     ops, counts = split_cigar(cigar)
     for op,ct in zip(ops, counts):
-        if op in ["H", "M", "N", "D"]:
+        if op in ["=", "H", "M", "N", "D"]:
             end += ct
 
     return end - 1
