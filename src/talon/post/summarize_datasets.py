@@ -7,7 +7,7 @@ from .. import query_utils as qutils
 def get_args():
     """ Fetches the arguments for the program """
 
-    program_desc = """Generates a tab-delimited file of gene and transcript 
+    program_desc = """Generates a tab-delimited file of gene and transcript
                       counts for each dataset in the database (broken down
                       by category)."""
     parser = argparse.ArgumentParser(description=program_desc)
@@ -15,10 +15,10 @@ def get_args():
         help='TALON database')
     parser.add_argument('--groups', dest = 'groups', metavar='FILE,', type = str,
         help='Optional: file of comma-delimited dataset groups to process together', default = None)
-    parser.add_argument("--verbose", 
+    parser.add_argument("--verbose",
                         help = "Verbose mode: print out the counts in terminal",
                         action="store_true")
-    parser.add_argument("--o", dest = "outprefix", 
+    parser.add_argument("--o", dest = "outprefix",
                         help = "Prefix for output file", type = str)
 
     args = parser.parse_args()
@@ -43,18 +43,22 @@ def write_counts_file(cursor, outprefix, datasets, verbose = False):
             - Number of genomic transcripts detected
     """
     o = open(outprefix + "_talon_summary.tsv", 'w')
+
+    d = dict()
     columns = [ "dataset", "reads_annotated", "known_genes", "antisense_genes",
                 "other_novel_genes", "known_transcripts", "novel_transcripts",
                  "ISMs", "prefix_ISMs", "suffix_ISMs", "NICs", "NNCs",
                 "antisense_transcripts", "genomic_transcripts" ]
+
     o.write("\t".join(columns) + "\n")
 
     # Get dataset names
     if datasets == None:
         cursor.execute(""" SELECT dataset_name FROM dataset """)
         datasets = [ str(x[0]) for x in cursor.fetchall() ]
-    
+
     for dataset in datasets:
+
         # Get number of reads in the dataset
         reads = qutils.count_observed_reads(cursor, dataset)
 
@@ -94,8 +98,8 @@ def write_counts_file(cursor, outprefix, datasets, verbose = False):
         genomic_transcripts = len(qutils.fetch_genomic_transcripts(cursor, dataset))
 
         outputs = [ dataset, reads, known_genes, antisense_genes,
-                intergenic_genes, known_transcripts, ISMs, prefix_ISMs,
-                suffix_ISMs, NICs, NNCs, antisense_transcripts, 
+                intergenic_genes, known_transcripts, novel_transcripts, ISMs, prefix_ISMs,
+                suffix_ISMs, NICs, NNCs, antisense_transcripts,
                 genomic_transcripts ]
 
         if verbose == True:
@@ -128,7 +132,7 @@ def process_groups(group_file):
         for line in f:
             line = line.strip()
             datasets.append(line.split(","))
-         
+
     return datasets
 
 def main():
@@ -149,9 +153,9 @@ def main():
         write_counts_file(cursor, options.outprefix, datasets, options.verbose)
 
     else:
-        write_counts_file(cursor, options.outprefix, None, options.verbose) 
+        write_counts_file(cursor, options.outprefix, None, options.verbose)
     conn.close()
-    
+
 
 if __name__ == '__main__':
     main()
