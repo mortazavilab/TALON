@@ -14,8 +14,12 @@ def check_read_quality(sam_record: pysam.AlignedSegment, run_info):
     cigar = sam_record.cigarstring
     seq = sam_record.query
     read_length = sam_record.query_length
-    dataset = sam_record.get_tag('RG')
- 
+
+    if not run_info.use_cb_tag:
+        dataset = sam_record.get_tag('RG')
+    elif run_info.use_cb_tag:
+        dataset = sam_record.get_tag('CB')
+
     # Only use uniquely mapped transcripts
     if flag not in [0, 16]:
         return [dataset, read_ID, 0, 0, read_length, "NA", "NA"]
@@ -137,7 +141,7 @@ def compute_transcript_end(start, cigar):
 
 def compute_jI(start, cigar):
     """ If the input sam file doesn't have the custom STARlong-derived jI tag,
-        we need to compute it. This is done by stepping through the CIGAR 
+        we need to compute it. This is done by stepping through the CIGAR
         string, where introns are represented by the N operation.
 
         start: The start position of the transcript with respect to the

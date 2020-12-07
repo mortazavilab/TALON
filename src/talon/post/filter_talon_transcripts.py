@@ -112,15 +112,26 @@ def fetch_reads_in_datasets_fracA_cutoff(database, datasets, max_frac_A):
             print("Reads in dataset {} appear to be unlabelled. "
               "Only known transcripts will pass the filter.".format(dataset))
 
-    with sqlite3.connect(database) as conn:
-        query = """SELECT read_name, gene_ID, transcript_ID, dataset, fraction_As
-                       FROM observed 
-                       WHERE fraction_As <= %f""" % (max_frac_A)
-        if datasets != None:
-            datasets = qutils.format_for_IN(datasets)
-            query += " AND dataset IN " + datasets
+    if max_frac_A != 1:
+      with sqlite3.connect(database) as conn:
+          query = """SELECT read_name, gene_ID, transcript_ID, dataset, fraction_As
+                         FROM observed 
+                         WHERE fraction_As <= %f""" % (max_frac_A)
+          if datasets != None:
+              datasets = qutils.format_for_IN(datasets)
+              query += " AND dataset IN " + datasets
 
-        data = pd.read_sql_query(query, conn)
+          data = pd.read_sql_query(query, conn)
+
+    else: 
+      with sqlite3.connect(database) as conn:
+          query = """SELECT read_name, gene_ID, transcript_ID, dataset, fraction_As
+                         FROM observed"""
+          if datasets != None:
+              datasets = qutils.format_for_IN(datasets)
+              query += " AND dataset IN " + datasets
+
+          data = pd.read_sql_query(query, conn)
 
     # warn the user if no novel models passed filtering
     if len(data.index) == 0:
