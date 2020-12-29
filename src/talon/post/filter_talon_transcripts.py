@@ -129,7 +129,7 @@ def fetch_reads_in_datasets_fracA_cutoff(database, datasets, max_frac_A):
                          FROM observed"""
           if datasets != None:
               datasets = qutils.format_for_IN(datasets)
-              query += " AND dataset IN " + datasets
+              query += " WHERE dataset IN " + datasets
 
           data = pd.read_sql_query(query, conn)
 
