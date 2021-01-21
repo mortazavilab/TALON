@@ -57,6 +57,11 @@ def getOptions():
                           "behavior is to filter out genomic transcripts "
                           "since they are unlikely to be real novel isoforms."),
                    default = False)
+    parser.add_option("--excludeISM", dest = "exclude_ISMs", action='store_true',
+                  help = ("If this option is set, transcripts from the ISM "
+                          "novelty category will be excluded from the output. "
+                          "Default behavior is to include those that pass other "
+                          "filtering thresholds."))
     parser.add_option("--o", dest = "outfile", help = "Outfile name",
         metavar = "FILE", type = "string")
 
@@ -276,7 +281,8 @@ def filter_talon_transcripts(database, annot, datasets, options):
         are known relative to. Can be tuned with the following options:
         - options.max_frac_A: maximum allowable fraction of As recorded for 
                               region after the read (0-1)
-        - options.allow_genomic: Removes genomic transcripts if set to True
+        - options.allow_genomic: Removes genomic transcripts if set to False
+        - options.exlude_ISMs: Removes ISM transcripts if set to True
         - options.min_count: Transcripts must appear at least this many times
                              to count as present in a dataset
         - options.min_datasets: After the min_count threshold has been 
@@ -301,6 +307,10 @@ def filter_talon_transcripts(database, annot, datasets, options):
     # Drop genomic transcripts if desired
     if options.allow_genomic == False:
         reads = reads.loc[reads.transcript_novelty != 'Genomic']
+
+    # Drop ISMs if desired
+    if options.exclude_ISMs == True:
+        reads = reads.loc[reads.transcript_novelty != 'ISM']
 
     # Perform counts-based filtering    
     filtered_counts = filter_on_min_count(reads, options.min_count)
