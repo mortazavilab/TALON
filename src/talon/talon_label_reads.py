@@ -130,7 +130,7 @@ def compute_frac_as_after_transcript(chrom=str, transcript_end=int, strand=str,
     return compute_frac_As(range_seq)
 
   
-def split_reads_by_chrom(sam_file, tmp_dir = "tmp_label_reads", n_threads = 1):
+def split_reads_by_chrom(sam_file, tmp_dir = "/dev/shm/tmp_label_reads", n_threads = 1):
     """ Reads a SAM/BAM file and splits the reads into one file per chromosome.
         Returns a list of the resulting filenames."""
 
