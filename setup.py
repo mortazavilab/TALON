@@ -65,7 +65,8 @@ setup(
             'talon_generate_report=talon.post.generate_talon_report:main',
             'talon_summarize=talon.post.summarize_datasets:main',
             'talon_fetch_reads=talon.post.get_read_annotations:main',
-            'talon_get_sjs=talon.post.get_transcript_sjs:main'
+            'talon_get_sjs=talon.post.get_transcript_sjs:main',
+            'talon_longest_end=talon.post.call_longest_ends:main'
         ]
     }
 )
