@@ -33,24 +33,19 @@ def get_args():
 
     return args
 
-# annot: TALON read annotation file
+# df: TALON read annotation dataframe
 # how: 'tes' or 'tss' for calling ends or starts respectively
 # novelty: 'all' or 'novel' based on which transcript models
 #          you want to modify the ends of
 # datasets: string file path of file with datasets to use when
 #           calling longest ends from reads
-def get_longest_ends(annot, how='tes', novelty='novel', datasets='a'):
-    df = pd.read_csv(annot, sep='\t')
-
-    if datasets != 'all':
-        dataset_df = pd.read_csv(datasets, header=None, names=['dataset'])
-        dataset_list = dataset_df['dataset'].tolist()
-        for d in dataset_list:
-            if d not in df.dataset.unique().tolist():
-                raise ValueError("Dataset name {} not found in read_annot".format(d))
+def get_longest_ends(df, how='tes', novelty='novel', datasets='all'):
 
     if novelty == 'novel':
         df = df.loc[df.transcript_novelty != 'Known']
+
+    if datasets != 'all':
+        df = df.loc[df.dataset.isin(datasets)]
 
     fwd = df.loc[df.strand == '+']
     rev = df.loc[df.strand == '-']
@@ -76,6 +71,8 @@ def get_longest_ends(annot, how='tes', novelty='novel', datasets='a'):
 
     # concat fwd and rev
     df = pd.concat([fwd, rev])
+
+    df = df.sort_values(by='transcript_ID', ascending='True')
 
     return df
 
@@ -230,6 +227,17 @@ def replace_gtf_end_coords(gtf, ends, opref, how='tes', test=False, verbose=Fals
     gtf_df.to_csv(fname, sep='\t', header=None, index=False, quoting=csv.QUOTE_NONE)
     return gtf_df, fname
 
+# return a list of datasets from read_annot file
+# subset by a list of datasets given from a datasets file
+def get_datasets_from_read_annot(df, datasets='all'):
+    if datasets != 'all':
+        dataset_df = pd.read_csv(datasets, header=None, names=['dataset'])
+        dataset_list = dataset_df['dataset'].tolist()
+        for d in dataset_list:
+            if d not in df.dataset.unique().tolist():
+                raise ValueError("Dataset name {} not found in read_annot".format(d))
+
+
 def main():
 
     args = get_args()
@@ -241,20 +249,32 @@ def main():
     verbose = args.verbose
     datasets = args.datasets_file
 
+    # read in read_annot file
+    try:
+        df = pd.read_csv(annot, sep='\t')
+    except:
+        raise Error('Problem loading read annot file {}'.format(annot))
+
+    # make sure datasets are valid
+    if datasets != 'all':
+        dataset_df = pd.read_csv(datasets, header=None, names=['dataset'])
+        dataset_list = dataset_df['dataset'].tolist()
+    datasets = get_datasets_from_read_annot(df, dataset_list)
+
     # first, call ends from the read annot file
     if mode == 'both':
 
         # tss first
-        ends = get_longest_ends(annot, how='tss', novelty=novelty, datasets=datasets)
-        df, fname = replace_gtf_end_coords(gtf, ends, oprefix,
+        ends = get_longest_ends(df, how='tss', novelty=novelty, datasets=datasets)
+        gtf_df, fname = replace_gtf_end_coords(gtf, ends, oprefix,
             how='tss', verbose=verbose)
 
         # tes
-        ends = get_longest_ends(annot, how='tes', novelty=novelty, datasets=datasets)
-        df, fname = replace_gtf_end_coords(fname, ends, oprefix,
+        ends = get_longest_ends(df, how='tes', novelty=novelty, datasets=datasets)
+        gtf_df, fname = replace_gtf_end_coords(fname, ends, oprefix,
             how='tes', verbose=verbose)
 
     else:
-        ends = get_longest_ends(annot, how=mode, novelty=novelty, datasets=datasets)
-        df, fname = replace_gtf_end_coords(gtf, ends, oprefix,
+        ends = get_longest_ends(df, how=mode, novelty=novelty, datasets=datasets)
+        gtf_df, fname = replace_gtf_end_coords(gtf, ends, oprefix,
             how=mode, verbose=verbose)
