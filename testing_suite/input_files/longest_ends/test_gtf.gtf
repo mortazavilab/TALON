@@ -1,0 +1,23 @@
+gene_id	transcript_id	start	stop	entry_type	strand	chr	source	frame	fields	score
+g_1		0	9	gene	+
+g_1	t_1	0	9	transcript	+
+g_1	t_1	0	2	exon	+
+g_1	t_1	3	9	exon	+
+g_2		11	16	gene	+
+g_2	t_2	11	13	transcript	+
+g_2	t_2	11	12	exon	+
+g_2	t_2	12	13	exon	+
+g_2	t_2.5	11	16	transcript	+
+g_2	t_2.5	11	13	exon	+
+g_2	t_2.5	14	16	exon	+
+g_3		20	25	gene	-
+g_3	t_3	20	25	transcript	-
+g_3	t_3	24	25	exon	-
+g_3	t_3	20	23	exon	-
+g_4		24	34	gene	-
+g_4	t_4	26	34	transcript	-
+g_4	t_4	30	34	exon 	-
+g_4	t_4	26	29	exon	-
+g_4	t_4.5	24	30	transcript	-
+g_4	t_4.5	26	30	exon 	-
+g_4	t_4.5	24	25	exon	-

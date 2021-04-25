@@ -85,19 +85,7 @@ def get_longest_ends(df, how='tes', novelty='novel', datasets='all'):
 # opref: output file prefix
 # verbose: display processing progress
 # test: print out dataframe before and after editing
-def replace_gtf_end_coords(gtf, ends, opref, how='tes', test=False, verbose=False):
-
-    # read preexisting GTF and
-    gtf_df = pd.read_csv(gtf, sep='\t', header=None, \
-                names=['chr', 'source', 'entry_type', \
-                       'start', 'stop', 'score', 'strand',\
-                       'frame', 'fields'], comment='#')
-
-    # get relevant values from fields
-    gtf_df['transcript_id'] = np.nan
-    gtf_df.loc[gtf_df.entry_type!='gene', 'transcript_id'] = gtf_df.loc[gtf_df.entry_type!='gene'].fields.str.split(pat='talon_transcript "', n=1, expand=True)[1]
-    gtf_df.loc[gtf_df.entry_type!='gene', 'transcript_id'] = gtf_df.loc[gtf_df.entry_type!='gene'].transcript_id.str.split(pat='"', n=1, expand=True)[0]
-
+def replace_gtf_end_coords(gtf_df, ends, how='tes', test=False, verbose=False):
 
     if how == 'tes':
         ends.columns = ['transcript_id', 'tes']
@@ -168,13 +156,14 @@ def replace_gtf_end_coords(gtf, ends, opref, how='tes', test=False, verbose=Fals
                 gtf_df.loc[i, 'stop'] = gtf_df.loc[i, 'tss']
 
     # now fix gene coordinates
-    gtf_df['gene_id'] = gtf_df.loc[gtf_df.entry_type!='gene'].fields.str.split(pat='talon_gene "', n=1, expand=True)[1]
-    gtf_df['gene_id'] = gtf_df.loc[gtf_df.entry_type!='gene'].gene_id.str.split(pat='"', n=1, expand=True)[0]
 
     # tes
     if how == 'tes':
         # fwd: replace "stop" of the gene with the maximum of the "stops"
-        gene_ind = gtf_df.loc[(gtf_df.strand == '+')&(gtf_df.entry_type=='gene')&(gtf_df.tes.notnull())].index.tolist()
+        # gene_ind = gtf_df.loc[(gtf_df.strand == '+')&(gtf_df.entry_type=='gene')&(gtf_df.tes.notnull())].index.tolist()
+        # gene_ind = gtf_df.loc[(gtf_df.strand == '+')&(gtf_df.entry_type=='gene')].index.tolist()
+        genes = gtf_df.loc[(gtf_df.strand == '+')&(gtf_df.entry_type=='transcript')&(gtf_df.tes.notnull())].gene_id.unique().tolist()
+        gene_ind = gtf_df.loc[(gtf_df.gene_id.isin(genes)&(gtf_df.entry_type=='gene'))].index.tolist()
         if gene_ind:
             fwd = gtf_df.loc[(gtf_df.strand == '+')&(gtf_df.entry_type=='transcript')]
             if test:
@@ -184,7 +173,9 @@ def replace_gtf_end_coords(gtf, ends, opref, how='tes', test=False, verbose=Fals
                 fwd.loc[fwd.gene_id==x.gene_id, 'stop'].max(), axis=1)
 
         # rev: replace "start" of the gene with the minimum of the "starts"
-        gene_ind = gtf_df.loc[(gtf_df.strand == '-')&(gtf_df.entry_type=='gene')&(gtf_df.tes.notnull())].index.tolist()
+        # gene_ind = gtf_df.loc[(gtf_df.strand == '-')&(gtf_df.entry_type=='gene')&(gtf_df.tes.notnull())].index.tolist()
+        genes = gtf_df.loc[(gtf_df.strand == '-')&(gtf_df.entry_type=='transcript')&(gtf_df.tes.notnull())].gene_id.unique().tolist()
+        gene_ind = gtf_df.loc[(gtf_df.gene_id.isin(genes)&(gtf_df.entry_type=='gene'))].index.tolist()
         if gene_ind:
             rev = gtf_df.loc[(gtf_df.strand == '-')&(gtf_df.entry_type=='transcript')]
             if test:
@@ -196,36 +187,40 @@ def replace_gtf_end_coords(gtf, ends, opref, how='tes', test=False, verbose=Fals
     # tss
     elif how == 'tss':
         # fwd: replace "start" of the gene with the minimum of the "starts"
-        gene_ind = gtf_df.loc[(gtf_df.strand == '+')&(gtf_df.entry_type=='gene')&(gtf_df.tss.notnull())].index.tolist()
+        # gene_ind = gtf_df.loc[(gtf_df.strand == '+')&(gtf_df.entry_type=='gene')&(gtf_df.tss.notnull())].index.tolist()
+        genes = gtf_df.loc[(gtf_df.strand == '+')&(gtf_df.entry_type=='transcript')&(gtf_df.tss.notnull())].gene_id.unique().tolist()
+        gene_ind = gtf_df.loc[(gtf_df.gene_id.isin(genes)&(gtf_df.entry_type=='gene'))].index.tolist()
         if gene_ind:
             fwd = gtf_df.loc[(gtf_df.strand == '+')&(gtf_df.entry_type=='transcript')]
             gtf_df.loc[gene_ind, 'start'] = gtf_df.loc[gene_ind].apply(lambda x: \
                 fwd.loc[fwd.gene_id==x.gene_id, 'start'].min(), axis=1)
 
         # rev: replace "stop" of the gene with the maximum of the "stops"
-        gene_ind = gtf_df.loc[(gtf_df.strand == '-')&(gtf_df.entry_type=='gene')&(gtf_df.tss.notnull())].index.tolist()
+        # gene_ind = gtf_df.loc[(gtf_df.strand == '-')&(gtf_df.entry_type=='gene')&(gtf_df.tss.notnull())].index.tolist()
+        genes = gtf_df.loc[(gtf_df.strand == '-')&(gtf_df.entry_type=='transcript')&(gtf_df.tss.notnull())].gene_id.unique().tolist()
+        gene_ind = gtf_df.loc[(gtf_df.gene_id.isin(genes)&(gtf_df.entry_type=='gene'))].index.tolist()
         if gene_ind:
             rev = gtf_df.loc[(gtf_df.strand == '-')&(gtf_df.entry_type=='transcript')]
             gtf_df.loc[gene_ind, 'stop'] = gtf_df.loc[gene_ind].apply(lambda x: \
-                rev.loc[rev.gene_ind==x.gene_ind, 'stop'].max(), axis=1)
+                rev.loc[rev.gene_id==x.gene_id, 'stop'].max(), axis=1)
 
     if test:
         print()
         print('After editing')
         print(gtf_df[['transcript_id', 'entry_type', 'strand', 'start', 'stop', how]])
 
-    cols=['chr', 'source', 'entry_type', \
-          'start', 'stop', 'score', 'strand',\
-           'frame', 'fields']
-    gtf_df = gtf_df[cols]
+    # cols=['chr', 'source', 'entry_type', \
+    #       'start', 'stop', 'score', 'strand',\
+    #        'frame', 'fields']
+    # gtf_df = gtf_df[cols]
     gtf_df['start'] = gtf_df['start'].astype('int')
     gtf_df['stop'] = gtf_df['stop'].astype('int')
-    if test:
-        fname = '{}_revised_{}_test.gtf'.format(opref, how)
-    else:
-        fname = '{}_revised_{}.gtf'.format(opref, how)
-    gtf_df.to_csv(fname, sep='\t', header=None, index=False, quoting=csv.QUOTE_NONE)
-    return gtf_df, fname
+    # if test:
+    #     fname = '{}_revised_{}_test.gtf'.format(opref, how)
+    # else:
+    #     fname = '{}_revised_{}.gtf'.format(opref, how)
+    # gtf_df.to_csv(fname, sep='\t', header=None, index=False, quoting=csv.QUOTE_NONE)
+    return gtf_df
 
 # return a list of datasets from read_annot file
 # subset by a list of datasets given from a datasets file
@@ -245,7 +240,7 @@ def main():
     annot = args.annot
     mode = args.mode
     novelty = args.novelty
-    oprefix = args.outprefix
+    opref = args.outprefix
     verbose = args.verbose
     datasets = args.datasets_file
 
@@ -261,20 +256,40 @@ def main():
         dataset_list = dataset_df['dataset'].tolist()
     datasets = get_datasets_from_read_annot(df, dataset_list)
 
+    # read gtf
+    gtf_df = pd.read_csv(gtf, sep='\t', header=None, \
+                names=['chr', 'source', 'entry_type', \
+                       'start', 'stop', 'score', 'strand',\
+                       'frame', 'fields'], comment='#')
+
+    # get relevant values from fields
+    gtf_df['transcript_id'] = np.nan
+    gtf_df.loc[gtf_df.entry_type!='gene', 'transcript_id'] = gtf_df.loc[gtf_df.entry_type!='gene'].fields.str.split(pat='talon_transcript "', n=1, expand=True)[1]
+    gtf_df.loc[gtf_df.entry_type!='gene', 'transcript_id'] = gtf_df.loc[gtf_df.entry_type!='gene'].transcript_id.str.split(pat='"', n=1, expand=True)[0]
+    gtf_df['gene_id'] = gtf_df.loc[gtf_df.entry_type!='gene'].fields.str.split(pat='talon_gene "', n=1, expand=True)[1]
+    gtf_df['gene_id'] = gtf_df.loc[gtf_df.entry_type!='gene'].gene_id.str.split(pat='"', n=1, expand=True)[0]
+
     # first, call ends from the read annot file
     if mode == 'both':
 
         # tss first
         ends = get_longest_ends(df, how='tss', novelty=novelty, datasets=datasets)
-        gtf_df, fname = replace_gtf_end_coords(gtf, ends, oprefix,
+        gtf_df = replace_gtf_end_coords(gtf_df, ends, opref,
             how='tss', verbose=verbose)
 
         # tes
         ends = get_longest_ends(df, how='tes', novelty=novelty, datasets=datasets)
-        gtf_df, fname = replace_gtf_end_coords(fname, ends, oprefix,
+        gtf_df = replace_gtf_end_coords(gtf_df, ends, opref,
             how='tes', verbose=verbose)
 
     else:
         ends = get_longest_ends(df, how=mode, novelty=novelty, datasets=datasets)
-        gtf_df, fname = replace_gtf_end_coords(gtf, ends, oprefix,
+        gtf_df = replace_gtf_end_coords(gtf_df, ends, opref,
             how=mode, verbose=verbose)
+
+    cols=['chr', 'source', 'entry_type', \
+          'start', 'stop', 'score', 'strand',\
+           'frame', 'fields']
+    gtf_df = gtf_df[cols]
+    fname = '{}_revised_{}.gtf'.format(opref, how)
+    gtf_df.to_csv(fname, sep='\t', header=None, index=False, quoting=csv.QUOTE_NONE)
