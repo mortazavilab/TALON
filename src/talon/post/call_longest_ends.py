@@ -1,4 +1,5 @@
 import pandas as pd
+pd.options.mode.chained_assignment = None 
 import argparse
 import numpy as np
 import csv
@@ -231,6 +232,8 @@ def get_datasets_from_read_annot(df, datasets='all'):
         for d in dataset_list:
             if d not in df.dataset.unique().tolist():
                 raise ValueError("Dataset name {} not found in read_annot".format(d))
+        datasets = dataset_list
+    return datasets
 
 
 def main():
@@ -244,6 +247,9 @@ def main():
     verbose = args.verbose
     datasets = args.datasets_file
 
+    # print(mode)
+    # return
+
     # read in read_annot file
     try:
         df = pd.read_csv(annot, sep='\t')
@@ -251,10 +257,10 @@ def main():
         raise Error('Problem loading read annot file {}'.format(annot))
 
     # make sure datasets are valid
-    if datasets != 'all':
-        dataset_df = pd.read_csv(datasets, header=None, names=['dataset'])
-        dataset_list = dataset_df['dataset'].tolist()
-    datasets = get_datasets_from_read_annot(df, dataset_list)
+    # if datasets != 'all':
+    #     dataset_df = pd.read_csv(datasets, header=None, names=['dataset'])
+    #     dataset_list = dataset_df['dataset'].tolist()
+    datasets = get_datasets_from_read_annot(df, datasets)
 
     # read gtf
     gtf_df = pd.read_csv(gtf, sep='\t', header=None, \
@@ -274,22 +280,22 @@ def main():
 
         # tss first
         ends = get_longest_ends(df, how='tss', novelty=novelty, datasets=datasets)
-        gtf_df = replace_gtf_end_coords(gtf_df, ends, opref,
+        gtf_df = replace_gtf_end_coords(gtf_df, ends,
             how='tss', verbose=verbose)
 
         # tes
         ends = get_longest_ends(df, how='tes', novelty=novelty, datasets=datasets)
-        gtf_df = replace_gtf_end_coords(gtf_df, ends, opref,
+        gtf_df = replace_gtf_end_coords(gtf_df, ends,
             how='tes', verbose=verbose)
 
     else:
         ends = get_longest_ends(df, how=mode, novelty=novelty, datasets=datasets)
-        gtf_df = replace_gtf_end_coords(gtf_df, ends, opref,
+        gtf_df = replace_gtf_end_coords(gtf_df, ends,
             how=mode, verbose=verbose)
 
     cols=['chr', 'source', 'entry_type', \
           'start', 'stop', 'score', 'strand',\
            'frame', 'fields']
     gtf_df = gtf_df[cols]
-    fname = '{}_revised_{}.gtf'.format(opref, how)
+    fname = '{}_revised_{}.gtf'.format(opref, mode)
     gtf_df.to_csv(fname, sep='\t', header=None, index=False, quoting=csv.QUOTE_NONE)
