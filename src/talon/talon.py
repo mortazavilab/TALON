@@ -2346,8 +2346,6 @@ def annotate_read(sam_record: pysam.AlignedSegment, cursor, run_info,
     """
     # Parse attributes to determine the chromosome, positions, and strand of the transcript
     read_ID = sam_record.query_name
-    print('in annotate_read')
-    print(run_info.use_cb_tag)
     if not run_info.use_cb_tag:
         dataset = sam_record.get_tag("RG")
     else:
