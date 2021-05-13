@@ -1412,11 +1412,11 @@ def check_inputs(options):
                         raise ValueError('Incorrect number of comma-separated fields'+ \
                                          ' in config file. There should be four: ' + \
                                          '(dataset name, sample description, ' + \
-                                         'platform, associated sam file).')
+                                         'platform, associated sam/bam file).')
 
                     # Make sure that the sam file exists
                     if not Path(curr_sam).exists():
-                        raise ValueError("SAM file '%s' does not exist!" % curr_sam)
+                        raise ValueError("SAM/BAM file '%s' does not exist!" % curr_sam)
 
                     metadata = (line[0], line[1], line[2])
                     dataname = metadata[0]
@@ -1432,8 +1432,8 @@ def check_inputs(options):
                     else:
                         dataset_metadata.append(metadata)
                         curr_datasets.append(dataname)
-                    if not curr_sam.endswith(".sam"):
-                        raise ValueError('Last field in config file must be a .sam file')
+                    if not curr_sam.endswith(".sam") and not curr_sam.endswith(".bam"):
+                        raise ValueError('Last field in config file must be a .sam/.bam file')
                     sam_files.append(curr_sam)
 
         # if we are using the RG tag, check that the config file adheres to the
@@ -1462,23 +1462,34 @@ def check_inputs(options):
                         raise ValueError('Incorrect number of comma-separated fields'+ \
                                          ' in config file. There should be three: ' + \
                                          '(sample description, ' + \
-                                         'platform, associated sam file).')
+                                         'platform, associated sam/bam file).')
 
                     # Make sure that the sam file exists
                     if not Path(curr_sam).exists():
-                        raise ValueError("SAM file '%s' does not exist!" % curr_sam)
+                        raise ValueError("SAM/BAM file '%s' does not exist!" % curr_sam)
                     metadata = ['', line[0], line[1]]
 
                     # get list of dataset names from the CB tag in the sam file
-                    df = pd.read_csv(curr_sam, sep='\tCB:Z:', comment='@', \
-                        usecols=[1], header=None, names=['cb_tag'], engine='python')
+                    if curr_sam.endswith('.sam'):
+                        df = pd.read_csv(curr_sam, sep='\tCB:Z:', comment='@', \
+                            usecols=[1], header=None, names=['cb_tag'], engine='python')
+                        # is the df empty?
+                        if df.empty:
+                            raise RuntimeError("SAM/BAM file contains no CB tags")
+                        df['dataset'] = df.cb_tag.str.split(pat='\t', n=1, expand=True)[0]
+                        datasets = df.dataset.unique().tolist()
 
-                    # is the df empty?
-                    if df.empty:
-                        raise RuntimeError("Sam file contains no CB tags")
+                    elif curr_sam.endswith('.bam'):
+                        datasets = []
 
-                    df['dataset'] = df.cb_tag.str.split(pat='\t', n=1, expand=True)[0]
-                    datasets = df.dataset.unique().tolist()
+                        # make an index so we can use the pysam fetch function
+                        pysam.index(curr_sam)
+                        infile = pysam.AlignmentFile(curr_sam, 'rb')
+                        for read in infile.fetch():
+                            tag = read.get_tag('CB')
+                            datasets.append(tag)
+                        # only unique dataset
+                        datasets = list(set(datasets))
 
                     for dataname in datasets:
                         metadata[0] = dataname
@@ -1497,10 +1508,10 @@ def check_inputs(options):
                             dataset_metadata.append(tuple(metadata))
                             curr_datasets.append(dataname)
                     if curr_sam in sam_files:
-                        warnings.warn("Skipping duplicated instance of sam file '" + \
+                        warnings.warn("Skipping duplicated instance of sam/bam file '" + \
                                        curr_sam  + "'.")
-                    if not curr_sam.endswith(".sam"):
-                        raise ValueError('Last field in config file must be a .sam file')
+                    if not curr_sam.endswith(".sam") and not curr_sam.endswith(".bam"):
+                        raise ValueError('Last field in config file must be a .sam/.bam file')
                     sam_files.append(curr_sam)
 
                     # else:

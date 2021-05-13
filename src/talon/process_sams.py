@@ -33,9 +33,6 @@ def preprocess_sam(sam_files, datasets, use_cb_tag, tmp_dir = "talon_tmp/", n_th
         The renaming is necessary in order to label the reads according to
         their dataset."""
 
-    print('in preprocess sam')
-    print(use_cb_tag)
-
     # Create the tmp dir
     os.system("mkdir -p %s " % (tmp_dir))
 
@@ -108,8 +105,6 @@ def partition_reads(sam_files, datasets, use_cb_tag, tmp_dir = "talon_tmp/", n_t
             - List of tuple intervals
             - filename of merged bam file (to keep track of the header)
            """
-
-    print(use_cb_tag)
     merged_bam = preprocess_sam(sam_files, datasets, use_cb_tag, tmp_dir = tmp_dir,
                                 n_threads = n_threads)
 
