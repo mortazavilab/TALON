@@ -24,7 +24,7 @@ We also recommend correcting the aligned reads with [TranscriptClean](https://gi
 To learn more about how TALON works, please see our preprint in BioRxiv: https://www.biorxiv.org/content/10.1101/672931v1
 
 # <a name="installation"></a>Installation
-Newer versions of TALON (v4.0+) are designed to be run with Python 3.6+. 
+Newer versions of TALON (v4.0+) are designed to be run with Python 3.6+.
 
 To install TALON, simply download the files using Github's "Download ZIP" button, then unzip them in the directory where you would like to store the program. Alternately, you can download a specific version of the program from the Releases tab.
 
@@ -85,7 +85,9 @@ Now that you've initialized your database and checked your reads for evidence of
 
 To run the **`talon`** annotator, create a comma-delimited configuration file with the following four columns: name, sample description, platform, sam file (full path). There should be one line for each dataset, and dataset names must be unique. If you decide later to add more datasets to an existing analysis, you can do so by creating a new config file for this data and running TALON again on the existing database.
 
-Please note that TALON versions 4.4+ can be run in multithreaded fashion for a much faster runtime. 
+If you're using the `--cb` option, the dataset names will be pulled from the SAM CB tag, making the first column of the config file unnecessary. Accordingly, TALON expects that when the `--cb` tag is provided, the config file only includes the following: sample description, platform, sam file (full path).
+
+Please note that TALON versions 4.4+ can be run in multithreaded fashion for a much faster runtime.
 
 ```
 usage: talon [-h] [--f CONFIG_FILE] [--db FILE,] [--build STRING,]
@@ -97,7 +99,9 @@ optional arguments:
   --f CONFIG_FILE       Dataset config file: dataset name, sample description,
                         platform, sam file (comma-delimited)  
   --db FILE,            TALON database. Created using
-                        talon_initialize_database 
+                        talon_initialize_database
+  --cb                  Use cell barcode tags to determine dataset. Useful for
+                        single-cell data. Requires 3-entry config file.
   --build STRING,       Genome build (i.e. hg38) to use. Must be in the
                         database.
   --threads THREADS, -t THREADS
@@ -111,25 +115,25 @@ optional arguments:
   --o OUTPREFIX         Prefix for output files
 
 ```
-TALON generates two output files in the course of a run. The QC log (file with suffix **`'QC.log'`**) is useful for tracking why a particular read was or was not included in the TALON analysis. 
+TALON generates two output files in the course of a run. The QC log (file with suffix **`'QC.log'`**) is useful for tracking why a particular read was or was not included in the TALON analysis.
 <details>
 <summary>QC log format</summary>  
-	
+
 Columns:  
 1. dataset  	
 2. read_ID  	
 3. passed_QC (1/0)  	
 4. primary_mapped (1/0)  
-5. read_length	
-6. fraction_aligned	
+5. read_length
+6. fraction_aligned
 7. Identity
 
 </details>
 
-The second output file (suffix **`'read_annot.tsv'`**) appears at the very end of the run and contains a line for every read that was successfully annotated. 
+The second output file (suffix **`'read_annot.tsv'`**) appears at the very end of the run and contains a line for every read that was successfully annotated.
 <details>
 <summary>Read annotation file format</summary>
-	
+
 Columns:  
 1. Name of individual read  
 2. Name of dataset the read belongs to  
@@ -142,8 +146,8 @@ Columns:
 9. Read length (soft-clipped bases not included)  
 10. Gene ID (issued by TALON, integer)  
 11. Transcript ID (issued by TALON, integer)  
-12. Annotation gene ID 
-13. Annotation transcript ID 
+12. Annotation gene ID
+13. Annotation transcript ID
 14. Annotation gene name (human-readable gene symbol)  
 15. Annotation transcript name (human-readable transcript symbol)  
 16. Gene novelty: one of "Known", "Antisense", or "Intergenic".   
@@ -205,7 +209,7 @@ Please note to run this utility, you must provide genome build (-b) and annotati
 
 <details>
 <summary>Abundance file format</summary>
-	
+
 The columns in the abundance file are as follows:
 1. TALON gene ID
 2. TALON transcript ID
@@ -225,7 +229,7 @@ One column per dataset, with a count indicating how many times the current trans
 
 ## <a name="talon_filter"></a>Filtering your transcriptome for isoform-level analysis
 
-Before quantifying your results on the isoform level, it is important to filter the novel transcript models because long-read platforms are prone to several forms of artifacts. The most effective experimental design for filtering is to use biological replicates. Some limited filtering is possible even for singlet datasets, but keep in mind that this is likely to be far less effective. 
+Before quantifying your results on the isoform level, it is important to filter the novel transcript models because long-read platforms are prone to several forms of artifacts. The most effective experimental design for filtering is to use biological replicates. Some limited filtering is possible even for singlet datasets, but keep in mind that this is likely to be far less effective.
 
 The **`talon_filter_transcripts`** module generates a whitelist of transcripts that are either:  
 a) Known  
@@ -270,7 +274,7 @@ The columns in the resulting output file are:
 
 ## Obtaining a custom GTF transcriptome annotation from a TALON database
 
-You can use the **`talon_create_GTF`** utility to extract a GTF-formatted annotation from the TALON database. 
+You can use the **`talon_create_GTF`** utility to extract a GTF-formatted annotation from the TALON database.
 ```
 Usage: talon_create_GTF [options]
 
