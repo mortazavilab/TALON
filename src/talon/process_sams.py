@@ -9,16 +9,12 @@ import pysam
 import os
 import time
 
-def convert_to_bam(sam, bam):
+def convert_to_bam(sam, bam, threads):
     """ Convert provided sam file to bam file (provided name).  """
 
-    print('in convert to bam')
-    print(sam)
-    print(bam)
-
     try:
-        infile = pysam.AlignmentFile(sam, "r")
-        outfile = pysam.AlignmentFile(bam, "wb", template=infile)
+        infile = pysam.AlignmentFile(sam, "r", threads=threads)
+        outfile = pysam.AlignmentFile(bam, "wb", template=infile, threads=threads)
         for s in infile:
             outfile.write(s)
 
@@ -45,7 +41,7 @@ def preprocess_sam(sam_files, datasets, use_cb_tag, tmp_dir = "talon_tmp/", n_th
             suffix = "." + sam.split(".")[-1]
             if suffix == ".sam":
                 bam_copy = tmp_dir + dataset + "_unsorted.bam"
-                convert_to_bam(sam, bam_copy)
+                convert_to_bam(sam, bam_copy, n_threads)
                 sam = bam_copy
             sorted_bam = tmp_dir + dataset + ".bam"
             pysam.sort("-@", str(n_threads), "-o", sorted_bam, sam)
@@ -73,7 +69,7 @@ def preprocess_sam(sam_files, datasets, use_cb_tag, tmp_dir = "talon_tmp/", n_th
             suffix = "."+fname_split[-1]
             if suffix == ".sam":
                 bam_copy = '{}{}_unsorted.bam'.format(tmp_dir, i)
-                convert_to_bam(sam, bam_copy)
+                convert_to_bam(sam, bam_copy, n_threads)
                 sam = bam_copy
             sorted_bam = '{}{}.bam'.format(tmp_dir, i)
             pysam.sort("-@", str(n_threads), "-o", sorted_bam, sam)
