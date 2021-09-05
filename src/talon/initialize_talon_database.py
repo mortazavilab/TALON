@@ -3,7 +3,7 @@
 # -----------------------------------------------------------------------------
 # This program reads in a GTF-formatted transcript annotation (ie GENCODE) and
 # creates a SQLite database with gene, transcript, and edge tables.
-# This database is used by the TALON pipeline to maintain a registry of 
+# This database is used by the TALON pipeline to maintain a registry of
 # known annotations as well as novel discoveries.
 
 import sqlite3
@@ -67,7 +67,7 @@ def create_database(path):
 
 def init_run_info(database, idprefix, min_length, cutoff_5p, cutoff_3p):
     """ Initializes a table that keeps track of important run information
-        such as the prefix for novel identifiers and the 5 prime and 3 prime 
+        such as the prefix for novel identifiers and the 5 prime and 3 prime
         distance cutoffs. Affects how downstream TALON runs are done"""
 
     # Connecting to the database file
@@ -83,7 +83,7 @@ def init_run_info(database, idprefix, min_length, cutoff_5p, cutoff_3p):
              ('schema_version', "v5.0"))
     c.execute('INSERT INTO run_info ' + cols + ' VALUES ' + '(?,?)',
              ('idprefix', idprefix))
-    c.execute('INSERT INTO run_info ' + cols + ' VALUES ' + '(?,?)', 
+    c.execute('INSERT INTO run_info ' + cols + ' VALUES ' + '(?,?)',
              ('cutoff_5p', cutoff_5p))
     c.execute('INSERT INTO run_info ' + cols + ' VALUES ' + '(?,?)',
                ('cutoff_3p', cutoff_3p))
@@ -94,7 +94,7 @@ def init_run_info(database, idprefix, min_length, cutoff_5p, cutoff_3p):
 
     conn.commit()
     conn.close()
-    return 
+    return
 
 def add_gene_table(database):
     """ Add a table to the database to track genes. Attributes are:
@@ -133,7 +133,7 @@ def add_transcript_table(database):
                 start_vertex INTEGER,
                 end_vertex INTEGER,
                 n_exons INTEGER,
-                 
+
                 FOREIGN KEY (gene_ID) REFERENCES genes(gene_ID),
                 FOREIGN KEY (start_vertex) REFERENCES vertex(vertex_ID),
                 FOREIGN KEY (end_vertex) REFERENCES vertex(vertex_ID),
@@ -147,18 +147,18 @@ def add_transcript_table(database):
     return
 
 def add_edge_table(database):
-    """ Add a table to the database to track edges linking vertices. 
+    """ Add a table to the database to track edges linking vertices.
         Attributes are:
         - Primary Key: ID (interally assigned by database)
         - Donor ID
         - Acceptor ID
     """
-    
+
     # Connecting to the database file
     conn = sqlite3.connect(database)
     c = conn.cursor()
 
-    # Create edge type table first. 
+    # Create edge type table first.
     add_edgetype_table(database)
 
     # Add edge table and set keys
@@ -168,7 +168,7 @@ def add_edge_table(database):
                 v2 INTEGER,
                 edge_type TEXT,
                 strand TEXT,
-                
+
                 PRIMARY KEY (edge_ID),
                 FOREIGN KEY (v1) REFERENCES vertex(vertex_ID),
                 FOREIGN KEY (v2) REFERENCES vertex(vertex_ID),
@@ -224,9 +224,9 @@ def add_vertex_table(database):
     command = """ CREATE TABLE IF NOT EXISTS vertex (
                 vertex_ID INTEGER,
                 gene_ID INTEGER,
-               
+
                 PRIMARY KEY(vertex_ID, gene_ID),
-                FOREIGN KEY(vertex_ID) REFERENCES location(location_ID), 
+                FOREIGN KEY(vertex_ID) REFERENCES location(location_ID),
                 FOREIGN KEY (gene_ID) REFERENCES genes(gene_ID)
                 ); """
 
@@ -301,7 +301,7 @@ def add_observed_table(database):
     # Add table and set primary key column
     c.execute("""CREATE TABLE observed (
                      obs_ID INTEGER PRIMARY KEY,
-                     gene_ID INTEGER, 
+                     gene_ID INTEGER,
                      transcript_ID INTEGER,
                      read_name TEXT,
                      dataset TEXT,
@@ -334,7 +334,7 @@ def add_observed_table(database):
 def add_abundance_table(database):
     """ Add a table to the database to track transcript abundance over
         all datasets.
-        - Transcript ID 
+        - Transcript ID
         - Dataset
         - Count
     """
@@ -348,10 +348,10 @@ def add_abundance_table(database):
                      transcript_ID INTEGER,
                      dataset INTEGER,
                      count INTEGER,
-                     
+
                  PRIMARY KEY(transcript_ID, dataset),
                  FOREIGN KEY(transcript_ID) REFERENCES transcripts(transcript_ID),
-                 FOREIGN KEY(dataset) REFERENCES dataset(dataset_ID)    
+                 FOREIGN KEY(dataset) REFERENCES dataset(dataset_ID)
               )""")
 
     conn.commit()
@@ -427,7 +427,7 @@ def add_annotation_table(database, table_name, key_table, fk_id):
                   source text,
                   attribute text,
                   value text,
-                   
+
                   PRIMARY KEY (ID, source, attribute)""" + fk_statement + """); """
     c.execute(command)
     conn.commit()
@@ -473,7 +473,7 @@ def read_gtf_file(gtf_file):
             gtf_file: Path to the GTF file
         Returns:
             genes: A dictionary mapping gene IDs to corresponding gene objects
-            transcripts: A dictionary mapping gene IDs to corresponding 
+            transcripts: A dictionary mapping gene IDs to corresponding
                    transcript objects
             exons: A dictionary mapping exon IDs to corresponding edge objects
     """
@@ -508,17 +508,17 @@ def read_gtf_file(gtf_file):
                     genes[gene_id].add_transcript(transcript)
                 native_id = transcript.identifier
                 transcripts[native_id] = transcript
-                
+
             # Entry is an edge
             elif entry_type == "exon":
                 exon = Edge.create_edge_from_gtf(tab_fields)
                 # This ID is used because of a rare GENCODE bug
                 location_exon_id = exon.identifier
-                exons[location_exon_id] = exon 
+                exons[location_exon_id] = exon
 
                 transcript_id = list(exon.transcript_ids)[0]
                 gene_id = exon.annotations["gene_id"]
-                
+
                 if location_exon_id not in exons:
                     # Add the new edge to the data structure
                     exons[location_exon_id] = exon
@@ -526,8 +526,8 @@ def read_gtf_file(gtf_file):
                     # Update existing exon entry, including its transcript set
                     exon = exons[location_exon_id]
                     exon.transcript_ids.add(transcript_id)
-           
-                if transcript_id in transcripts:         
+
+                if transcript_id in transcripts:
                     currTranscript = transcripts[transcript_id]
                     currTranscript.add_exon(exon)
 
@@ -593,7 +593,7 @@ def populate_db(database, annot_name, chrom_genes, chrom_transcripts, edges, gen
         start_time = time.time()
         print(chromosome)
         genes = chrom_genes[chromosome]
-        transcripts = chrom_transcripts[chromosome]        
+        transcripts = chrom_transcripts[chromosome]
 
         gene_id_map = add_genes(c, genes, annot_name)
         add_transcripts(c, transcripts, annot_name, gene_id_map, genome_build)
@@ -602,7 +602,7 @@ def populate_db(database, annot_name, chrom_genes, chrom_transcripts, edges, gen
         end_time = time.time()
         print("It took {} to process chromosome".format(hms_string(end_time - start_time)))
     conn.close()
-    
+
     return
 
 def add_genes(c, genes, annot_name):
@@ -640,7 +640,7 @@ def add_genes(c, genes, annot_name):
     print("bulk update gene_annotations...")
     bulk_update_gene_annotations(c, bulk_annotations)
     return gene_id_map
- 
+
 def bulk_update_genes(c, genes, gene_counter):
     """
        Given a list of tuple-formatted gene entries, this function inserts them
@@ -659,7 +659,7 @@ def bulk_update_genes(c, genes, gene_counter):
 
 def bulk_update_gene_annotations(c, bulk_annotations):
     """
-       Given a list of tuple-formatted gene annotation entries, this function 
+       Given a list of tuple-formatted gene annotation entries, this function
        inserts them into the database at the provided cursor (c).
     """
 
@@ -669,7 +669,7 @@ def bulk_update_gene_annotations(c, bulk_annotations):
                   '(?,?,?,?,?)'
     c.executemany(command, bulk_annotations)
 
-    return 
+    return
 
 def add_transcripts(c, transcripts, annot_name, gene_id_map, genome_build):
 
@@ -709,8 +709,8 @@ def add_transcripts(c, transcripts, annot_name, gene_id_map, genome_build):
         else:
             db_gene_id = "NULL"
 
-        # Process exons to create vertices and edges 
-        transcript_tuple = process_transcript(c, transcript, db_transcript_id, 
+        # Process exons to create vertices and edges
+        transcript_tuple = process_transcript(c, transcript, db_transcript_id,
                                               db_gene_id, genome_build,
                                               annot_name, vertices, edges)
         bulk_transcripts.append(transcript_tuple)
@@ -724,7 +724,7 @@ def add_transcripts(c, transcripts, annot_name, gene_id_map, genome_build):
                 continue
             value = attributes[att]
             bulk_annotations.append((db_transcript_id, annot_name, source, att, value))
- 
+
     print("bulk update transcripts...")
     bulk_update_transcripts(c, bulk_transcripts, counter)
     print("bulk update annotations...")
@@ -742,12 +742,12 @@ def bulk_update_transcripts(c, transcripts, counter):
        into the database at the provided cursor (c).
     """
     cols = " (" + ", ".join([str_wrap_double(x) for x in ["transcript_ID",
-           "gene_ID", "start_exon", "jn_path", "end_exon", "start_vertex", "end_vertex", 
+           "gene_ID", "start_exon", "jn_path", "end_exon", "start_vertex", "end_vertex",
            "n_exons"]]) + ") "
     g_command = 'INSERT INTO "transcripts"' + cols + "VALUES " + \
                 '(?,?,?,?,?,?,?,?)'
     c.executemany(g_command,transcripts)
- 
+
     update_counter = 'UPDATE "counters" SET "count" = ? WHERE "category" = ?'
     c.execute(update_counter, [counter, "transcripts"])
 
@@ -755,7 +755,7 @@ def bulk_update_transcripts(c, transcripts, counter):
 
 def bulk_update_transcript_annotations(c, bulk_annotations):
     """
-       Given a list of tuple-formatted transcript annotation entries, this 
+       Given a list of tuple-formatted transcript annotation entries, this
        function inserts them into the database at the provided cursor (c).
     """
     cols = " (" + ", ".join([str_wrap_double(x) for x in ["ID","annot_name",
@@ -781,7 +781,7 @@ def bulk_update_vertices(c, vertices):
         gene_IDs = list(vertex[-1])
         vertex_list += [ (vertex[0], x) for x in gene_IDs ]
         location_list.append(vertex[0:4])
- 
+
     # Bulk entry of vertices
     cols = " (" + ", ".join([str_wrap_double(x) for x in ["vertex_ID","gene_id"]]) + ") "
     command = 'INSERT INTO "vertex"' + cols + "VALUES " + \
@@ -821,7 +821,7 @@ def bulk_update_edges(c, edges):
 
     return
 
-def process_transcript(c, transcript, transcript_id, gene_id, genome_build, 
+def process_transcript(c, transcript, transcript_id, gene_id, genome_build,
                        annot_name, vertices, edges):
 
     exons = transcript.exons
@@ -883,7 +883,7 @@ def process_transcript(c, transcript, transcript_id, gene_id, genome_build,
 
     transcript_tuple = (transcript_id, gene_id, start_exon, transcript_path,
                         end_exon, start_vertex, end_vertex, n_exons)
-    
+
     return transcript_tuple
 
 
@@ -909,9 +909,9 @@ def add_exon_annotations_to_db(c, exon, exon_id, annot_name):
         c.execute(command,vals)
 
     return
-            
+
 def create_edge(vertex_1, vertex_2, edge_type, strand, edges):
-    """  
+    """
        Creates a new edge with the provided information, unless a duplicate
        already exists in the 'edges' dict.
     """
@@ -921,7 +921,7 @@ def create_edge(vertex_1, vertex_2, edge_type, strand, edges):
         existing_edge_id = edges[query][0]
         return existing_edge_id, edges
 
-    # In the case of no match, create the edge 
+    # In the case of no match, create the edge
     # Get ID number from counter
     edge_id = edges["counter"] + 1
     edges["counter"] += 1
@@ -933,7 +933,7 @@ def create_edge(vertex_1, vertex_2, edge_type, strand, edges):
 
 def create_vertex(c, gene_id, genome_build, chromosome, pos, vertices):
     """
-       Creates a new vertex with the provided information, unless a duplicate 
+       Creates a new vertex with the provided information, unless a duplicate
        already exists in the database.
     """
     # Check if the vertex exists. If yes, add current gene ID to it
@@ -1003,7 +1003,7 @@ def main():
 
     # Read in genes, transcripts, and edges from GTF file
     genes, transcripts, exons = read_gtf_file(gtf_file)
-    
+
     # Filter transcripts by length if this option is set to a nonzero value
     if min_length > 0:
         genes, transcripts = filter_by_length(genes, transcripts, min_length)
