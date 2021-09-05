@@ -50,7 +50,8 @@ setup(
     install_requires=[
         "pandas",
         "pysam==0.15.4",
-        "pybedtools",
+        "pyranges",
+        "bamread",
         "pyfaidx"
     ],
     entry_points={
