@@ -81,7 +81,9 @@ def preprocess_sam(sam_files, datasets, use_cb_tag, tmp_dir = "talon_tmp/", n_th
     # Merge datasets and use -r option to include a read group tag
     try:
         pysam.merge(*merge_args)
-        pysam.index(merged_bam)
+        sorted_bam = tmp_dir + "merged_sorted.bam"
+        pysam.sort("-@", str(n_threads), "-o", sorted_bam, merged_bam)
+        pysam.index(sorted_bam)
         ts = time.strftime("%Y-%m-%d %H:%M:%S", time.gmtime())
         print("[ %s ] Merged input SAM/BAM files" % (ts))
     except:
@@ -89,7 +91,7 @@ def preprocess_sam(sam_files, datasets, use_cb_tag, tmp_dir = "talon_tmp/", n_th
                             "Check your file paths and make sure that all "
                             "files have headers."))
 
-    return merged_bam
+    return sorted_bam
 
 def partition_reads(sam_files, datasets, use_cb_tag, tmp_dir = "talon_tmp/", n_threads = 0):
     """ Use bedtools merge to create non-overlapping intervals from all of the
