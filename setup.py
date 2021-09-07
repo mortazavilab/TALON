@@ -51,7 +51,7 @@ setup(
         "pandas",
         "pysam==0.15.4",
         "pyranges",
-        "bamread",
+        "bamread>=0.0.11",
         "pyfaidx"
     ],
     entry_points={
