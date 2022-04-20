@@ -73,7 +73,7 @@ def get_longest_ends(df, how='tes', novelty='novel', datasets='all'):
     # concat fwd and rev
     df = pd.concat([fwd, rev])
 
-    df = df.sort_values(by='transcript_ID', ascending='True')
+    df = df.sort_values(by='transcript_ID', ascending=True)
 
     return df
 
