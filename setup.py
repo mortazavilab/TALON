@@ -49,7 +49,7 @@ setup(
     python_requires=">=3.6",
     install_requires=[
         "pandas",
-        "pysam==0.15.4",
+        "pysam>=0.15.4",
         "pybedtools",
         "pyfaidx"
     ],
