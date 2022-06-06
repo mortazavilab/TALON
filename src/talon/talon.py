@@ -29,7 +29,7 @@ from itertools import repeat,islice
 
 # set verbosity for pysam
 save = pysam.set_verbosity(0)
-pysam.set_verbosity(save)
+# pysam.set_verbosity(save)
 
 class Counter(object):
     def __init__(self, initval=0):
