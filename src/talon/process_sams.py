@@ -9,6 +9,10 @@ import pysam
 import os
 import time
 
+# set verbosity for pysam
+save = pysam.set_verbosity(0)
+pysam.set_verbosity(save)
+
 def convert_to_bam(sam, bam, threads):
     """ Convert provided sam file to bam file (provided name).  """
 
