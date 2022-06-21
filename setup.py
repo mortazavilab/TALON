@@ -49,6 +49,8 @@ setup(
     python_requires=">=3.6",
     install_requires=[
         "pandas",
+        "pyranges",
+        "bamread>=0.0.11",
         "pysam>=0.15.4",
         "pybedtools",
         "pyfaidx"

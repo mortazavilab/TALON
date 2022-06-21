@@ -4,12 +4,11 @@
 # Functions related to processing the input SAM files and partitioning them
 # for processing in parallel
 
-import pybedtools
+import pyranges as pr
 import pysam
 import os
 import time
 
-# set verbosity for pysam
 save = pysam.set_verbosity(0)
 # pysam.set_verbosity(save)
 
@@ -18,7 +17,8 @@ def convert_to_bam(sam, bam, threads):
 
     try:
         infile = pysam.AlignmentFile(sam, "r", threads=threads)
-        outfile = pysam.AlignmentFile(bam, "wb", template=infile, threads=threads)
+        outfile = pysam.AlignmentFile(
+            bam, "wb", template=infile, threads=threads)
         for s in infile:
             outfile.write(s)
 
@@ -27,9 +27,10 @@ def convert_to_bam(sam, bam, threads):
         raise RuntimeError("Problem converting sam file '%s' to bam." % (sam))
 
 
-def preprocess_sam(sam_files, datasets, use_cb_tag, tmp_dir = "talon_tmp/", n_threads = 0):
+def preprocess_sam(sam_files, datasets, use_cb_tag,
+                   tmp_dir="talon_tmp/", n_threads=0):
     """ Copy and rename the provided SAM/BAM file(s), merge them, and index.
-        This is necessary in order to use Pybedtools commands on the reads.
+        This is necessary in order to use following commands on the reads.
         The renaming is necessary in order to label the reads according to
         their dataset."""
 
@@ -52,7 +53,8 @@ def preprocess_sam(sam_files, datasets, use_cb_tag, tmp_dir = "talon_tmp/", n_th
             renamed_sams.append(sorted_bam)
 
         merged_bam = tmp_dir + "merged.bam"
-        merge_args = [merged_bam] + renamed_sams + ["-f", "-r", "-@", str(n_threads)]
+        merge_args = [merged_bam] + renamed_sams + \
+            ["-f", "-r", "-@", str(n_threads)]
         # index_args = [merged_bam, "-@", str(n_threads)]
 
         # # Merge datasets and use -r option to include a read group tag
@@ -97,7 +99,9 @@ def preprocess_sam(sam_files, datasets, use_cb_tag, tmp_dir = "talon_tmp/", n_th
 
     return sorted_bam
 
-def partition_reads(sam_files, datasets, use_cb_tag, tmp_dir = "talon_tmp/", n_threads = 0):
+
+def partition_reads(sam_files, datasets, use_cb_tag,
+                    tmp_dir="talon_tmp/", n_threads=0):
     """ Use bedtools merge to create non-overlapping intervals from all of the
         transcripts in a series of SAM/BAM files. Then, iterate over the intervals
         to extract all reads inside of them from the pysam object.
@@ -107,32 +111,33 @@ def partition_reads(sam_files, datasets, use_cb_tag, tmp_dir = "talon_tmp/", n_t
             - List of tuple intervals
             - filename of merged bam file (to keep track of the header)
            """
-    merged_bam = preprocess_sam(sam_files, datasets, use_cb_tag, tmp_dir = tmp_dir,
-                                n_threads = n_threads)
+    merged_bam = preprocess_sam(sam_files, datasets, use_cb_tag,
+                                tmp_dir=tmp_dir, n_threads=n_threads)
 
     try:
-        all_reads = pybedtools.BedTool(merged_bam).bam_to_bed()
+        gr = pr.read_bam(merged_bam)
     except Exception as e:
         print(e)
         raise RuntimeError("Problem opening sam file %s" % (merged_bam))
 
-    # Must sort the Bedtool object
-    sorted_reads = all_reads.sort()
-    intervals = sorted_reads.merge(d = 100000000)
+    gr = gr.merge(slack=100000000, strand=False)
 
     # Now open each sam file using pysam and extract the reads
     coords = []
     read_groups = []
     with pysam.AlignmentFile(merged_bam) as bam:  # type: pysam.AlignmentFile
-        for interval in intervals:
-            reads = get_reads_in_interval(bam, interval.chrom,
-                                          interval.start, interval.end)
+        for _, interval in gr.df.iterrows():
+            reads = get_reads_in_interval(bam, interval.Chromosome,
+                                          interval.Start, interval.End)
             read_groups.append(reads)
-            coords.append((interval.chrom, interval.start + 1, interval.end))
+            coords.append((interval.Chromosome,
+                           interval.Start + 1, interval.End))
 
     return read_groups, coords, merged_bam
 
-def write_reads_to_file(read_groups, intervals, header_template, tmp_dir = "talon_tmp/"):
+
+def write_reads_to_file(read_groups, intervals,
+                        header_template, tmp_dir="talon_tmp/"):
     """ For each read group, iterate over the reads and write them to a file
         named for the interval they belong to. This step is necessary because
         Pysam objects cannot be pickled. """
@@ -145,7 +150,7 @@ def write_reads_to_file(read_groups, intervals, header_template, tmp_dir = "talo
         for group, interval in zip(read_groups, intervals):
             fname = tmp_dir + "_".join([str(x) for x in interval]) + ".bam"
             outbam_names.append(fname)
-            with pysam.AlignmentFile(fname, "wb", template = template) as f:
+            with pysam.AlignmentFile(fname, "wb", template=template) as f:
                 for read in group:
                     f.write(read)
 
@@ -157,5 +162,5 @@ def get_reads_in_interval(sam, chrom, start, end):
         the provided interval. Note that this means there may be reads that
         extend beyond the bounds of the interval. """
     iterator = sam.fetch(chrom, start, end)
-    reads = [ x for x in iterator ]
+    reads = [x for x in iterator]
     return reads
