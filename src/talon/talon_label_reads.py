@@ -48,8 +48,8 @@ def get_options():
     (opts, args) = parser.parse_args()
     return opts
 
-def fetch_seq(chrom=str, start=int, stop=int, strand=str, genome=pyfaidx.Fasta,
-              indexing = 0):
+def fetch_seq(chrom: str, start: int, stop: int, strand: str, genome: pyfaidx.Fasta,
+              indexing=0):
     """ Given a genomic interval, return the sequence with respect to the
         strand supplied.
         If 1-based indexing is specified, then 1 will be subtracted from the
@@ -71,7 +71,7 @@ def fetch_seq(chrom=str, start=int, stop=int, strand=str, genome=pyfaidx.Fasta,
 
     return str(seq)
 
-def compute_frac_As(seq=str):
+def compute_frac_As(seq: str):
     """ Compute fraction of sequence made up of As """
 
     a = seq.count('A')
@@ -81,7 +81,7 @@ def compute_frac_As(seq=str):
     else:
         return float(a)/n
 
-def fetch_range_after_transcript(transcript_end=int, strand=str, length=int):
+def fetch_range_after_transcript(transcript_end: int, strand: str, length: int):
     """ Given the 1-based stop position of a transcript and its strand,
         return a 1-based genomic range of the specified length that starts with
         the base just after the end position. The smaller position is always
@@ -104,7 +104,7 @@ def fetch_range_after_transcript(transcript_end=int, strand=str, length=int):
 
     return (min(range_start, range_end), max(range_start, range_end))
 
-def compute_transcript_end(transcript=pysam.AlignedSegment):
+def compute_transcript_end(transcript: pysam.AlignedSegment):
     """ Compute the position of the final transcript base relative to the genome,
         taking strand into account. Position is 1-based. """
 
@@ -114,8 +114,8 @@ def compute_transcript_end(transcript=pysam.AlignedSegment):
     if strand == '-':
         return transcript.reference_start + 1 # (make 1-based)
 
-def compute_frac_as_after_transcript(chrom=str, transcript_end=int, strand=str,
-                                     range_size=int, genome=pyfaidx.Fasta):
+def compute_frac_as_after_transcript(chrom: str, transcript_end: int, strand: str,
+                                     range_size: int, genome: pyfaidx.Fasta):
     """ Given a transcript end, strand, range size, and genome object,
         compute the fraction of sequence in the range immediately after
         the transcript end that is made up of As."""
