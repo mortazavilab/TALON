@@ -49,7 +49,9 @@ setup(
     python_requires=">=3.6",
     install_requires=[
         "pandas",
-        "pysam==0.15.4",
+        "pyranges",
+        "bamread>=0.0.11",
+        "pysam>=0.15.4",
         "pybedtools",
         "pyfaidx"
     ],
@@ -65,7 +67,8 @@ setup(
             'talon_generate_report=talon.post.generate_talon_report:main',
             'talon_summarize=talon.post.summarize_datasets:main',
             'talon_fetch_reads=talon.post.get_read_annotations:main',
-            'talon_get_sjs=talon.post.get_transcript_sjs:main'
+            'talon_get_sjs=talon.post.get_transcript_sjs:main',
+            'talon_longest_end=talon.post.call_longest_ends:main'
         ]
     }
 )
