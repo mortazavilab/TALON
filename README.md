@@ -115,6 +115,8 @@ optional arguments:
   --identity MIN_IDENTITY, -i MIN_IDENTITY
                         Minimum alignment identity in order to use a SAM
                         entry. Default = 0.8
+  --tmpDir 
+                        Path to directory for tmp files. Default = `talon_tmp/`
   --o OUTPREFIX         Prefix for output files
 
 ```
