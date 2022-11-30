@@ -2613,10 +2613,12 @@ def main():
 
         # Partition the reads
         read_groups, intervals, header_file = procsams.partition_reads(sam_files,
-                                                                       datasets, use_cb_tag)
+                                                                       datasets,
+                                                                       use_cb_tag,
+                                                                       tmp_dir=options.tmp_dir)
 
         read_files = procsams.write_reads_to_file(
-            read_groups, intervals, header_file)
+            read_groups, intervals, header_file, tmp_dir=options.tmp_dir)
         ts = time.strftime("%Y-%m-%d %H:%M:%S", time.gmtime())
         print("[ %s ] Split reads into %d intervals" % (ts, len(read_groups)))
 
