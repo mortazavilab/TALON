@@ -2592,6 +2592,11 @@ def main():
     min_coverage = float(options.min_coverage)
     min_identity = float(options.min_identity)
     outprefix = options.outprefix
+    tmp_dir = options.tmp_dir
+
+    # format tmp_dir if missing fwd slash
+    if not tmp_dir.endswith('/'):
+        tmp_dir += '/'
 
     # Set globally accessible counters
     get_counters(database)
@@ -2599,9 +2604,9 @@ def main():
     # Initialize worker pool
     with mp.Pool(processes=threads) as pool:
         run_info = init_run_info(database, build, min_coverage, min_identity,
-                                 use_cb_tag, tmp_dir=options.tmp_dir)
+                                 use_cb_tag, tmp_dir=tmp_dir)
         run_info.outfiles = init_outfiles(options.outprefix,
-                                          tmp_dir=options.tmp_dir)
+                                          tmp_dir=tmp_dir)
 
         # Create annotation entry for each dataset
         datasets = []
@@ -2615,10 +2620,10 @@ def main():
         read_groups, intervals, header_file = procsams.partition_reads(sam_files,
                                                                        datasets,
                                                                        use_cb_tag,
-                                                                       tmp_dir=options.tmp_dir)
+                                                                       tmp_dir=tmp_dir)
 
         read_files = procsams.write_reads_to_file(
-            read_groups, intervals, header_file, tmp_dir=options.tmp_dir)
+            read_groups, intervals, header_file, tmp_dir=tmp_dir)
         ts = time.strftime("%Y-%m-%d %H:%M:%S", time.gmtime())
         print("[ %s ] Split reads into %d intervals" % (ts, len(read_groups)))
 
