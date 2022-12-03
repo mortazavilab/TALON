@@ -143,7 +143,8 @@ def write_reads_to_file(read_groups, intervals,
         Pysam objects cannot be pickled. """
 
     tmp_dir = tmp_dir + "interval_files/"
-    os.system("mkdir -p %s " % (tmp_dir))
+    if not os.path.exists(tmp_dir):
+        os.makedirs(tmp_dir)
 
     outbam_names = []
     with pysam.AlignmentFile(header_template, "rb") as template:
