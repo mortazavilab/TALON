@@ -18,7 +18,7 @@ import warnings
 def getOptions():
     parser = OptionParser(description = ("talon_filter_transcripts is a "
                           "utility that filters the transcripts inside "
-                          "a TALON database to produce a transcript whitelist. "
+                          "a TALON database to produce a transcript pass list. "
                           "This list can then be used by downstream analysis "
                           "tools to determine which transcripts and other "
                           "features should be reported (for example in a GTF file)"))
@@ -35,6 +35,9 @@ def getOptions():
                               "or as a file with one dataset per line. "
                               "If this option is omitted, all datasets will "
                               "be included."))
+    parser.add_option("--includeAnnot", dest = "include_annot", action= "store_true",
+                help = ("Include all transcripts from the annotation, regardless "
+                        "of if they were observed in the data."))
     parser.add_option("--maxFracA", dest = "max_frac_A", default = 0.5,
                       help = ("Maximum fraction of As to allow in the window "
                               "located immediately after any read assigned to "
@@ -69,7 +72,7 @@ def getOptions():
     (options, args) = parser.parse_args()
     return options
 
-def get_known_transcripts(database, annot, datasets = None):
+def get_known_transcripts(database, annot, include_annot, datasets = None):
     """ Fetch gene ID and transcript ID of all known transcripts detected in
         the specified datasets """
 
@@ -80,7 +83,10 @@ def get_known_transcripts(database, annot, datasets = None):
                        WHERE (ta.attribute = 'transcript_status'
                               AND ta.value = 'KNOWN'
                               AND ta.annot_name = '%s')""" % (annot)
-        if datasets != None:
+
+        # if we're filtering known transcripts for those that
+        # are actually observed rather than including them all
+        if datasets != None and not include_annot:
             datasets = qutils.format_for_IN(datasets)
             query += " AND observed.dataset IN " + datasets
         known = pd.read_sql_query(query, conn)
@@ -268,6 +274,8 @@ def filter_talon_transcripts(database, annot, datasets, options):
     """ Filter transcripts belonging to the specified datasets in a TALON
         database. The 'annot' parameter specifies which annotation transcripts
         are known relative to. Can be tuned with the following options:
+        - options.include_annot: Include all annotated transcripts regardless
+                                 of whether they are expressed
         - options.max_frac_A: maximum allowable fraction of As recorded for
                               region after the read (0-1)
         - options.allow_genomic: Removes genomic transcripts if set to False
@@ -284,7 +292,9 @@ def filter_talon_transcripts(database, annot, datasets, options):
         of these parameters.
         """
     # Known transcripts automatically pass the filter
-    known = get_known_transcripts(database, annot, datasets = datasets)
+    known = get_known_transcripts(database, annot,
+                                  options.include_annot,
+                                  datasets = datasets)
 
     # Get reads that pass fraction A cutoff
     reads = fetch_reads_in_datasets_fracA_cutoff(database, datasets,
@@ -342,7 +352,7 @@ def main():
     filtered = filter_talon_transcripts(database, annot, datasets, options)
 
     # Write gene and transcript IDs to file
-    print("Writing whitelisted gene-transcript TALON ID pairs to " + options.outfile + "...")
+    print("Writing gene-transcript TALON ID pairs that passed filtering to " + options.outfile + "...")
     filtered.to_csv(options.outfile, sep = ",", header = False, index = False)
 
 

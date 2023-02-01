@@ -115,7 +115,7 @@ optional arguments:
   --identity MIN_IDENTITY, -i MIN_IDENTITY
                         Minimum alignment identity in order to use a SAM
                         entry. Default = 0.8
-  --tmpDir 
+  --tmpDir
                         Path to directory for tmp files. Default = `talon_tmp/`
   --o OUTPREFIX         Prefix for output files
 
@@ -250,6 +250,8 @@ Options:
                         Which annotation version to use. Will determine which
                         annotation transcripts are considered known or novel
                         relative to. Note: must be in the TALON database.
+  --includeAnnot        Include all transcripts from the annotation, regardless
+                        of if they were observed in the data.
   --datasets=DATASETS   Datasets to include. Can be provided as a comma-
                         delimited list on the command line, or as a file with
                         one dataset per line. If this option is omitted, all
