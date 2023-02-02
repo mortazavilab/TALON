@@ -309,8 +309,6 @@ def filter_talon_transcripts(database, annot, datasets, options):
     known = get_known_transcripts(database, annot,
                                   options.include_annot,
                                   datasets = datasets)
-    print(f'Found {len(known)} known transcripts')
-    import pdb; pdb.set_trace()
 
     # Get reads that pass fraction A cutoff
     reads = fetch_reads_in_datasets_fracA_cutoff(database, datasets,
