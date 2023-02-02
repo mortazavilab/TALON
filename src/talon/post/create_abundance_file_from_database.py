@@ -1,8 +1,8 @@
 # TALON: Techonology-Agnostic Long Read Analysis Pipeline
 # Author: Dana Wyman
 # -----------------------------------------------------------------------------
-# create_abundance_file_from_database.py is a utility that outputs the abundance 
-# for each transcript in the TALON database across datasets. Modified by 
+# create_abundance_file_from_database.py is a utility that outputs the abundance
+# for each transcript in the TALON database across datasets. Modified by
 # filtering option.
 
 import sqlite3
@@ -15,6 +15,7 @@ from . import filter_talon_transcripts as filt
 from .. import dstruct as dstruct
 from .. import length_utils as lu
 from . import post_utils as putils
+from . import ab_utils as autils
 from .. import query_utils as qutils
 from .. import talon as talon
 
@@ -39,10 +40,10 @@ def getOptions():
 
     parser.add_option("--build", "-b", dest = "build",
         help = "Genome build to use. Note: must be in the TALON database.",
-        type = "string") 
- 
+        type = "string")
+
     parser.add_option("--datasets", "-d",  dest = "datasets_file",
-        help = """Optional: A file indicating which datasets should be 
+        help = """Optional: A file indicating which datasets should be
                   included (one dataset name per line). Default is to include
                   all datasets.""",
         metavar = "FILE", type = "string", default = None)
@@ -55,7 +56,7 @@ def getOptions():
     return options
 
 def create_outname(options):
-    """ Creates filename for the output GTF that reflects the input options that
+    """ Creates filename for the output abundance that reflects the input options that
         were used. """
 
     outname = options.outprefix + "_talon_abundance"
@@ -65,61 +66,61 @@ def create_outname(options):
     outname += ".tsv"
     return outname
 
-def fetch_dataset_list(dataset_file, database):
-    """ Gets a list of all datasets in the database """
-
-    conn = sqlite3.connect(database)
-    cursor = conn.cursor()
-    all_db_datasets = qutils.fetch_all_datasets(cursor)
-    conn.close()
-
-    if dataset_file == None:
-        
-        return all_db_datasets
-
-    else:
-        datasets = []
-        with open(dataset_file, 'r') as f:
-            for line in f:
-                dataset = line.strip()
-                if dataset not in all_db_datasets:
-                    raise ValueError("Dataset name '%s' not found in database" \
-                                      % (dataset))
-                datasets.append(dataset)
-   
-        return datasets
+# def fetch_dataset_list(dataset_file, database):
+#     """ Gets a list of all datasets in the database """
+#
+#     conn = sqlite3.connect(database)
+#     cursor = conn.cursor()
+#     all_db_datasets = qutils.fetch_all_datasets(cursor)
+#     conn.close()
+#
+#     if dataset_file == None:
+#
+#         return all_db_datasets
+#
+#     else:
+#         datasets = []
+#         with open(dataset_file, 'r') as f:
+#             for line in f:
+#                 dataset = line.strip()
+#                 if dataset not in all_db_datasets:
+#                     raise ValueError("Dataset name '%s' not found in database" \
+#                                       % (dataset))
+#                 datasets.append(dataset)
+#
+#         return datasets
 
 def create_abundance_dict(database, datasets):
     """Process the abundance table by dataset in order to create a dictionary
        data structure organized like this:
            transcript_ID -> dataset -> abundance in that dataset
     """
-    abundance = {}    
+    abundance = {}
 
     conn = sqlite3.connect(database)
     conn.row_factory = sqlite3.Row
     cursor = conn.cursor()
 
     for dataset in datasets:
-        query = """ SELECT transcript_ID, count FROM abundance 
+        query = """ SELECT transcript_ID, count FROM abundance
                     WHERE dataset = '%s' """ % dataset
         cursor.execute(query)
 
         for transcript in cursor.fetchall():
             transcript_ID = transcript["transcript_ID"]
-            count = transcript["count"]  
+            count = transcript["count"]
 
             if transcript_ID in abundance:
                 abundance[transcript_ID][dataset] = count
             else:
                 abundance[transcript_ID] = {}
-                abundance[transcript_ID][dataset] = count 
+                abundance[transcript_ID][dataset] = count
 
     conn.close()
     return abundance
 
 def fetch_abundances(database, datasets, annot, whitelist):
-    """Constructs a query to get the following information for every 
+    """Constructs a query to get the following information for every
        whitelisted transcript:
            1) TALON gene ID
            2) TALON transcript ID
@@ -150,7 +151,7 @@ def fetch_abundances(database, datasets, annot, whitelist):
 
     whitelist_string = "WHERE t.transcript_ID IN (" + ','.join(whitelist) + ");"
 
-    name_status_query = """        
+    name_status_query = """
                 FROM transcripts t
                 LEFT JOIN gene_annotations ga_id ON t.gene_ID = ga_id.ID
                     AND ga_id.annot_name = '%s'
@@ -158,12 +159,12 @@ def fetch_abundances(database, datasets, annot, whitelist):
                 LEFT JOIN transcript_annotations ta_id ON t.transcript_ID = ta_id.ID
                     AND ta_id.annot_name = '%s'
                     AND ta_id.attribute = 'transcript_id'
-                LEFT JOIN gene_annotations ga_name ON t.gene_ID = ga_name.ID 
-	            AND ga_name.annot_name = '%s' 
+                LEFT JOIN gene_annotations ga_name ON t.gene_ID = ga_name.ID
+	            AND ga_name.annot_name = '%s'
                     AND ga_name.attribute = 'gene_name'
-                LEFT JOIN transcript_annotations ta_name ON t.transcript_ID = ta_name.ID 
-	            AND ta_name.annot_name = '%s' 
-                    AND ta_name.attribute = 'transcript_name' 
+                LEFT JOIN transcript_annotations ta_name ON t.transcript_ID = ta_name.ID
+	            AND ta_name.annot_name = '%s'
+                    AND ta_name.attribute = 'transcript_name'
                 """ % (annot, annot, annot, annot)
 
     full_query = "\n".join([col_query, name_status_query, whitelist_string])
@@ -189,21 +190,21 @@ def fetch_abundances(database, datasets, annot, whitelist):
         for dataset in datasets:
             if dataset in abundance[transcript_ID]:
                 dataset_counts.append(str(abundance[transcript_ID][dataset]))
-            else: 
+            else:
                 dataset_counts.append("0")
 
-        # Combine abundance info with rest of transcript information        
+        # Combine abundance info with rest of transcript information
         combined_entry = list(entry) + dataset_counts
         final_abundance.append(combined_entry)
 
     return final_abundance, colnames
 
-def write_abundance_file(abundances, col_names, prefix, n_places, datasets, 
+def write_abundance_file(abundances, col_names, prefix, n_places, datasets,
                          novelty_types, transcript_lengths, outfile):
     """ Writes abundances and metadata to an output file """
 
     o = open(outfile, 'w')
-    
+
     novelty_type_cols = ["gene_novelty", "transcript_novelty", "ISM_subtype"]
 
     first_dataset_index = len(col_names) - len(datasets)
@@ -213,7 +214,7 @@ def write_abundance_file(abundances, col_names, prefix, n_places, datasets,
     o.write("\t".join(all_colnames) + "\n")
 
     abundance_list = [list(elem) for elem in abundances]
-    
+
     # Find indices of columns that may need 'None' replaced
     gene_ID_index = all_colnames.index("gene_ID")
     transcript_ID_index = all_colnames.index("transcript_ID")
@@ -225,8 +226,8 @@ def write_abundance_file(abundances, col_names, prefix, n_places, datasets,
 
     # Iterate over abundances, fixing Nones, and write to file
     for transcript in abundances:
-        curr_novelty = get_gene_and_transcript_novelty_types(transcript[gene_ID_index], 
-                                                             transcript[transcript_ID_index], 
+        curr_novelty = get_gene_and_transcript_novelty_types(transcript[gene_ID_index],
+                                                             transcript[transcript_ID_index],
                                                              novelty_types)
         transcript = list(transcript)
         transcript = transcript[0:first_dataset_index] + \
@@ -254,7 +255,7 @@ def write_abundance_file(abundances, col_names, prefix, n_places, datasets,
             if transcript[index] == None:
                 transcript[index] = 0
         o.write("\t".join([str(x) for x in transcript]) + "\n")
-        
+
     o.close()
     return
 
@@ -289,7 +290,7 @@ def get_gene_and_transcript_novelty_types(gene_ID, transcript_ID, novelty_type):
     elif transcript_ID in novelty_type.genomic_transcripts:
         curr_novel["transcript_novelty"] = "Genomic"
     elif transcript_ID in novelty_type.known_transcripts:
-        curr_novel["transcript_novelty"] = "Known" 
+        curr_novel["transcript_novelty"] = "Known"
     else:
         print("Warning: Could not locate novelty type for transcript %s" % transcript_ID)
 
@@ -303,67 +304,67 @@ def get_gene_and_transcript_novelty_types(gene_ID, transcript_ID, novelty_type):
         curr_novel["ISM_subtype"] = "Suffix"
     else:
         curr_novel["ISM_subtype"] = "None"
-               
+
     return curr_novel
 
-def check_annot_validity(annot, database):
-    """ Make sure that the user has entered a correct annotation name """
-
-    conn = sqlite3.connect(database)
-    cursor = conn.cursor()
-
-    cursor.execute("SELECT DISTINCT annot_name FROM gene_annotations")
-    annotations = [str(x[0]) for x in cursor.fetchall()]
-    conn.close()
-
-    if "TALON" in annotations:
-        annotations.remove("TALON") 
-
-    if annot == None:
-        message = "Please provide a valid annotation name. " + \
-                  "In this database, your options are: " + \
-                  ", ".join(annotations)
-        raise ValueError(message)
-
-    if annot not in annotations:
-        message = "Annotation name '" + annot + \
-                  "' not found in this database. Try one of the following: " + \
-                  ", ".join(annotations)  
-        raise ValueError(message)
-
-    return
-
-def check_build_validity(build, database):
-    """ Make sure that the user has entered a correct build name """
-
-    conn = sqlite3.connect(database)
-    cursor = conn.cursor()
-
-    cursor.execute("SELECT name FROM genome_build")
-    builds = [str(x[0]) for x in cursor.fetchall()]
-    conn.close()
-
-    if build == None:
-        message = "Please provide a valid genome build name. " + \
-                  "In this database, your options are: " + \
-                  ", ".join(builds)
-        raise ValueError(message)
-
-    if build not in builds:
-        message = "Build name '" + build + \
-                  "' not found in this database. Try one of the following: " + \
-                  ", ".join(builds)
-        raise ValueError(message)
-
-    return
+# def check_annot_validity(annot, database):
+#     """ Make sure that the user has entered a correct annotation name """
+#
+#     conn = sqlite3.connect(database)
+#     cursor = conn.cursor()
+#
+#     cursor.execute("SELECT DISTINCT annot_name FROM gene_annotations")
+#     annotations = [str(x[0]) for x in cursor.fetchall()]
+#     conn.close()
+#
+#     if "TALON" in annotations:
+#         annotations.remove("TALON")
+#
+#     if annot == None:
+#         message = "Please provide a valid annotation name. " + \
+#                   "In this database, your options are: " + \
+#                   ", ".join(annotations)
+#         raise ValueError(message)
+#
+#     if annot not in annotations:
+#         message = "Annotation name '" + annot + \
+#                   "' not found in this database. Try one of the following: " + \
+#                   ", ".join(annotations)
+#         raise ValueError(message)
+#
+#     return
+#
+# def check_build_validity(build, database):
+#     """ Make sure that the user has entered a correct build name """
+#
+#     conn = sqlite3.connect(database)
+#     cursor = conn.cursor()
+#
+#     cursor.execute("SELECT name FROM genome_build")
+#     builds = [str(x[0]) for x in cursor.fetchall()]
+#     conn.close()
+#
+#     if build == None:
+#         message = "Please provide a valid genome build name. " + \
+#                   "In this database, your options are: " + \
+#                   ", ".join(builds)
+#         raise ValueError(message)
+#
+#     if build not in builds:
+#         message = "Build name '" + build + \
+#                   "' not found in this database. Try one of the following: " + \
+#                   ", ".join(builds)
+#         raise ValueError(message)
+#
+#     return
 
 def make_novelty_type_struct(database, datasets):
     """ Create a data structure where it is possible to look up whether a gene
         or transcript belongs to a particular category of novelty"""
 
     conn = sqlite3.connect(database)
-    conn.row_factory = sqlite3.Row 
-    cursor = conn.cursor() 
+    conn.row_factory = sqlite3.Row
+    cursor = conn.cursor()
 
     novelty_type = dstruct.Struct()
     novelty_type.known_genes = set(qutils.fetch_all_known_genes_detected(cursor, datasets))
@@ -382,49 +383,49 @@ def make_novelty_type_struct(database, datasets):
     conn.close()
     return novelty_type
 
-def fetch_naming_prefix(database):
-    """ Get naming prefix from the database run_info table """
-    conn = sqlite3.connect(database)
-    conn.row_factory = sqlite3.Row
-    cursor = conn.cursor()
-    cursor.execute("SELECT value FROM run_info WHERE item = 'idprefix'")
-    prefix = cursor.fetchone()[0]
+# def fetch_naming_prefix(database):
+#     """ Get naming prefix from the database run_info table """
+#     conn = sqlite3.connect(database)
+#     conn.row_factory = sqlite3.Row
+#     cursor = conn.cursor()
+#     cursor.execute("SELECT value FROM run_info WHERE item = 'idprefix'")
+#     prefix = cursor.fetchone()[0]
+#
+#     conn.close()
+#     return prefix
+#
+# def fetch_n_places(database):
+#     """ Get length of name field from the database run_info table """
+#     conn = sqlite3.connect(database)
+#     conn.row_factory = sqlite3.Row
+#     cursor = conn.cursor()
+#     cursor.execute("SELECT value FROM run_info WHERE item = 'n_places'")
+#     n_places = cursor.fetchone()[0]
+#
+#     conn.close()
+#     return int(n_places)
 
-    conn.close()
-    return prefix
-
-def fetch_n_places(database):
-    """ Get length of name field from the database run_info table """
-    conn = sqlite3.connect(database)
-    conn.row_factory = sqlite3.Row
-    cursor = conn.cursor()
-    cursor.execute("SELECT value FROM run_info WHERE item = 'n_places'")
-    n_places = cursor.fetchone()[0]
-
-    conn.close()
-    return int(n_places)
-
-def get_transcript_lengths(database, build):
-    """ Read the transcripts from the database. Then compute the lengths. 
-        Store in a dictionary """
-
-    transcript_lengths = {} 
-
-    conn = sqlite3.connect(database)
-    conn.row_factory = sqlite3.Row
-    cursor = conn.cursor()
-
-    # Get the exon lengths
-    exon_lens = lu.get_all_exon_lengths(cursor, build)
-
-    cursor.execute("SELECT * FROM transcripts")
-    for transcript_row in cursor.fetchall():
-        transcript_ID = transcript_row['transcript_ID']
-        length = lu.get_transcript_length(transcript_row, exon_lens)
-        transcript_lengths[transcript_ID] = length
-
-    conn.close() 
-    return transcript_lengths
+# def get_transcript_lengths(database, build):
+#     """ Read the transcripts from the database. Then compute the lengths.
+#         Store in a dictionary """
+#
+#     transcript_lengths = {}
+#
+#     conn = sqlite3.connect(database)
+#     conn.row_factory = sqlite3.Row
+#     cursor = conn.cursor()
+#
+#     # Get the exon lengths
+#     exon_lens = lu.get_all_exon_lengths(cursor, build)
+#
+#     cursor.execute("SELECT * FROM transcripts")
+#     for transcript_row in cursor.fetchall():
+#         transcript_ID = transcript_row['transcript_ID']
+#         length = lu.get_transcript_length(transcript_row, exon_lens)
+#         transcript_lengths[transcript_ID] = length
+#
+#     conn.close()
+#     return transcript_lengths
 
 
 def main():
@@ -432,7 +433,7 @@ def main():
     database = options.database
     annot = options.annot
     build = options.build
-    
+
     whitelist_file = options.whitelist
     dataset_file = options.datasets_file
     outfile = create_outname(options)
@@ -441,14 +442,14 @@ def main():
     if not Path(database).exists():
         raise ValueError("Database file '%s' does not exist!" % database)
 
-    check_annot_validity(annot, database)
-    check_build_validity(build, database)
+    autils.check_annot_validity(annot, database)
+    autils.check_build_validity(build, database)
 
-    # Determine which transcripts to include    
-    whitelist = putils.handle_filtering(database, 
-                                        annot, 
-                                        False, 
-                                        whitelist_file, 
+    # Determine which transcripts to include
+    whitelist = putils.handle_filtering(database,
+                                        annot,
+                                        False,
+                                        whitelist_file,
                                         dataset_file)
 
     # create transcript whitelist
@@ -458,14 +459,14 @@ def main():
             transcript_whitelist.append(str(id_tuple[1]))
 
     # Get transcript length dict
-    transcript_lengths = get_transcript_lengths(database, build)
+    transcript_lengths = autils.get_transcript_lengths(database, build)
 
     # Create the abundance file
-    datasets = fetch_dataset_list(dataset_file, database)
+    datasets = autils.fetch_dataset_list(dataset_file, database)
     novelty_type = make_novelty_type_struct(database, datasets)
     abundances, colnames = fetch_abundances(database, datasets, annot, transcript_whitelist)
-    prefix = fetch_naming_prefix(database)
-    n_places = fetch_n_places(database)
+    prefix = autils.fetch_naming_prefix(database)
+    n_places = autils.fetch_n_places(database)
     write_abundance_file(abundances, colnames, prefix, n_places, datasets, novelty_type, transcript_lengths, outfile)
 
 if __name__ == '__main__':
