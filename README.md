@@ -308,7 +308,35 @@ Options:
   --o=FILE              Prefix for output GTF
 ```
 
-Please note to run this utility, you must provide genome build (-b) and annotation (-a) names that match those provided for the talon_initialize_database, otherwise it will not run.
+Please note to run this utility, you must provide genome build (-b) and annotation (-a) names that match those provided for the `talon_initialize_database`, otherwise it will not run.
+
+## <a name="talon_adata"></a>Creating a TALON AnnData object
+
+For users that have single-cell data or that prefer to use the [AnnData format](https://anndata.readthedocs.io/en/latest/) to access abundance information, the **`talon_create_adata`** utility can be run. This utility produces an AnnData with counts information in sparse matrix format for each transcript, so it is also helpful if the abundance files start to get very large.
+
+```
+Usage: talon_create_adata [options]
+
+Options:
+  -h, --help            show this help message and exit
+  --db=FILE             TALON database
+  -a ANNOT, --annot=ANNOT
+                        Which annotation version to use. Will determine which
+                        annotation transcripts are considered known or novel
+                        relative to. Note: must be in the TALON database.
+  --pass_list=FILE      Pass list file of transcripts to include in the
+
+                        output. First column should be TALON gene ID,
+                        second column should be TALON transcript ID
+  -b BUILD, --build=BUILD
+                        Genome build to use. Note: must be in the TALON
+                        database.
+  -d FILE, --datasets=FILE
+                        Optional: A file indicating which datasets should be
+                        included (one dataset name per line). Default is to
+                        include                   all datasets.
+  --o=FILE              Output .h5ad file name
+```
 
 # <a name="talon_cite"></a>Citing TALON
 Please cite our preprint when using TALON:  

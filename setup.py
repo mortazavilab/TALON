@@ -53,7 +53,8 @@ setup(
         "bamread>=0.0.11",
         "pysam>=0.15.4",
         "pybedtools",
-        "pyfaidx"
+        "pyfaidx",
+        "scanpy"
     ],
     entry_points={
         "console_scripts": [
@@ -63,6 +64,7 @@ setup(
             'talon_filter_transcripts=talon.post.filter_talon_transcripts:main',
             'talon_abundance=talon.post.create_abundance_file_from_database:main',
             'talon_create_GTF=talon.post.create_GTF_from_database:main',
+            'talon_create_adata=talon.post.create_anndata_from_database:main',
             'talon_reformat_gtf=talon.reformat_gtf:main',
             'talon_generate_report=talon.post.generate_talon_report:main',
             'talon_summarize=talon.post.summarize_datasets:main',
