@@ -325,16 +325,17 @@ Options:
                         annotation transcripts are considered known or novel
                         relative to. Note: must be in the TALON database.
   --pass_list=FILE      Pass list file of transcripts to include in the
-
                         output. First column should be TALON gene ID,
                         second column should be TALON transcript ID
   -b BUILD, --build=BUILD
                         Genome build to use. Note: must be in the TALON
                         database.
+  --gene                Output AnnData on the gene level rather than the
+                        transcript
   -d FILE, --datasets=FILE
                         Optional: A file indicating which datasets should be
                         included (one dataset name per line). Default is to
-                        include                   all datasets.
+                        include all datasets.
   --o=FILE              Output .h5ad file name
 ```
 

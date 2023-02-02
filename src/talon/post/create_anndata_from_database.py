@@ -46,6 +46,10 @@ def getOptions():
         help = "Genome build to use. Note: must be in the TALON database.",
         type = "string")
 
+    parser.add_option('--gene', dest='gene_level',
+        help='Output AnnData on the gene level rather than the transcript',
+        action='store_true')
+
     parser.add_option("--datasets", "-d",  dest = "dataset_file",
         help = """Optional: A file indicating which datasets should be
                   included (one dataset name per line). Default is to include
@@ -239,7 +243,7 @@ def get_g_t_names(db, annot, tids):
 
     return df
 
-def get_var_info(db, annot, build, tids=None, gids=None):
+def get_var_info(db, annot, build, tids=None, gids=None, gene_level=False):
     """
     Get info about names, IDs, novelty categories, etc. for each gene
     and transcript in a talon DB
@@ -250,6 +254,7 @@ def get_var_info(db, annot, build, tids=None, gids=None):
         build (str): Name of genome build in TALON db
         tids (list of int): Internal transcript IDs to include
         gids (list of int): Internal gene IDs to include
+        gene_level (bool): Whether to return info on the gene level
 
     Returns:
         df (pandas DataFrame): DataFrame with metadata about
@@ -261,12 +266,33 @@ def get_var_info(db, annot, build, tids=None, gids=None):
     prefix = autils.fetch_naming_prefix(db)
     n_places = autils.fetch_n_places(db)
 
-    # add gene / transcript names / ids
-    df[['temp_gid', 'temp_tid']] = df.apply(lambda x: talon.construct_names(x.gene_ID,
-                         x.transcript_ID,
-                         prefix,
-                         n_places),
-                     axis=1, result_type='expand')
+    # make names for novel genes / transcripts
+    # determine how many missing digits there are
+    # repeat '0' for that many spaces for each gene / transcript ID
+    df['zero'] = '0'
+    df['n_gid_zero_to_add'] = n_places-df.gene_ID.astype(str).str.len()
+    df['temp_gid'] = prefix+'G'+df['zero'].str.repeat(df['n_gid_zero_to_add'])+df['gene_ID'].astype(str)
+    df['n_tid_zero_to_add'] = n_places-df.transcript_ID.astype(str).str.len()
+    df['temp_tid'] = prefix+'T'+df['zero'].str.repeat(df['n_tid_zero_to_add'])+df['transcript_ID'].astype(str)
+
+    df['temp'] = df.temp_gid.str.len()
+    if len(df['temp'].unique().tolist()) != 1:
+        raise ValueError('Problem naming genes')
+    df['temp'] = df.temp_tid.str.len()
+    if len(df['temp'].unique().tolist()) != 1:
+        raise ValueError('Problem naming transcripts')
+
+    # drop extra stuff
+    drop_cols = ['zero', 'n_gid_zero_to_add',
+                 'n_tid_zero_to_add', 'temp']
+    df.drop(drop_cols, axis=1, inplace=True)
+
+    # # add gene / transcript names / ids
+    # df[['temp_gid', 'temp_tid']] = df.apply(lambda x: talon.construct_names(x.gene_ID,
+    #                      x.transcript_ID,
+    #                      prefix,
+    #                      n_places),
+    #                  axis=1, result_type='expand')
 
     # replace null gene names / ids
     inds = df.loc[df.annot_gene_id.isnull()].index
@@ -306,6 +332,16 @@ def get_var_info(db, annot, build, tids=None, gids=None):
              'gene_novelty', 'transcript_novelty', 'ISM_subtype']
     df = df[order]
 
+    # gene level -- drop columns that are only relevant to transcripts
+    # and drop duplicated entries
+    if gene_level:
+        drop_cols = ['transcript_ID', 'annot_transcript_id',
+                     'annot_transcript_name', 'length',
+                     'transcript_novelty', 'ISM_subtype',
+                     'n_exons']
+        df.drop(drop_cols, axis=1, inplace=True)
+        df.drop_duplicates(inplace=True)
+
     return df
 
 def get_obs_info(db, dataset_file):
@@ -332,25 +368,58 @@ def get_obs_info(db, dataset_file):
         df.rename({'dataset_name': 'dataset'}, axis=1, inplace=True)
     return df
 
-def get_X_info(db, obs, var):
+def get_X_info(db, obs, var, gene_level=False):
+    """
+    Get sparse matrix representation of gene or transcript counts
+    from the TALON db
+
+    Parameters:
+        db (str): Path to TALON db
+        obs (pandas DataFrame): Pandas DataFrame with information about each
+            dataset / sample to include
+        var (pandas DataFrame): Pandas DataFrame with information about each
+            gene or transcript to include
+        gene_level (bool): Whether to compute counts on the gene / transcript level
+    """
+
     dataset_str = qutils.format_for_IN(obs.dataset.unique().tolist())
-    transcript_str = qutils.format_for_IN(var.transcript_ID.unique().tolist())
-    with sqlite3.connect(db) as conn:
+
+    # filter on genes
+    if gene_level:
+        var_col = 'gene_ID'
+        feat_str = qutils.format_for_IN(var[var_col].unique().tolist())
+        query = f"""SELECT t.gene_ID, ab.transcript_ID, ab.dataset, ab.count
+                    FROM abundance as ab
+                    LEFT JOIN transcripts as t
+                        ON t.transcript_ID = ab.transcript_ID
+                    WHERE ab.transcript_ID in {feat_str}
+                    AND ab.dataset in {dataset_str}
+                 """
+
+    # filter on transcripts
+    else:
+        var_col = 'transcript_ID'
+        feat_str = qutils.format_for_IN(var[var_col].unique().tolist())
         query = f"""SELECT transcript_ID, dataset, count
-                    FROM abundance WHERE transcript_ID in {transcript_str}
+                    FROM abundance WHERE transcript_ID in {feat_str}
                     AND dataset in {dataset_str}
                  """
+    with sqlite3.connect(db) as conn:
         df = pd.read_sql_query(query, conn)
+
+    # sum over transcripts from the same gene / dataset
+    if gene_level:
+        df.drop('transcript_ID', axis=1, inplace=True)
+        df = df.groupby(['gene_ID', 'dataset']).sum().reset_index()
 
     # make categories based on ordering of obs and var tables
     obs_col = 'dataset'
-    var_col = 'transcript_ID'
     obs_cat = pd.api.types.CategoricalDtype(obs[obs_col], ordered=True)
     if obs_cat.categories.tolist() != obs[obs_col].tolist():
         raise ValueError('Problem with dataset names')
     var_cat = pd.api.types.CategoricalDtype(var[var_col], ordered=True)
     if var_cat.categories.tolist() != var[var_col].tolist():
-        raise ValueError('Problem with transcript IDs')
+        raise ValueError('Problem with feature IDs')
 
     # create sparse matrix representation without
     # inflating
@@ -359,6 +428,12 @@ def get_X_info(db, obs, var):
     X = csr_matrix((df['count'], (row, col)), \
                    shape=(obs_cat.categories.size,
                           var_cat.categories.size))
+
+    # # code to inflate matrix
+    # dfs = pd.SparseDataFrame(X, \
+    #                      index=obs_cat.categories, \
+    #                      columns=var_cat.categories, \
+    #                      default_fill_value=0)
 
     return X
 
@@ -371,8 +446,7 @@ def main():
     pass_list_file = options.pass_list
     dataset_file = options.dataset_file
     ofile = options.ofile
-
-
+    gene_level = options.gene_level
 
     # make sure that the input database exists
     if not Path(db).exists():
@@ -391,9 +465,9 @@ def main():
     tids = [i[1] for i in list(set(pass_list))]
 
     # get obs, var, and X tables
-    var = get_var_info(db, annot, build, tids, gids)
+    var = get_var_info(db, annot, build, tids, gids, gene_level)
     obs = get_obs_info(db, dataset_file)
-    X = get_X_info(db, obs, var)
+    X = get_X_info(db, obs, var, gene_level)
 
     # assemble adata
     adata = anndata.AnnData(X=X, obs=obs, var=var)
