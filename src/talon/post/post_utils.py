@@ -38,9 +38,14 @@ def handle_filtering(database, annot, observed, whitelist_file, dataset_file):
         query = """ SELECT DISTINCT gene_ID, transcript_ID
                     FROM observed
                     WHERE transcript_ID IN %s
-                    AND dataset in %s """
-        cursor.execute(query % (transcript_str, dataset_str))
+                    AND dataset in %s """ % (transcript_str, dataset_str)
+        cursor.execute(query)
         whitelist = cursor.fetchall()
 
     conn.close()
+
+    # check if the pass list has any transcripts
+    if len(whitelist) == 0:
+        raise ValueError('No transcripts found with the given filtering settings')
+
     return whitelist
