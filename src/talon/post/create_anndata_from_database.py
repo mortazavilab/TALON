@@ -392,7 +392,7 @@ def get_X_info(db, obs, var, gene_level=False):
                     FROM abundance as ab
                     LEFT JOIN transcripts as t
                         ON t.transcript_ID = ab.transcript_ID
-                    WHERE ab.transcript_ID in {feat_str}
+                    WHERE t.gene_ID in {feat_str}
                     AND ab.dataset in {dataset_str}
                  """
 
