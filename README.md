@@ -15,6 +15,7 @@ works from mapped SAM files, allowing data from different sequencing platforms
 * [Working with the TALON results](#talon_utils)
   * [Accessing abundance information](#talon_abundance)
   * [Filtering transcript models](#talon_filter)
+  * [Creating gene / transcript-level AnnDatas](#talon_adata)
 * [Citing TALON](#talon_cite)
 
 Reads must be aligned to the reference genome prior to using TALON. We recommend the Minimap2 aligner - please see their GitHub page [here](https://github.com/lh3/minimap2) for recommended long-read parameters by technology. Please note that TALON requires the SAM MD tag, so Minimap2 should be run with the --MD flag enabled. In principle, you can use any other long-read alignment software provided that an MD tag is generated.
