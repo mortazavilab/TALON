@@ -77,15 +77,29 @@ def get_known_transcripts(database, annot, include_annot, datasets = None):
         the specified datasets """
 
     with sqlite3.connect(database) as conn:
-        query = """SELECT DISTINCT gene_ID, transcript_ID FROM observed
-                       LEFT JOIN transcript_annotations AS ta
-                           ON ta.ID = observed.transcript_ID
-                       WHERE (ta.attribute = 'transcript_status'
-                              AND ta.value = 'KNOWN'
-                              AND ta.annot_name = '%s')""" % (annot)
+        # pull from observed table
+        if not include_annot:
+            query = """SELECT DISTINCT gene_ID, transcript_ID FROM observed
+                           LEFT JOIN transcript_annotations AS ta
+                               ON ta.ID = observed.transcript_ID
+                           WHERE (ta.attribute = 'transcript_status'
+                                  AND ta.value = 'KNOWN'
+                                  AND ta.annot_name = '%s')""" % (annot)
 
-        # if we're filtering known transcripts for those that
-        # are actually observed rather than including them all
+        # pull from normal transcripts table
+        elif include_annot:
+            query = f"""SELECT DISTINCT t.gene_ID, t.transcript_ID
+                FROM transcripts as t
+                LEFT JOIN transcript_annotations as ta
+                    ON ta.ID = t.transcript_ID
+                WHERE (ta.attribute = 'transcript_status'
+                    AND ta.value = 'KNOWN'
+                    AND ta.annot_name = '{annot}')
+                     """
+
+        # limit to datasets that transcript is seen in if requested
+        # if we requested to include all annotated transcripts, we don't need
+        # to do this
         if datasets != None and not include_annot:
             datasets = qutils.format_for_IN(datasets)
             query += " AND observed.dataset IN " + datasets
@@ -295,6 +309,8 @@ def filter_talon_transcripts(database, annot, datasets, options):
     known = get_known_transcripts(database, annot,
                                   options.include_annot,
                                   datasets = datasets)
+    print(f'Found {len(known)} known transcripts')
+    import pdb; pdb.set_trace()
 
     # Get reads that pass fraction A cutoff
     reads = fetch_reads_in_datasets_fracA_cutoff(database, datasets,
