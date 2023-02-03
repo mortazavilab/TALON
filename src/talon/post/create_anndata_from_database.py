@@ -407,6 +407,9 @@ def get_X_info(db, obs, var, gene_level=False):
     with sqlite3.connect(db) as conn:
         df = pd.read_sql_query(query, conn)
 
+    # remove genes / transcripts w/ 0 counts
+    df = df.loc[df['count'] > 0]
+
     # sum over transcripts from the same gene / dataset
     if gene_level:
         df.drop('transcript_ID', axis=1, inplace=True)
