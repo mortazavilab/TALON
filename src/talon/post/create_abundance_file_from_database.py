@@ -182,6 +182,8 @@ def fetch_abundances(database, datasets, annot, whitelist):
     final_abundance = []
     for entry in abundance_tuples:
         transcript_ID = entry["transcript_ID"]
+
+        # limit only to expressed transcripts
         if transcript_ID not in abundance:
             continue
 
