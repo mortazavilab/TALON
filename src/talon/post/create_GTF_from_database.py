@@ -2,7 +2,7 @@
 # Author: Dana Wyman
 # -----------------------------------------------------------------------------
 # create_GTF_from_database.py is a utility that outputs the genes, transcripts,
-# and exons stored a TALON database into a GTF annotation file. 
+# and exons stored a TALON database into a GTF annotation file.
 
 import copy
 import itertools
@@ -11,6 +11,7 @@ from optparse import OptionParser
 import sqlite3
 
 from . import post_utils as putils
+from . import ab_utils as autils
 from pathlib import Path
 
 from .. import query_utils as qutils
@@ -40,10 +41,10 @@ def getOptions():
     parser.add_option("--observed", dest ="observed", action='store_true',
                       help = "If this option is set, the GTF file will only  \
                       include transcripts that were observed in at least one \
-                      dataset (redundant if dataset file provided).")   
- 
+                      dataset (redundant if dataset file provided).")
+
     parser.add_option("--datasets", "-d",  dest = "datasets_file",
-        help = """Optional: A file indicating which datasets should be 
+        help = """Optional: A file indicating which datasets should be
                   included (one dataset name per line). Default is to include
                   all datasets.""",
         metavar = "FILE", type = "string", default = None)
@@ -58,11 +59,11 @@ def getOptions():
 def create_outname(options):
     """ Creates filename for the output GTF that reflects the input options that
         were used. """
-    
+
     outname = options.outprefix + "_talon"
-    if options.observed == True: 
+    if options.observed == True:
         outname = "_".join([ outname, "observedOnly" ])
-    
+
     outname += ".gtf"
     return outname
 
@@ -73,8 +74,8 @@ def get_annotations(database, feat_type, annot, whitelist = None):
 
         Returns:
             annotation_dict: dictionary data structure in which the keys are
-                             gene/transcript/exon TALON IDs (depending on 
-                             choice of feat_type) and the value is a list of 
+                             gene/transcript/exon TALON IDs (depending on
+                             choice of feat_type) and the value is a list of
                              annotation tuples.
     """
     # Fetch the annotations
@@ -95,7 +96,7 @@ def get_annotations(database, feat_type, annot, whitelist = None):
     annotation_tuples = cursor.fetchall()
 
     # Sort based on ID
-    sorted_annotations = sorted(annotation_tuples, key=lambda x: x[0]) 
+    sorted_annotations = sorted(annotation_tuples, key=lambda x: x[0])
 
     # Group by ID and store in a dictionary
     ID_groups = {}
@@ -122,7 +123,7 @@ def get_gene_2_transcripts(database, genome_build, whitelist):
     cursor = conn.cursor()
     whitelist_string = "(" + ','.join([str(x) for x in whitelist]) + ")"
     query = """
-            SELECT 
+            SELECT
                t.gene_ID,
                t.transcript_ID,
                loc1.chromosome,
@@ -137,14 +138,14 @@ def get_gene_2_transcripts(database, genome_build, whitelist):
            LEFT JOIN location loc1 ON t.start_vertex = loc1.location_ID
            LEFT JOIN location loc2 ON t.end_vertex = loc2.location_ID
            LEFT JOIN genes ON t.gene_ID = genes.gene_ID
-           WHERE loc1.genome_build = '""" + genome_build + """' AND 
+           WHERE loc1.genome_build = '""" + genome_build + """' AND
            loc2.genome_build = '""" + genome_build + \
-           """' AND t.transcript_ID IN """ + whitelist_string 
+           """' AND t.transcript_ID IN """ + whitelist_string
     cursor.execute(query)
     transcript_tuples = cursor.fetchall()
 
     # Sort based on gene ID
-    sorted_transcript_tuples = sorted(transcript_tuples, key=lambda x: x["gene_ID"])    
+    sorted_transcript_tuples = sorted(transcript_tuples, key=lambda x: x["gene_ID"])
 
     gene_groups = {}
     for key,group in itertools.groupby(sorted_transcript_tuples,operator.itemgetter(0)):
@@ -152,17 +153,17 @@ def get_gene_2_transcripts(database, genome_build, whitelist):
         gene_groups[key] = sorted(list(group), key=lambda x: x["min_pos"])
     conn.close()
 
-    return gene_groups 
+    return gene_groups
 
 def fetch_exon_locations(database, genome_build):
-    """ Queries the database to create a dictionary mapping exon IDs to 
+    """ Queries the database to create a dictionary mapping exon IDs to
         the chromosome, start, end, and strand of the exon """
 
     conn = sqlite3.connect(database)
     cursor = conn.cursor()
 
     query = """
-            SELECT 
+            SELECT
                 e.edge_ID,
                 loc1.chromosome,
                 MIN(loc1.position,loc2.position),
@@ -174,7 +175,7 @@ def fetch_exon_locations(database, genome_build):
              WHERE loc1.genome_build = '""" + genome_build + """' AND
              loc2.genome_build = '""" + genome_build + \
              """' AND e.edge_type = 'exon';"""
-    
+
     cursor.execute(query)
     exon_location_tuples = cursor.fetchall()
 
@@ -184,7 +185,7 @@ def fetch_exon_locations(database, genome_build):
         exon_ID = loc_tuple[0]
         exon_locations[exon_ID] = loc_tuple[1:]
 
-    conn.close() 
+    conn.close()
     return exon_locations
 
 def create_gtf(database, annot, genome_build, whitelist, outfile):
@@ -198,20 +199,20 @@ def create_gtf(database, annot, genome_build, whitelist, outfile):
             transcript_whitelist.append(id_tuple[1])
 
     # Get gene, transcript, and exon annotations
-    gene_annotations = get_annotations(database, "gene", annot, 
-                                       whitelist = gene_whitelist)  
+    gene_annotations = get_annotations(database, "gene", annot,
+                                       whitelist = gene_whitelist)
     transcript_annotations = get_annotations(database, "transcript", annot,
-                                             whitelist = transcript_whitelist) 
+                                             whitelist = transcript_whitelist)
     exon_annotations = get_annotations(database, "exon", annot)
 
 
     # Get transcript data from the database
-    gene_2_transcripts = get_gene_2_transcripts(database, genome_build, 
+    gene_2_transcripts = get_gene_2_transcripts(database, genome_build,
                          transcript_whitelist)
 
     # Get exon location info from database
     exon_ID_2_location = fetch_exon_locations(database, genome_build)
- 
+
     # -------------------------------------------------------------
 
     o = open(outfile, 'w')
@@ -224,21 +225,21 @@ def create_gtf(database, annot, genome_build, whitelist, outfile):
             attribute = annot[3]
             value = annot[4]
             gene_annotation_dict[attribute] = value
-        gene_GTF_line = get_gene_GTF_entry(gene_ID, transcript_tuples, 
+        gene_GTF_line = get_gene_GTF_entry(gene_ID, transcript_tuples,
                                       copy.copy(gene_annotation_dict))
         o.write(gene_GTF_line + "\n")
-    
+
         # Create a GTF entry for every transcript of this gene
         for transcript_entry in transcript_tuples:
             transcript_ID = transcript_entry["transcript_ID"]
             curr_transcript_annot = transcript_annotations[transcript_ID]
-            
+
             transcript_annotation_dict = {}
             for annot in curr_transcript_annot:
                 attribute = annot[3]
                 value = annot[4]
                 transcript_annotation_dict[attribute] = value
-            transcript_GTF_line = get_transcript_GTF_entry(transcript_entry, 
+            transcript_GTF_line = get_transcript_GTF_entry(transcript_entry,
                                             copy.copy(gene_annotation_dict),
                                        copy.copy(transcript_annotation_dict))
             o.write(transcript_GTF_line + "\n")
@@ -261,11 +262,11 @@ def create_gtf(database, annot, genome_build, whitelist, outfile):
                     value = annot[4]
                     exon_annotation_dict[attribute] = value
 
-                
-                exon_GTF_line = get_exon_GTF_entry(gene_ID, transcript_ID, 
+
+                exon_GTF_line = get_exon_GTF_entry(gene_ID, transcript_ID,
                                                    exon_ID, exon_num,
                                                    exon_ID_2_location,
-                                                   copy.copy(gene_annotation_dict), 
+                                                   copy.copy(gene_annotation_dict),
                                                    copy.copy(transcript_annotation_dict),
                                                    exon_annotation_dict)
                 o.write(exon_GTF_line + "\n")
@@ -283,9 +284,9 @@ def make_descriptor_string(attribute, value):
     return str(attribute) + ' "' + str(value) + '";'
 
 def format_GTF_tag_values_for_gene(gene_ID, annotation_dict):
-    """ Parses the annotations for this gene, and supplements them where 
+    """ Parses the annotations for this gene, and supplements them where
         necessary for novel transcripts """
- 
+
     attributes = []
 
     # Mandatory: Gene ID
@@ -305,7 +306,7 @@ def format_GTF_tag_values_for_gene(gene_ID, annotation_dict):
     # Mandatory: Gene Status
     gene_status = annotation_dict.pop("gene_status")
     attributes.append(make_descriptor_string("gene_status", gene_status))
-   
+
     # Gene type
     if "gene_type" in annotation_dict:
         gene_type = annotation_dict.pop("gene_type")
@@ -317,9 +318,9 @@ def format_GTF_tag_values_for_gene(gene_ID, annotation_dict):
     else:
         source = "TALON"
         attributes.append(make_descriptor_string("source", source))
-    
+
     # TALON Gene ID
-    attributes.append(make_descriptor_string("talon_gene", gene_ID)) 
+    attributes.append(make_descriptor_string("talon_gene", gene_ID))
 
     # Add any remaining annotations
     for attribute,value in sorted(annotation_dict.items()):
@@ -363,7 +364,7 @@ def format_GTF_tag_values_for_transcript(gene_ID, transcript_ID, gene_annot_dict
     if "gene_type" in gene_annot_dict:
         gene_type = gene_annot_dict.pop("gene_type")
         attributes.append(make_descriptor_string("gene_type", gene_type))
- 
+
     # Transcript Type
     if "transcript_type" in transcript_annot_dict:
         transcript_type = transcript_annot_dict.pop("transcript_type")
@@ -372,14 +373,14 @@ def format_GTF_tag_values_for_transcript(gene_ID, transcript_ID, gene_annot_dict
     # Mandatory: Transcript Status
     transcript_status = transcript_annot_dict.pop("transcript_status")
     attributes.append(make_descriptor_string("transcript_status", transcript_status))
-    
+
     # Mandatory: Transcript Name
     if "transcript_name" in transcript_annot_dict:
         transcript_name = transcript_annot_dict.pop("transcript_name")
     else:
         transcript_name = "TALON_transcript-" + str(transcript_ID)
     attributes.append(make_descriptor_string("transcript_name", transcript_name))
-    
+
     # TALON Gene ID
     attributes.append(make_descriptor_string("talon_gene", gene_ID))
 
@@ -388,12 +389,12 @@ def format_GTF_tag_values_for_transcript(gene_ID, transcript_ID, gene_annot_dict
 
     # Add any remaining annotations
     for attribute,value in sorted(transcript_annot_dict.items()):
-        attributes.append(make_descriptor_string(attribute, value)) 
+        attributes.append(make_descriptor_string(attribute, value))
 
     return attributes
 
 def format_GTF_tag_values_for_exon(gene_ID, transcript_ID, exon_ID, exon_number,
-                                   gene_annot_dict, transcript_annot_dict, 
+                                   gene_annot_dict, transcript_annot_dict,
                                    exon_annot_dict):
     """ Parses the annotations for this exon, and supplements them where
         necessary for novel exons """
@@ -491,7 +492,7 @@ def get_gene_GTF_entry(gene_ID, associated_transcript_tuples, annotation_dict):
     frame = "."
     attributes = " ".join(format_GTF_tag_values_for_gene(gene_ID, annotation_dict))
 
-    GTF = '\t'.join([chromosome, source, feature, start, end, score, strand, 
+    GTF = '\t'.join([chromosome, source, feature, start, end, score, strand,
                      frame, attributes])
     return GTF
 
@@ -515,8 +516,8 @@ def get_transcript_GTF_entry(transcript_entry, curr_gene_annot_dict, curr_transc
     score = "."
     strand = transcript_entry["strand"]
     frame = "."
-    attributes = " ".join(format_GTF_tag_values_for_transcript(gene_ID, 
-                                                               transcript_ID, 
+    attributes = " ".join(format_GTF_tag_values_for_transcript(gene_ID,
+                                                               transcript_ID,
                                                                curr_gene_annot_dict,
                                                                curr_transcript_annot_dict))
 
@@ -524,7 +525,7 @@ def get_transcript_GTF_entry(transcript_entry, curr_gene_annot_dict, curr_transc
                      frame, attributes])
     return GTF
 
-def get_exon_GTF_entry(gene_ID, transcript_ID, exon_ID, exon_num, exon_ID_2_location, 
+def get_exon_GTF_entry(gene_ID, transcript_ID, exon_ID, exon_num, exon_ID_2_location,
                        curr_gene_annot_dict, curr_transcript_annot_dict,
                        curr_exon_annot_dict):
     """ Creates a GTF annotation entry for the given exon """
@@ -542,67 +543,67 @@ def get_exon_GTF_entry(gene_ID, transcript_ID, exon_ID, exon_num, exon_ID_2_loca
     score = "."
     strand = curr_exon_location[3]
     frame = "."
-    attributes = " ".join(format_GTF_tag_values_for_exon(gene_ID, 
-                                                         transcript_ID, 
+    attributes = " ".join(format_GTF_tag_values_for_exon(gene_ID,
+                                                         transcript_ID,
                                                          exon_ID, exon_num,
                                                          curr_gene_annot_dict,
                                                          curr_transcript_annot_dict,
                                                          curr_exon_annot_dict))
 
-    GTF = '\t'.join([chromosome, source, feature, start, end, score, strand, 
+    GTF = '\t'.join([chromosome, source, feature, start, end, score, strand,
                      frame, attributes])
     return GTF
 
-def check_annot_validity(annot, database):
-    """ Make sure that the user has entered a correct annotation name """
-
-    conn = sqlite3.connect(database)
-    cursor = conn.cursor()
-
-    cursor.execute("SELECT DISTINCT annot_name FROM gene_annotations")
-    annotations = [str(x[0]) for x in cursor.fetchall()]
-    conn.close()
-
-    if "TALON" in annotations:
-        annotations.remove("TALON")
-
-    if annot == None:
-        message = "Please provide a valid annotation name. " + \
-                  "In this database, your options are: " + \
-                  ", ".join(annotations)
-        raise ValueError(message)
-
-    if annot not in annotations:
-        message = "Annotation name '" + annot + \
-                  "' not found in this database. Try one of the following: " + \
-                  ", ".join(annotations)
-        raise ValueError(message)
-
-    return
-
-def check_build_validity(build, database):
-    """ Make sure that the user has entered a correct build name """
-
-    conn = sqlite3.connect(database)
-    cursor = conn.cursor()
-
-    cursor.execute("SELECT name FROM genome_build")
-    builds = [str(x[0]) for x in cursor.fetchall()]
-    conn.close()
-
-    if build == None:
-        message = "Please provide a valid genome build name. " + \
-                  "In this database, your options are: " + \
-                  ", ".join(builds)
-        raise ValueError(message)
-
-    if build not in builds:
-        message = "Build name '" + build + \
-                  "' not found in this database. Try one of the following: " + \
-                  ", ".join(builds)
-        raise ValueError(message)
-
-    return
+# def check_annot_validity(annot, database):
+#     """ Make sure that the user has entered a correct annotation name """
+#
+#     conn = sqlite3.connect(database)
+#     cursor = conn.cursor()
+#
+#     cursor.execute("SELECT DISTINCT annot_name FROM gene_annotations")
+#     annotations = [str(x[0]) for x in cursor.fetchall()]
+#     conn.close()
+#
+#     if "TALON" in annotations:
+#         annotations.remove("TALON")
+#
+#     if annot == None:
+#         message = "Please provide a valid annotation name. " + \
+#                   "In this database, your options are: " + \
+#                   ", ".join(annotations)
+#         raise ValueError(message)
+#
+#     if annot not in annotations:
+#         message = "Annotation name '" + annot + \
+#                   "' not found in this database. Try one of the following: " + \
+#                   ", ".join(annotations)
+#         raise ValueError(message)
+#
+#     return
+#
+# def check_build_validity(build, database):
+#     """ Make sure that the user has entered a correct build name """
+#
+#     conn = sqlite3.connect(database)
+#     cursor = conn.cursor()
+#
+#     cursor.execute("SELECT name FROM genome_build")
+#     builds = [str(x[0]) for x in cursor.fetchall()]
+#     conn.close()
+#
+#     if build == None:
+#         message = "Please provide a valid genome build name. " + \
+#                   "In this database, your options are: " + \
+#                   ", ".join(builds)
+#         raise ValueError(message)
+#
+#     if build not in builds:
+#         message = "Build name '" + build + \
+#                   "' not found in this database. Try one of the following: " + \
+#                   ", ".join(builds)
+#         raise ValueError(message)
+#
+#     return
 
 def main():
     options = getOptions()
@@ -614,25 +615,25 @@ def main():
     build = options.build
     outfile = create_outname(options)
 
-    check_annot_validity(annot, database)
-    check_build_validity(build, database)
+    autils.check_annot_validity(annot, database)
+    autils.check_build_validity(build, database)
 
     # Make sure that the input database exists!
     if not Path(database).exists():
         raise ValueError("Database file '%s' does not exist!" % database)
 
 
-    # Determine which transcripts to include    
-    whitelist = putils.handle_filtering(database, 
-                                        annot, 
-                                        observed, 
-                                        whitelist_file, 
+    # Determine which transcripts to include
+    whitelist = putils.handle_filtering(database,
+                                        annot,
+                                        observed,
+                                        whitelist_file,
                                         dataset_file)
     # Sort on gene ID
     sorted_whitelist = sorted(whitelist, key=lambda x: x[0])
 
-    create_gtf(database, annot, build, whitelist, outfile)    
-    
+    create_gtf(database, annot, build, whitelist, outfile)
+
 
 if __name__ == '__main__':
     main()

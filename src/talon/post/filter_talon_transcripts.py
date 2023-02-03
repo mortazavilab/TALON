@@ -10,6 +10,7 @@ from optparse import OptionParser
 import sqlite3
 from pathlib import Path
 from .. import query_utils as qutils
+from . import ab_utils as autils
 from talon.post import get_read_annotations as read_annot
 import pandas as pd
 import os
@@ -154,32 +155,32 @@ def fetch_reads_in_datasets_fracA_cutoff(database, datasets, max_frac_A):
     return data
 
 
-def check_annot_validity(annot, database):
-    """ Make sure that the user has entered a correct annotation name """
-
-    conn = sqlite3.connect(database)
-    cursor = conn.cursor()
-
-    cursor.execute("SELECT DISTINCT annot_name FROM gene_annotations")
-    annotations = [str(x[0]) for x in cursor.fetchall()]
-    conn.close()
-
-    if "TALON" in annotations:
-        annotations.remove("TALON")
-
-    if annot == None:
-        message = "Please provide a valid annotation name. " + \
-                  "In this database, your options are: " + \
-                  ", ".join(annotations)
-        raise ValueError(message)
-
-    if annot not in annotations:
-        message = "Annotation name '" + annot + \
-                  "' not found in this database. Try one of the following: " + \
-                  ", ".join(annotations)
-        raise ValueError(message)
-
-    return
+# def check_annot_validity(annot, database):
+#     """ Make sure that the user has entered a correct annotation name """
+#
+#     conn = sqlite3.connect(database)
+#     cursor = conn.cursor()
+#
+#     cursor.execute("SELECT DISTINCT annot_name FROM gene_annotations")
+#     annotations = [str(x[0]) for x in cursor.fetchall()]
+#     conn.close()
+#
+#     if "TALON" in annotations:
+#         annotations.remove("TALON")
+#
+#     if annot == None:
+#         message = "Please provide a valid annotation name. " + \
+#                   "In this database, your options are: " + \
+#                   ", ".join(annotations)
+#         raise ValueError(message)
+#
+#     if annot not in annotations:
+#         message = "Annotation name '" + annot + \
+#                   "' not found in this database. Try one of the following: " + \
+#                   ", ".join(annotations)
+#         raise ValueError(message)
+#
+#     return
 
 def check_db_version(database):
     """ Make sure the user is using a v5 database """
@@ -354,7 +355,7 @@ def main():
     check_db_version(database)
 
     # Make sure that the provided annotation name is valid
-    check_annot_validity(annot, database)
+    autils.check_annot_validity(annot, database)
 
     # Parse datasets
     datasets = parse_datasets(options.datasets, database)
