@@ -3,22 +3,22 @@
 #------------------------------------------------------------------------------
 
 class Gene(object):
-    """ Contains high-level information about a gene, such as its identifiers, 
+    """ Contains high-level information about a gene, such as its identifiers,
         genomic location, and transcripts. Does not contain exon information.
         Attributes:
             - identifier: Accession ID of gene, i.e. an Ensembl ID. Required.
-            - name: Human-readable name of the gene. This attribute can be left 
+            - name: Human-readable name of the gene. This attribute can be left
               empty if the gene does not have an assigned name.
             - chromosome: Chromosome that the gene is located on (format "chr1")
-            - start: The start position of the gene with respect to the forward 
+            - start: The start position of the gene with respect to the forward
               strand (int). Should always be less than or equal to end.
-            - end: The end position of the gene with respect to the forward strand 
+            - end: The end position of the gene with respect to the forward strand
               (int). Should always be greater than or equal to start.
-            - strand: "+" if the gene is on the forward strand, "-" if it is on 
+            - strand: "+" if the gene is on the forward strand, "-" if it is on
               the reverse strand
             - annotations: a dictionary of miscellaneous annotation categories
               extracted from a GTF
-            
+
     """
 
     def __init__(self, identifier, chromosome, start, end, strand, annotations):
@@ -35,7 +35,7 @@ class Gene(object):
         self.annotations = annotations
 
         if start > end:
-            raise ValueError("""Plus strand gene start must be less than or 
+            raise ValueError("""Plus strand gene start must be less than or
                              equal to end.""")
 
     def set_name(self, name):
@@ -48,12 +48,17 @@ class Gene(object):
         """ Adds a key-value pair (transcript identifier -> Transcript oject)
             to the gene's transcript dictionary
             Args:
-                transcript: object of type Transcript. Must overlap with the 
+                transcript: object of type Transcript. Must overlap with the
                 location of the gene.
         """
         if transcript.start >= self.end or transcript.end <= self.start:
-            raise ValueError('Transcript must overlap the gene it is assigned to')
- 
+
+            # only throw the error if we have a multi-bp transcript
+            if transcript.start != transcript.end:
+                transcript_id = transcript.identifier
+                gene_id = transcript.gene_id
+                raise ValueError(f'Transcript ({transcript_id}) must overlap the gene ({gene_id}) it is assigned to')
+
         if transcript.gene_id == self.identifier:
             # In order to belong to a gene, the transcript gene_id must match
             transcript_id = transcript.identifier
@@ -61,7 +66,7 @@ class Gene(object):
         else:
             raise ValueError('Gene ID of transcript must match gene ' + \
                   'in order for assignment to be made.')
-        return             
+        return
 
 
     def print_gene(self):
@@ -75,8 +80,8 @@ class Gene(object):
 
         print("\tLocation: " + self.chromosome + ":" + str(self.start) + "-" + \
               str(self.end) + "(" + self.strand + ")")
-        
-        # Print transcripts in shorthand 
+
+        # Print transcripts in shorthand
         for transcript in self.transcripts:
             print("\t Transcript: " + transcript)
 
@@ -127,7 +132,7 @@ def get_gene_from_gtf(gene_info):
     return gene
 
 def extract_gene_annotations_from_GTF(tab_fields):
-    """Parses the description field of a gene GTF in order to organize the 
+    """Parses the description field of a gene GTF in order to organize the
        information therein into a dictionary.
     """
 
@@ -145,12 +150,12 @@ def extract_gene_annotations_from_GTF(tab_fields):
 
         key = fields[0].replace('"', '')
         val = ' '.join(fields[1:]).replace('"', '')
-        
+
         attributes[key] = val
 
     attributes["source"] = tab_fields[1]
 
-    return attributes  
+    return attributes
 
 def get_gene_from_exon(exon, gene_id):
     """ In rare cases, GTF exons are listed with gene and transcript IDs that
