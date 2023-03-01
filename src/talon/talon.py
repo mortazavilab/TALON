@@ -1520,8 +1520,20 @@ def check_inputs(options):
 
                     # get list of dataset names from the CB tag in the sam file
                     if curr_sam.endswith('.sam'):
-                        df = pd.read_csv(curr_sam, sep='\tCB:Z:', comment='@',
-                                         usecols=[1], header=None, names=['cb_tag'], engine='python')
+
+                        # which rows are comment rows?
+                        with open(curr_sam, 'r') as infile:
+                            skip_rows = []
+                            for i, line in enumerate(infile):
+                                if line.startswith('@'):
+                                    skip_rows.append(i)
+                                else:
+                                    break
+                        # read just the cb tags
+                        df = pd.read_csv(curr_sam, sep='\tCB:Z:',
+                                         skiprows=skip_rows,
+                                         usecols=[1], header=None,
+                                         names=['cb_tag'], engine='python')
                         # is the df empty?
                         if df.empty:
                             raise RuntimeError(
