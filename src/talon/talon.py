@@ -1558,12 +1558,12 @@ def check_inputs(options):
                         metadata[0] = dataname
 
                         if dataname in existing_datasets:
-                            raise RuntimeError(("Dataset for read group {} " +
+                            raise RuntimeError((f"Dataset for read group {f} " +
                                                 "already in database."))
                             # warnings.warn("Ignoring dataset with name '" + dataname + \
                             #               "' because it is already in the database.")
                         elif dataname in curr_datasets:
-                            raise RuntimeError(("Dataset for read group {} " +
+                            raise RuntimeError((f"Dataset for read group {f} " +
                                                 "already in config file."))
                             # warnings.warn("Skipping duplicated instance of dataset '" + \
                             #                dataname + "'.")
