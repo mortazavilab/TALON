@@ -94,9 +94,9 @@ If you're using the `--cb` option, the dataset names will be pulled from the SAM
 Please note that TALON versions 4.4+ can be run in multithreaded fashion for a much faster runtime.
 
 ```
-usage: talon [-h] [--f CONFIG_FILE] [--db FILE,] [--build STRING,]
+usage: talon [-h] [--f CONFIG_FILE] [--cb] [--db FILE,] [--build STRING,]
              [--threads THREADS] [--cov MIN_COVERAGE]
-             [--identity MIN_IDENTITY] [--o OUTPREFIX]
+             [--identity MIN_IDENTITY] [--nsg] [--o OUTPREFIX]
 
 optional arguments:
   -h, --help            show this help message and exit  
@@ -116,6 +116,10 @@ optional arguments:
   --identity MIN_IDENTITY, -i MIN_IDENTITY
                         Minimum alignment identity in order to use a SAM
                         entry. Default = 0.8
+  --nsg, --create_novel_spliced_genes
+                        Make novel genes with the intergenic novelty label for
+                        transcripts that don't share splice junctions with any
+                        other models
   --tmpDir
                         Path to directory for tmp files. Default = `talon_tmp/`
   --o OUTPREFIX         Prefix for output files

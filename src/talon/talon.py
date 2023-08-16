@@ -113,6 +113,10 @@ def get_args():
     parser.add_argument("--identity", "-i", dest="min_identity",
                         help="Minimum alignment identity in order to use a SAM entry. Default = 0.8",
                         type=float, default=0.8)
+    parser.add_argument("--nsg", "--create_novel_spliced_genes", dest='create_novel_spliced_genes', action='store_true',
+                        help="Make novel genes with the intergenic novelty label " +
+                        "for transcripts that don't share " +
+                        "splice junctions with any other models", default=False)
     parser.add_argument("--tmpDir", dest="tmp_dir",
                         help="Path to directory for tmp files. Default = `talon_tmp/`",
                         type=str,  default="talon_tmp/")
@@ -634,6 +638,13 @@ def search_for_overlap_with_gene(chromosome, start, end, strand,
     # Among multiple matches, preferentially return the same-strand gene with
     # the greatest amount of overlap
     same_strand_matches = len([x for x in matches if x["strand"] == strand])
+    # for m in matches:
+    #     print()
+    #     print(m['gene_ID'])
+    #     print(m['start'])
+    #     print(m['end'])
+    #
+    # print(same_strand_matches)
 
     if strand == "+" and same_strand_matches > 0 or \
             strand == "-" and same_strand_matches == 0:
@@ -950,9 +961,12 @@ def process_NIC(chrom, positions, strand, edge_IDs, vertex_IDs, transcript_dict,
             gene_matches += [x[0]
                              for x in list(curr_matches) if x[1] == strand]
 
+
     # Now count up how often we see each gene
     gene_tally = dict((x, gene_matches.count(x)) for x in set(gene_matches))
 
+    # print(gene_matches)
+    # print(gene_tally)
     # TODO: deal with fusions
 
     # For the main assignment, pick the gene that is observed the most
@@ -1002,7 +1016,6 @@ def process_NIC(chrom, positions, strand, edge_IDs, vertex_IDs, transcript_dict,
 def find_gene_match_on_vertex_basis(vertex_IDs, strand, vertex_2_gene):
     """ Use vertices in a transcript to try to pinpoint the gene it belongs to.
     """
-
     gene_matches = []
     for vertex in vertex_IDs:
         if vertex in vertex_2_gene:
@@ -1017,6 +1030,8 @@ def find_gene_match_on_vertex_basis(vertex_IDs, strand, vertex_2_gene):
     # Now count up how often we see each gene
     gene_tally = dict((x, gene_matches.count(x)) for x in set(gene_matches))
 
+    # print(gene_matches)
+    # print(gene_tally)
     # TODO: deal with fusions
 
     # For the main assignment, pick the gene that is observed the most
@@ -1148,9 +1163,14 @@ def process_remaining_mult_cases(chrom, positions, strand, edge_IDs, vertex_IDs,
     transcript_novelty = []
     start_end_info = {}
 
-    gene_ID, match_strand = search_for_overlap_with_gene(chrom, positions[0],
-                                                         positions[-1], strand,
-                                                         cursor, run_info, tmp_gene)
+    if not run_info.create_novel_spliced_genes:
+        gene_ID, match_strand = search_for_overlap_with_gene(chrom, positions[0],
+                                                             positions[-1], strand,
+                                                             cursor, run_info, tmp_gene)
+    else:
+        print('uwu')
+        gene_ID = None
+        match_strand = None
 
     # We don't care about the gene when making these assignments
     start_vertex, start_exon, start_novelty, known_start, diff_5p = process_5p(chrom,
@@ -1490,7 +1510,6 @@ def check_inputs(options):
             sam_files = []
             dataset_metadata = []
             curr_datasets = []
-
             cursor.execute(""" SELECT dataset_name FROM dataset """)
             existing_datasets = [str(x[0]) for x in cursor.fetchall()]
 
@@ -1593,7 +1612,7 @@ def check_inputs(options):
 
 
 def init_run_info(database, genome_build, min_coverage=0.9, min_identity=0,
-                  use_cb_tag=False, tmp_dir="talon_tmp/"):
+                  use_cb_tag=False, create_novel_spliced_genes=False, tmp_dir="talon_tmp/"):
     """ Initializes a dictionary that keeps track of important run information
         such as the desired genome build, the prefix for novel identifiers,
         and the novel counters for the run. """
@@ -1607,6 +1626,7 @@ def init_run_info(database, genome_build, min_coverage=0.9, min_identity=0,
         run_info.min_coverage = min_coverage
         run_info.min_identity = min_identity
         run_info.use_cb_tag = use_cb_tag
+        run_info.create_novel_spliced_genes = create_novel_spliced_genes
         run_info.tmp_dir = tmp_dir
         os.system("mkdir -p %s " % (tmp_dir))
 
@@ -2605,6 +2625,7 @@ def main():
     min_identity = float(options.min_identity)
     outprefix = options.outprefix
     tmp_dir = options.tmp_dir
+    create_novel_spliced_genes = bool(options.create_novel_spliced_genes)
 
     # format tmp_dir if missing fwd slash
     if not tmp_dir.endswith('/'):
@@ -2616,7 +2637,8 @@ def main():
     # Initialize worker pool
     with mp.Pool(processes=threads) as pool:
         run_info = init_run_info(database, build, min_coverage, min_identity,
-                                 use_cb_tag, tmp_dir=tmp_dir)
+                                 use_cb_tag, create_novel_spliced_genes,
+                                 tmp_dir=tmp_dir)
         run_info.outfiles = init_outfiles(options.outprefix,
                                           tmp_dir=tmp_dir)
 
