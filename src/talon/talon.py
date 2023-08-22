@@ -1168,7 +1168,6 @@ def process_remaining_mult_cases(chrom, positions, strand, edge_IDs, vertex_IDs,
                                                              positions[-1], strand,
                                                              cursor, run_info, tmp_gene)
     else:
-        print('uwu')
         gene_ID = None
         match_strand = None
 
