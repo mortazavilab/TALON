@@ -112,7 +112,7 @@ try:
         "--3p", "300",
         "--idprefix", "ENCODEH",
         "--l", "300",
-        "--g",  "hg38", "--o", 
+        "--g",  "hg38", "--o",
         "scratch/multiexon_read_overlapping_monoexon_transcript/talon"])
 
 except Exception as e:
@@ -160,14 +160,14 @@ try:
         "--o", "scratch/intergenic_GM12878" ])
 except Exception as e:
     print(e)
-    sys.exit("TALON run failed on chr11_and_Tcf3")
+    sys.exit("TALON run failed on chr22")
 
 # Actually perform the chr11_and_Tcf3 TALON run
 try:
     subprocess.check_output(
        ["talon",
         "--f", "input_files/chr11_and_Tcf3/config.csv",
-        "--db", "scratch/chr11_and_Tcf3.db", 
+        "--db", "scratch/chr11_and_Tcf3.db",
         "--build", "mm10",
         "--cov", "0",
         "--identity", "0",
@@ -213,3 +213,40 @@ try:
 except Exception as e:
     print(e)
     sys.exit("Problem creating mock database for filtering tests")
+
+
+# code to get cenps-cort and rpl11-eloa only gtf
+# import pyranges as pr
+# df = pr.read_gtf('/Users/fairliereese/Documents/programming/mortazavi_lab/ref/gencode.v29/gencode.v29.annotation.gtf', duplicate_attr=True).df
+# gnames = ['CENPS', 'CORT', 'CENPS-CORT', 'RPL11', 'ELOA']
+# df = df.loc[df.gene_name.isin(gnames)]
+# df = pr.PyRanges(df)
+# df.to_gtf('input_files/readthrough/readthrough.gtf')
+
+try:
+    subprocess.check_output(
+       ["talon_initialize_database",
+        "--f", "input_files/readthrough/readthrough.gtf",
+        "--a",  "gencode_v29",
+        "--5p", "500",
+        "--3p", "300",
+        "--idprefix", "TALON",
+        "--l", "0",
+        "--g",  "hg38", "--o", "scratch/readthrough"])
+except Exception as e:
+    print(e)
+    sys.exit("Database initialization failed on readthrough annotation")
+
+# Actually perform the readthrough TALON run
+try:
+    subprocess.check_output(
+       ["talon",
+        "--f", "input_files/readthrough/config.csv",
+        "--db", "scratch/readthrough.db",
+        "--build", "hg38",
+        "--cov", "0",
+        "--identity", "0",
+        "--o", "scratch/readthrough" ])
+except Exception as e:
+    print(e)
+    sys.exit("TALON run failed on readthrough")

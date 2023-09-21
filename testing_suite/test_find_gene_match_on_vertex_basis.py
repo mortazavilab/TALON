@@ -26,6 +26,26 @@ class TestIdentifyGeneOnVertexBasis(object):
         assert fusion == False
         conn.close()
 
+    def test_fusion_match(self):
+        """ Example where the vertices overlap multiple genes.
+        """
+        conn, cursor = get_db_cursor()
+        db = "scratch/toy.db"
+        build = "toy_build"
+        init_refs.make_temp_novel_gene_table(cursor, "toy_build")
+        run_info = talon.init_run_info(db, build)
+        vertex2gene = init_refs.make_vertex_2_gene_dict(cursor)
+
+        vertex_IDs = (1, 2, 3, 4, 5, 9, 10, 11)
+        strand = "+"
+
+        gene_ID, fusion = talon.find_gene_match_on_vertex_basis(vertex_IDs, strand, vertex2gene)
+
+        correct_gene_ID = None
+        assert gene_ID == correct_gene_ID
+        assert fusion == True
+        conn.close()
+
     def test_NNC_type_match(self):
         """ Example where some vertices match a gene, while others don't.
         """
