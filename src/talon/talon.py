@@ -1173,7 +1173,7 @@ def process_remaining_mult_cases(chrom, positions, strand, edge_IDs, vertex_IDs,
     transcript_novelty = []
     start_end_info = {}
 
-    if not run_info.create_novel_spliced_genes:
+    if not run_info.create_novel_spliced_genes and not fusion:
         gene_ID, match_strand = search_for_overlap_with_gene(chrom, positions[0],
                                                              positions[-1], strand,
                                                              cursor, run_info, tmp_gene)
