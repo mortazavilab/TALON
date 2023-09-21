@@ -28,7 +28,7 @@ class TestIdentifyNNC(object):
         strand = "+"
         v_novelty = [0, 0]
 
-        gene_ID, transcript_ID, transcript_novelty, start_end_info = talon.process_NNC(chrom,
+        gene_ID, transcript_ID, transcript_novelty, start_end_info, fusion = talon.process_NNC(chrom,
                                                             positions,
                                                             strand, edge_IDs,
                                                             vertex_IDs, transcript_dict,
@@ -40,4 +40,5 @@ class TestIdentifyNNC(object):
         assert gene_ID == correct_gene_ID
         assert start_end_info["vertex_IDs"] == [1] + vertex_IDs + [6]
         assert transcript_dict[frozenset(start_end_info["edge_IDs"])] != None
+        assert fusion == False
         conn.close()

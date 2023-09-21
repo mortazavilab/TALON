@@ -6,7 +6,7 @@ from .helper_fns import fetch_correct_ID, get_db_cursor
 class TestIdentifyNIC(object):
 
     def test_NIC_match(self):
-        """ Example where the transcript is an NIC match to an existing one by 
+        """ Example where the transcript is an NIC match to an existing one by
             virtue of skipping an exon.
         """
         conn, cursor = get_db_cursor()
@@ -28,22 +28,23 @@ class TestIdentifyNIC(object):
         strand = "+"
         v_novelty = [0, 0]
 
-        gene_ID, transcript_ID, novelty, start_end_info = talon.process_NIC(chrom, 
-                                                            positions, 
-                                                            strand, edge_IDs, 
+        gene_ID, transcript_ID, novelty, start_end_info, fusion = talon.process_NIC(chrom,
+                                                            positions,
+                                                            strand, edge_IDs,
                                                             vertex_IDs, transcript_dict,
-                                                            gene_starts, gene_ends, 
-                                                            edge_dict, location_dict, 
+                                                            gene_starts, gene_ends,
+                                                            edge_dict, location_dict,
                                                             vertex_2_gene, run_info)
 
         correct_gene_ID = fetch_correct_ID("TG1", "gene", cursor)
         assert gene_ID == correct_gene_ID
         assert start_end_info["vertex_IDs"] == [1,2,5,6]
         assert transcript_dict[frozenset(start_end_info["edge_IDs"])] != None
+        assert fusion == False
         conn.close()
 
     def test_antisense(self):
-        """ Example where the vertices are known but there is no same-strand 
+        """ Example where the vertices are known but there is no same-strand
             match """
 
         conn, cursor = get_db_cursor()
@@ -64,7 +65,7 @@ class TestIdentifyNIC(object):
         chrom = "chr1"
         start = 1000
         end = 1
-        edge_IDs = [ talon.edge_counter.value() + 1 ] 
+        edge_IDs = [ talon.edge_counter.value() + 1 ]
         positions = [ 1000, 900, 100, 1]
         vertex_IDs = [ 5, 2 ]
         strand = "-"
@@ -73,16 +74,16 @@ class TestIdentifyNIC(object):
 
         # Find antisense match
         gene_ID, transcript_ID, gene_novelty, transcript_novelty, start_end_info = \
-                                      talon.process_spliced_antisense(chrom, positions, 
-                                                                  strand, edge_IDs, 
-                                                                  vertex_IDs, 
+                                      talon.process_spliced_antisense(chrom, positions,
+                                                                  strand, edge_IDs,
+                                                                  vertex_IDs,
                                                                   transcript_dict,
-                                                                  gene_starts, 
-                                                                  gene_ends, 
-                                                                  edge_dict, locations, 
+                                                                  gene_starts,
+                                                                  gene_ends,
+                                                                  edge_dict, locations,
                                                                   vertex_2_gene, run_info,
                                                                   cursor, "temp_gene")
-        #anti_gene_ID = talon.find_gene_match_on_vertex_basis(vertex_IDs, 
+        #anti_gene_ID = talon.find_gene_match_on_vertex_basis(vertex_IDs,
         #                                                     anti_strand,
         #                                                     vertex_2_gene)
 
@@ -92,4 +93,3 @@ class TestIdentifyNIC(object):
         assert start_end_info["vertex_IDs"] == [6, 5, 2, 1]
 
         conn.close()
-

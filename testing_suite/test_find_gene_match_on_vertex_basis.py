@@ -19,10 +19,11 @@ class TestIdentifyGeneOnVertexBasis(object):
         vertex_IDs = (1, 2, 3, 4, 5, 6)
         strand = "+"
 
-        gene_ID = talon.find_gene_match_on_vertex_basis(vertex_IDs, strand, vertex2gene)
+        gene_ID, fusion = talon.find_gene_match_on_vertex_basis(vertex_IDs, strand, vertex2gene)
 
         correct_gene_ID = fetch_correct_ID("TG1", "gene", cursor)
         assert gene_ID == correct_gene_ID
+        assert fusion == False
         conn.close()
 
     def test_NNC_type_match(self):
@@ -38,10 +39,11 @@ class TestIdentifyGeneOnVertexBasis(object):
         vertex_IDs = (1, 200, 3, 4, 5, 6)
         strand = "+"
 
-        gene_ID = talon.find_gene_match_on_vertex_basis(vertex_IDs, strand, vertex2gene)
+        gene_ID, fusion = talon.find_gene_match_on_vertex_basis(vertex_IDs, strand, vertex2gene)
 
         correct_gene_ID = fetch_correct_ID("TG1", "gene", cursor)
         assert gene_ID == correct_gene_ID
+        assert fusion == False
         conn.close()
 
     def test_no_match(self):
@@ -56,7 +58,8 @@ class TestIdentifyGeneOnVertexBasis(object):
         vertex_IDs = (1000, 2000, 3000, 4000)
         strand = "+"
 
-        gene_ID = talon.find_gene_match_on_vertex_basis(vertex_IDs, strand, vertex2gene)
+        gene_ID, fusion = talon.find_gene_match_on_vertex_basis(vertex_IDs, strand, vertex2gene)
 
         assert gene_ID == None
+        assert fusion == False
         conn.close()
