@@ -30,33 +30,27 @@ def getOptions():
 
     parser.add_option("--db", dest = "database",
         help = "TALON database", metavar = "FILE", type = "string")
-
     parser.add_option("--annot", "-a", dest = "annot",
         help = """Which annotation version to use. Will determine which
                   annotation transcripts are considered known or novel
                   relative to. Note: must be in the TALON database.""",
         type = "string")
-
     parser.add_option("--pass_list", dest = "pass_list",
                       help = "Pass list file of transcripts to include in the \
                               output. First column should be TALON gene ID, \
                               second column should be TALON transcript ID",
                       metavar = "FILE", type = "string", default = None)
-
     parser.add_option("--build", "-b", dest = "build",
         help = "Genome build to use. Note: must be in the TALON database.",
         type = "string")
-
     parser.add_option('--gene', dest='gene_level',
         help='Output AnnData on the gene level rather than the transcript',
         action='store_true')
-
     parser.add_option("--datasets", "-d",  dest = "dataset_file",
         help = """Optional: A file indicating which datasets should be
                   included (one dataset name per line). Default is to include
                   all datasets.""",
         metavar = "FILE", type = "string", default = None)
-
     parser.add_option("--o", dest = "ofile", help = "Output file name",
         metavar = "FILE", type = "string")
 
