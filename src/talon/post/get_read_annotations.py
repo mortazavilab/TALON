@@ -1,7 +1,7 @@
 # TALON: Techonology-Agnostic Long Read Analysis Pipeline
 # Author: Dana Wyman
 # -----------------------------------------------------------------------------
-# get_read_annotations.py is a utility that queries a TALON 
+# get_read_annotations.py is a utility that queries a TALON
 # database in order to get read-specific annotation information.
 
 import argparse
@@ -34,9 +34,9 @@ def get_args():
 
 def fetch_reads(database, build, tmp_file = None, datasets = None):
     """ Performs database query to fetch location and gene/transcript assignment
-        info for each long read in the specified datasets. 
+        info for each long read in the specified datasets.
         If tmp_file is set to None (default), then the function will return
-        the query results in a list of lists. If an alternate value is provided, 
+        the query results in a list of lists. If an alternate value is provided,
         then the results will be written to a tmp file of that name."""
 
     if datasets != None:
@@ -50,8 +50,8 @@ def fetch_reads(database, build, tmp_file = None, datasets = None):
         conn.row_factory = sqlite3.Row
         cursor = conn.cursor()
 
-        query = """ SELECT os.read_name, 
-                           os.dataset, 
+        query = """ SELECT os.read_name,
+                           os.dataset,
                            loc1.genome_build,
                            os.gene_ID as gene_ID,
                            os.transcript_ID as transcript_ID,
@@ -66,17 +66,17 @@ def fetch_reads(database, build, tmp_file = None, datasets = None):
                            os.fraction_As,
                            os.custom_label,
                            os.allelic_label,
-                           os.start_support, 
+                           os.start_support,
                            os.end_support
                     FROM observed as os
-                    LEFT JOIN location as loc1 ON 
-                        loc1.location_ID = os.start_vertex 
-                    LEFT JOIN location as loc2 ON 
+                    LEFT JOIN location as loc1 ON
+                        loc1.location_ID = os.start_vertex
+                    LEFT JOIN location as loc2 ON
                         loc2.location_ID = os.end_vertex
                     LEFT JOIN genes ON genes.gene_ID = os.gene_ID
-                    LEFT JOIN transcripts ON 
+                    LEFT JOIN transcripts ON
                         transcripts.transcript_ID = os.transcript_ID
-                    WHERE loc1.genome_build = '$build' 
+                    WHERE loc1.genome_build = '$build'
                     AND loc2.genome_build = '$build' """
         query = Template(query + dataset_str)
         try:
@@ -86,7 +86,7 @@ def fetch_reads(database, build, tmp_file = None, datasets = None):
             raise RuntimeError("Problem with reads database query")
 
         if tmp_file != None:
-            o = open(tmp_file, 'w') 
+            o = open(tmp_file, 'w')
         else:
             reads = []
 
@@ -113,16 +113,16 @@ def fetch_reads(database, build, tmp_file = None, datasets = None):
                 read_end = entry["end_vertex_pos"] - TTS_diff
             else:
                 raise ValueError("Unrecognized strand value: " + str(strand))
-            
+
             # Create entry for output
             out_read = (entry["read_name"], entry["dataset"],
                         entry["genome_build"], entry["gene_ID"],
-                        entry["transcript_ID"], entry["chrom"], 
+                        entry["transcript_ID"], entry["chrom"],
                         read_start, read_end, strand, entry["n_exons"],
                         entry["read_length"], entry["fraction_As"],
                         entry["custom_label"], entry["allelic_label"],
                         entry["start_support"], entry["end_support"])
-           
+
             if tmp_file != None:
                 o.write("\t".join([ str(x) for x in out_read ]) + "\n")
             else:
@@ -131,7 +131,7 @@ def fetch_reads(database, build, tmp_file = None, datasets = None):
 
     # Return results or close file
     if count == 0:
-        raise ValueError(("No reads detected. Make sure your dataset names are " 
+        raise ValueError(("No reads detected. Make sure your dataset names are "
                           "correct."))
 
     if tmp_file != None:
@@ -161,6 +161,13 @@ def get_gene_novelty(database):
         for entry in cursor:
             gene_novelty[entry[0]] = "Antisense"
 
+        # Fetch fusion genes
+        cursor.execute("""SELECT ID FROM gene_annotations
+                              WHERE attribute = "fusion_novel"
+                              AND value = "TRUE";""")
+        for entry in cursor:
+            gene_novelty[entry[0]] = "Fusion"
+
         # Fetch intergenic genes
         cursor.execute("""SELECT ID FROM gene_annotations
                               WHERE attribute = "intergenic_novel"
@@ -172,7 +179,7 @@ def get_gene_novelty(database):
 
 def get_transcript_novelty(database):
     """ Given a database, get the novelty status of each transcript. """
-  
+
     transcript_novelty = {}
     with sqlite3.connect(database) as conn:
         conn.row_factory = sqlite3.Row
@@ -184,59 +191,66 @@ def get_transcript_novelty(database):
                               AND value = "KNOWN";""")
         for entry in cursor:
             transcript_novelty[entry[0]] = "Known"
-    
+
         # Fetch ISM transcripts
         cursor.execute("""SELECT ID FROM transcript_annotations
                               WHERE attribute = "ISM_transcript"
                               AND value = "TRUE";""")
         for entry in cursor:
             transcript_novelty[entry[0]] = "ISM"
-    
+
         # Fetch NIC transcripts
         cursor.execute("""SELECT ID FROM transcript_annotations
                               WHERE attribute = "NIC_transcript"
                               AND value = "TRUE";""")
         for entry in cursor:
             transcript_novelty[entry[0]] = "NIC"
-    
+
         # Fetch NNC transcripts
         cursor.execute("""SELECT ID FROM transcript_annotations
                               WHERE attribute = "NNC_transcript"
                               AND value = "TRUE";""")
         for entry in cursor:
             transcript_novelty[entry[0]] = "NNC"
-    
+
         # Fetch antisense transcripts
         cursor.execute("""SELECT ID FROM transcript_annotations
                               WHERE attribute = "antisense_transcript"
                               AND value = "TRUE";""")
         for entry in cursor:
             transcript_novelty[entry[0]] = "Antisense"
-    
+
         # Fetch intergenic transcripts
         cursor.execute("""SELECT ID FROM transcript_annotations
                               WHERE attribute = "intergenic_transcript"
                               AND value = "TRUE";""")
         for entry in cursor:
             transcript_novelty[entry[0]] = "Intergenic"
-    
+
         # Fetch genomic transcripts
         cursor.execute("""SELECT ID FROM transcript_annotations
                               WHERE attribute = "genomic_transcript"
                               AND value = "TRUE";""")
         for entry in cursor:
             transcript_novelty[entry[0]] = "Genomic"
-    
+
+        # Fetch fusion transcripts
+        cursor.execute("""SELECT ID FROM transcript_annotations
+                              WHERE attribute = "fusion_transcript"
+                              AND value = "TRUE";""")
+        for entry in cursor:
+            transcript_novelty[entry[0]] = "Fusion"
+
     return transcript_novelty
 
 def get_ISM_novelty(database):
     """ Given a database, get the ISM subtype of each ISM transcript. """
-    
+
     all_ISMs = set()
     prefix_ISMs = set()
     suffix_ISMs = set()
     ISM_novelty = {}
-    
+
     with sqlite3.connect(database) as conn:
         conn.row_factory = sqlite3.Row
         cursor = conn.cursor()
@@ -275,7 +289,7 @@ def get_ISM_novelty(database):
 
     return ISM_novelty
 
-def get_gene_annotations(database): 
+def get_gene_annotations(database):
     """ Create a dictionary linking each TALON gene ID to its human-readable
         name and accession ID """
 
@@ -286,13 +300,13 @@ def get_gene_annotations(database):
         conn.row_factory = sqlite3.Row
         cursor = conn.cursor()
 
-        cursor.execute("""SELECT ID, ga.value FROM gene_annotations as ga 
+        cursor.execute("""SELECT ID, ga.value FROM gene_annotations as ga
                           WHERE attribute = "gene_name";""")
         for entry in cursor:
             gene_name[entry["ID"]] = entry["value"]
 
         cursor.execute("""SELECT ID, ga.value FROM gene_annotations as ga
-                          WHERE attribute = "gene_id";""") 
+                          WHERE attribute = "gene_id";""")
         for entry in cursor:
             gene_ID[entry["ID"]] = entry["value"]
 
@@ -347,8 +361,8 @@ def make_read_annot_file(database, build, outprefix, datasets = "all"):
             22. Start support (external assay)
             23. End support (external assay)
 
-        By default, reads from all datasets in the database are included, but 
-        this can be modified by supplying a list/tuple of dataset names to the 
+        By default, reads from all datasets in the database are included, but
+        this can be modified by supplying a list/tuple of dataset names to the
         datasets parameter.
     """
     tmp_read_file = outprefix + "_reads.tmp"
@@ -356,19 +370,19 @@ def make_read_annot_file(database, build, outprefix, datasets = "all"):
 
     # Make annotation dicts
     gene_names, gene_IDs = get_gene_annotations(database)
-    transcript_names, transcript_IDs = get_transcript_annotations(database) 
+    transcript_names, transcript_IDs = get_transcript_annotations(database)
 
     # Make novelty dicts
     gene_novelty = get_gene_novelty(database)
     transcript_novelty = get_transcript_novelty(database)
-    ISM_novelty = get_ISM_novelty(database) 
+    ISM_novelty = get_ISM_novelty(database)
 
     fname = outprefix + "_talon_read_annot.tsv"
     o = open(fname, 'w')
-    colnames = [ "read_name", "dataset", "genome_build", "chrom", 
+    colnames = [ "read_name", "dataset", "genome_build", "chrom",
                  "read_start", "read_end", "strand", "n_exons", "read_length",
                  "gene_ID", "transcript_ID", "annot_gene_id", "annot_transcript_id",
-                 "annot_gene_name", "annot_transcript_name", "gene_novelty", 
+                 "annot_gene_name", "annot_transcript_name", "gene_novelty",
                  "transcript_novelty", "ISM_subtype", "fraction_As", "custom_label",
                  "allelic_label", "start_support", "end_support"]
     o.write("\t".join(colnames) + "\n")
@@ -396,8 +410,8 @@ def make_read_annot_file(database, build, outprefix, datasets = "all"):
             if curr_transcript_novelty == "ISM":
                 curr_ISM_novelty = ISM_novelty[transcript_ID]
             else:
-                curr_ISM_novelty = "None"    
-             
+                curr_ISM_novelty = "None"
+
             # Get annotation info
             try:
                 annot_gene_id = gene_IDs[gene_ID]
@@ -413,7 +427,7 @@ def make_read_annot_file(database, build, outprefix, datasets = "all"):
                 annot_transcript_id = "None"
             try:
                 annot_transcript_name = transcript_names[transcript_ID]
-            except: 
+            except:
                 annot_transcript_name = "None"
 
             gene_ID = str(gene_ID)
@@ -421,9 +435,9 @@ def make_read_annot_file(database, build, outprefix, datasets = "all"):
             o.write("\t".join([read_name, dataset, genome_build, chrom,
                                read_start, read_end, strand, n_exons, read_length,
                                gene_ID, transcript_ID,
-                               annot_gene_id, annot_transcript_id, 
-                               annot_gene_name, annot_transcript_name, 
-                               curr_gene_novelty, curr_transcript_novelty, 
+                               annot_gene_id, annot_transcript_id,
+                               annot_gene_name, annot_transcript_name,
+                               curr_gene_novelty, curr_transcript_novelty,
                                curr_ISM_novelty, fraction_As, custom_label,
                                allelic_label, start_support, end_support]) + "\n")
 
@@ -467,10 +481,10 @@ def main():
         raise ValueError("Database file '%s' does not exist!" % database)
 
     if datasets != None:
-        datasets = datasets.split(",")   
-   
+        datasets = datasets.split(",")
+
     make_read_annot_file(database, build, outprefix, datasets = datasets)
-    
+
 
 if __name__ == '__main__':
     main()

@@ -950,30 +950,13 @@ def process_NIC(chrom, positions, strand, edge_IDs, vertex_IDs, transcript_dict,
         this, look up each vertex in the vertex_2_gene dict, and keep track of all
         same-strand genes. """
 
-    gene_matches = []
     start_end_info = {}
 
-    for vertex in vertex_IDs:
-        if vertex in vertex_2_gene:
-            curr_matches = vertex_2_gene[vertex]
-
-            # Make sure the gene is on the correct strand
-            gene_matches += [x[0]
-                             for x in list(curr_matches) if x[1] == strand]
-
-
-    # Now count up how often we see each gene
-    gene_tally = dict((x, gene_matches.count(x)) for x in set(gene_matches))
-
-    # print(gene_matches)
-    # print(gene_tally)
-    # TODO: deal with fusions
-
-    # For the main assignment, pick the gene that is observed the most
-    if len(gene_tally) == 0:
-        return None, None, [], None
-
-    gene_ID = max(gene_tally, key=gene_tally.get)
+    gene_ID, fusion = find_gene_match_on_vertex_basis(vertex_IDs,
+                                                      strand,
+                                                      vertex_2_gene)
+    if gene_ID == None:
+      return None, None, [], None, fusion
 
     # Get matches for the ends
     start_vertex, start_exon, start_novelty, known_start, diff_5p = process_5p(chrom,
@@ -1009,35 +992,60 @@ def process_NIC(chrom, positions, strand, edge_IDs, vertex_IDs, transcript_dict,
     transcript_ID = novel_transcript["transcript_ID"]
     novelty = [(transcript_ID, run_info.idprefix, "TALON",
                 "NIC_transcript", "TRUE")]
+    fusion = False
 
-    return gene_ID, transcript_ID, novelty, start_end_info
+    return gene_ID, transcript_ID, novelty, start_end_info, fusion
 
 
 def find_gene_match_on_vertex_basis(vertex_IDs, strand, vertex_2_gene):
     """ Use vertices in a transcript to try to pinpoint the gene it belongs to.
+
+    Parameters:
+        vertex_IDs (list of int): List of vertices in the read
+        strand (str): Strand of read
+        vertex_2_gene (dict): Dict. w/ keys = vertices, items = gene IDs of genes
+            that use this vertex
+
+    Returns:
+        gene_ID (str or None): Gene ID of matching gene, or None if novel gene
+            needs to be created
+        fusion (bool): Whether gene read is from might be fusion / read through
     """
     gene_matches = []
+    n_gene_matches = []
+
     for vertex in vertex_IDs:
         if vertex in vertex_2_gene:
             curr_matches = vertex_2_gene[vertex]
 
-            # Make sure the gene is on the correct strand
-            gene_matches += [x[0] for x in curr_matches if x[1] == strand]
+            # enforce same strandedness
+            matches = [m for m in list(curr_matches) if m[1] == strand]
 
-    if len(gene_matches) == 0:
-        return None
+            gene_matches += [x[0] for x in list(matches)]
 
-    # Now count up how often we see each gene
+            # how many genes have this splice site?
+            n_gene_matches.append(len(matches))
+
+    # how many splice sites are from each gene
     gene_tally = dict((x, gene_matches.count(x)) for x in set(gene_matches))
 
-    # print(gene_matches)
-    # print(gene_tally)
-    # TODO: deal with fusions
+    # no shared splice junctions
+    if len(gene_matches) == 0:
+        return None, False
+
+    # if there is more than one splice site from two non-overlapping genes
+    # we need to make a new gene
+    # when there are no shared splice sites between gene hits but we did
+    # hit more than one gene
+    elif max(n_gene_matches) <= 1 and len(gene_tally) > 1:
+        return None, True
 
     # For the main assignment, pick the gene that is observed the most
-    gene_ID = max(gene_tally, key=gene_tally.get)
+    else:
+        gene_ID = max(gene_tally, key=gene_tally.get)
+        fusion = False
 
-    return gene_ID
+    return gene_ID, fusion
 
 
 def process_NNC(chrom, positions, strand, edge_IDs, vertex_IDs, transcript_dict,
@@ -1047,10 +1055,10 @@ def process_NNC(chrom, positions, strand, edge_IDs, vertex_IDs, transcript_dict,
     novelty = []
     start_end_info = {}
 
-    gene_ID = find_gene_match_on_vertex_basis(
+    gene_ID, fusion = find_gene_match_on_vertex_basis(
         vertex_IDs, strand, vertex_2_gene)
     if gene_ID == None:
-        return None, None, [], None
+        return None, None, [], None, False
 
     # Get matches for the ends
     start_vertex, start_exon, start_novelty, known_start, diff_5p = process_5p(chrom,
@@ -1085,8 +1093,9 @@ def process_NNC(chrom, positions, strand, edge_IDs, vertex_IDs, transcript_dict,
 
     novelty.append((transcript_ID, run_info.idprefix, "TALON",
                     "NNC_transcript", "TRUE"))
+    fusion = False
 
-    return gene_ID, transcript_ID, novelty, start_end_info
+    return gene_ID, transcript_ID, novelty, start_end_info, fusion
 
 
 def process_spliced_antisense(chrom, positions, strand, edge_IDs, vertex_IDs,
@@ -1102,7 +1111,7 @@ def process_spliced_antisense(chrom, positions, strand, edge_IDs, vertex_IDs,
         anti_strand = "-"
     else:
         anti_strand = "+"
-    anti_gene_ID = find_gene_match_on_vertex_basis(vertex_IDs, anti_strand,
+    anti_gene_ID, fusion = find_gene_match_on_vertex_basis(vertex_IDs, anti_strand,
                                                    vertex_2_gene)
     if anti_gene_ID == None:
         return None, None, gene_novelty, transcript_novelty, start_end_info
@@ -1155,7 +1164,8 @@ def process_spliced_antisense(chrom, positions, strand, edge_IDs, vertex_IDs,
 
 def process_remaining_mult_cases(chrom, positions, strand, edge_IDs, vertex_IDs,
                                  transcript_dict, gene_starts, gene_ends, edge_dict,
-                                 locations, vertex_2_gene, run_info, cursor, tmp_gene):
+                                 locations, vertex_2_gene, run_info, cursor, tmp_gene,
+                                 fusion):
     """ This function is a catch-all for multiexonic transcripts that were not
         FSM, ISM, NIC, NNC, or spliced antisense.
     """
@@ -1199,17 +1209,25 @@ def process_remaining_mult_cases(chrom, positions, strand, edge_IDs, vertex_IDs,
     start_end_info["vertex_IDs"] = vertex_IDs
 
     if gene_ID == None:
+
+        if fusion:
+            t_nov = 'fusion_transcript'
+            g_nov = 'fusion_novel'
+        else:
+            t_nov = 'intergenic_transcript'
+            g_nov = 'intergenic_novel'
+
         gene_ID = create_gene(chrom, positions[0], positions[-1],
                               strand, cursor, tmp_gene)
 
         gene_novelty.append((gene_ID, run_info.idprefix, "TALON",
-                             "intergenic_novel", "TRUE"))
+                             g_nov, "TRUE"))
 
         transcript_ID = create_transcript(chrom, positions[0], positions[-1],
                                           gene_ID, edge_IDs, vertex_IDs,
                                           transcript_dict)["transcript_ID"]
         transcript_novelty.append((transcript_ID, run_info.idprefix, "TALON",
-                                   "intergenic_transcript", "TRUE"))
+                                   t_nov, "TRUE"))
 
     elif match_strand != strand:
         anti_gene_ID = gene_ID
@@ -1291,6 +1309,7 @@ def identify_transcript(chrom, positions, strand, cursor, location_dict, edge_di
     all_exons_known = check_all_exons_known(e_novelty)
     splice_vertices_known = (sum(v_novelty) == 0)
     all_exons_novel = (reduce(operator.mul, e_novelty, 1) == 1)
+    fusion = False
 
     # Look for FSM or ISM.
     if all_SJs_known:
@@ -1298,6 +1317,7 @@ def identify_transcript(chrom, positions, strand, cursor, location_dict, edge_di
         all_matches = search_for_ISM(edge_IDs, transcript_dict)
         if all_matches != None:
             # Look for FSM first
+            print('looking for fsm')
             gene_ID, transcript_ID, transcript_novelty, start_end_info = process_FSM(chrom,
                                                                                      positions, strand, edge_IDs,
                                                                                      vertex_IDs, all_matches,
@@ -1306,6 +1326,7 @@ def identify_transcript(chrom, positions, strand, cursor, location_dict, edge_di
                                                                                      location_dict, run_info)
             if gene_ID == None:
                 # Now look for ISM
+                print('looking for ism')
                 gene_ID, transcript_ID, transcript_novelty, start_end_info = process_ISM(chrom,
                                                                                          positions,
                                                                                          strand, edge_IDs,
@@ -1317,7 +1338,8 @@ def identify_transcript(chrom, positions, strand, cursor, location_dict, edge_di
                                                                                          run_info)
         # Look for NIC
         if gene_ID == None:
-            gene_ID, transcript_ID, transcript_novelty, start_end_info = process_NIC(chrom,
+            print('looking for nic')
+            gene_ID, transcript_ID, transcript_novelty, start_end_info, fusion = process_NIC(chrom,
                                                                                      positions,
                                                                                      strand, edge_IDs,
                                                                                      vertex_IDs, transcript_dict,
@@ -1328,7 +1350,8 @@ def identify_transcript(chrom, positions, strand, cursor, location_dict, edge_di
     # Novel in catalog transcripts have known splice donors and acceptors,
     # but new connections between them.
     elif splice_vertices_known and gene_ID == None:
-        gene_ID, transcript_ID, transcript_novelty, start_end_info = process_NIC(chrom,
+        print('looking for nic (again?)')
+        gene_ID, transcript_ID, transcript_novelty, start_end_info, fusion = process_NIC(chrom,
                                                                                  positions,
                                                                                  strand, edge_IDs,
                                                                                  vertex_IDs, transcript_dict,
@@ -1337,7 +1360,8 @@ def identify_transcript(chrom, positions, strand, cursor, location_dict, edge_di
                                                                                  vertex_2_gene, run_info)
 
     # Antisense transcript with splice junctions matching known gene
-    if splice_vertices_known and gene_ID == None:
+    if splice_vertices_known and gene_ID == None and not fusion:
+        print('looking for spliced antisese')
         gene_ID, transcript_ID, gene_novelty, transcript_novelty, start_end_info = \
             process_spliced_antisense(chrom, positions,
                                       strand, edge_IDs,
@@ -1351,8 +1375,9 @@ def identify_transcript(chrom, positions, strand, cursor, location_dict, edge_di
 
     # Novel not in catalog transcripts contain new splice donors/acceptors
     # and contain at least one splice junction.
-    elif not(splice_vertices_known):
-        gene_ID, transcript_ID, transcript_novelty, start_end_info = process_NNC(chrom,
+    elif not(splice_vertices_known) and not fusion:
+        print('lookign for NNCs')
+        gene_ID, transcript_ID, transcript_novelty, start_end_info, fusion = process_NNC(chrom,
                                                                                  positions,
                                                                                  strand, edge_IDs,
                                                                                  vertex_IDs, transcript_dict,
@@ -1361,6 +1386,7 @@ def identify_transcript(chrom, positions, strand, cursor, location_dict, edge_di
                                                                                  vertex_2_gene, run_info)
     # Transcripts that don't match the previous categories end up here
     if gene_ID == None:
+        print('looking for this other stuff')
         gene_ID, transcript_ID, gene_novelty, transcript_novelty, start_end_info = \
             process_remaining_mult_cases(chrom, positions,
                                          strand, edge_IDs,
@@ -1369,7 +1395,12 @@ def identify_transcript(chrom, positions, strand, cursor, location_dict, edge_di
                                          gene_starts, gene_ends,
                                          edge_dict, location_dict,
                                          vertex_2_gene, run_info,
-                                         cursor, tmp_gene)
+                                         cursor, tmp_gene,
+                                         fusion)
+
+    print(gene_ID)
+    print(gene_novelty)
+    print(transcript_novelty)
 
     # Add all novel vertices to vertex_2_gene now that we have the gene ID
     vertex_IDs = start_end_info["vertex_IDs"]
@@ -1398,7 +1429,6 @@ def identify_transcript(chrom, positions, strand, cursor, location_dict, edge_di
                                    "transcript_name", talon_transcript_name))
         transcript_novelty.append((transcript_ID, run_info.idprefix, "TALON",
                                    "transcript_id", talon_transcript_name))
-
     # Add annotation entries for any novel exons
     exon_novelty = []
     exons = edge_IDs[::2]
@@ -2466,6 +2496,8 @@ def annotate_read(sam_record: pysam.AlignedSegment, cursor, run_info,
     """
     # Parse attributes to determine the chromosome, positions, and strand of the transcript
     read_ID = sam_record.query_name
+    print()
+    print(read_ID)
     if not run_info.use_cb_tag:
         dataset = sam_record.get_tag("RG")
     else:
