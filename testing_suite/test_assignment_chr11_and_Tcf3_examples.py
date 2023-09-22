@@ -4,7 +4,7 @@ from .helper_fns import fetch_correct_ID
 @pytest.mark.integration
 
 class TestAssignments(object):
-    """ The objective here is to make sure that each transcript in the 
+    """ The objective here is to make sure that each transcript in the
         chr11_and_Tcf3 example set was assigned the expected identity. """
 
     def test_ISM_of_Canx(self):
@@ -37,7 +37,7 @@ class TestAssignments(object):
         conn.close()
 
     def test_prefix_ISM_of_Canx(self):
-        """ m54284_180814_002203/18677911/ccs is an ISM transcript of Canx at 
+        """ m54284_180814_002203/18677911/ccs is an ISM transcript of Canx at
             first glance that has known 5' and 3' ends. Comes from BC017 data. """
 
         conn = sqlite3.connect("scratch/chr11_and_Tcf3.db")
@@ -55,7 +55,7 @@ class TestAssignments(object):
         assert assignment['gene_ID'] == correct_gene_ID
         assert assignment['transcript_ID'] == 8462
         assert assignment['start_delta'] == 30
-        assert assignment['end_delta'] == -290 
+        assert assignment['end_delta'] == -290
 
         # Now make sure that the novel transcript was annotated correctly
         annot_dict = make_annot_dict(cursor, assignment['transcript_ID'])
@@ -117,7 +117,7 @@ class TestAssignments(object):
         conn.close()
 
     def test_NIC_of_Drg1(self):
-        """ For this example, the same read was planted in two different 
+        """ For this example, the same read was planted in two different
             datasets (m54284_180814_002203/49414590/ccs) """
 
         conn = sqlite3.connect("scratch/chr11_and_Tcf3.db")
@@ -129,7 +129,7 @@ class TestAssignments(object):
         read_ID = "m54284_180814_002203/49414590/ccs"
 
         # Fetch observed entry from table
-        query = """SELECT * from observed WHERE dataset IN 
+        query = """SELECT * from observed WHERE dataset IN
                    ('PB65_B017', 'PB65_B018') AND read_name = ?"""
         cursor.execute(query, [read_ID])
         correct_gene_ID = fetch_correct_ID("Drg1", "gene", cursor)
@@ -148,14 +148,14 @@ class TestAssignments(object):
     def test_FSM_of_Drg1(self):
         """ Read m54284_180814_002203/40042763/ccs is an FSM of the Drg1 gene
             (BC017) """
-        
+
         conn = sqlite3.connect("scratch/chr11_and_Tcf3.db")
         conn.row_factory = sqlite3.Row
         cursor = conn.cursor()
 
         dataset = "PB65_B017"
         read_ID = "m54284_180814_002203/40042763/ccs"
-        
+
         # Fetch observed entry from table
         query = """SELECT * from observed WHERE dataset = ? AND read_name = ?"""
         assignment = cursor.execute(query, [dataset, read_ID]).fetchall()[0]
@@ -199,8 +199,8 @@ class TestAssignments(object):
         assert annot_dict["antisense_transcript"] == "TRUE"
         assert annot_dict["transcript_status"] == "NOVEL"
         conn.close()
-        
-        
+
+
 
 def make_annot_dict_gene(cursor, gene_ID):
     """ Extracts all gene annotations for the transcript ID and puts

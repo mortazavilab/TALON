@@ -1398,10 +1398,6 @@ def identify_transcript(chrom, positions, strand, cursor, location_dict, edge_di
                                          cursor, tmp_gene,
                                          fusion)
 
-    print(gene_ID)
-    print(gene_novelty)
-    print(transcript_novelty)
-
     # Add all novel vertices to vertex_2_gene now that we have the gene ID
     vertex_IDs = start_end_info["vertex_IDs"]
     edge_IDs = start_end_info["edge_IDs"]

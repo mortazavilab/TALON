@@ -247,6 +247,79 @@ class TestAssignments(object):
         assert annot_dict["transcript_status"] == "NOVEL"
         conn.close()
 
+    def test_FSM_of_overlapping_single_gene_cenps(self):
+        """ cenps_fsm is an FSM an annotated gene that is subsumed by the
+            RPL11-ELOA readthrough loci. However it should just
+            be annotated to RPL11"""
+
+        conn = sqlite3.connect("scratch/readthrough.db")
+        conn.row_factory = sqlite3.Row
+        cursor = conn.cursor()
+
+        dataset = "hl60_1_1"
+        read_ID = "cenps_fsm"
+
+        # Fetch observed entry from table
+        query = """SELECT * from observed WHERE dataset = ? AND read_name = ?"""
+        assignment = cursor.execute(query, [dataset, read_ID]).fetchall()[0]
+
+        correct_gene_ID = fetch_correct_ID("CENPS", "gene", cursor)
+        assert assignment['gene_ID'] == correct_gene_ID
+
+        annot_dict = make_annot_dict(cursor, assignment['transcript_ID'])
+        assert annot_dict["transcript_status"] == "KNOWN"
+        conn.close()
+
+    def test_NIC_of_annot_single_gene_2(self):
+       """ cenps_nic shares all sss w/ annotated cenps. I named the read wrong oops
+       validated by looking for the shared sss of the weird exon w/ known models
+       (cenps-204 and cenps-205) """
+
+       conn = sqlite3.connect("scratch/readthrough.db")
+       conn.row_factory = sqlite3.Row
+       cursor = conn.cursor()
+
+       dataset = "hl60_1_1"
+       read_ID = "cenps_nic"
+
+       # Fetch observed entry from table
+       query = """SELECT * from observed WHERE dataset = ? AND read_name = ?"""
+       assignment = cursor.execute(query, [dataset, read_ID]).fetchall()[0]
+       correct_gene_ID = fetch_correct_ID("CENPS", "gene", cursor)
+       assert assignment['gene_ID'] == correct_gene_ID
+
+       # Now make sure that the novel transcript was annotated correctly
+       annot_dict = make_annot_dict(cursor, assignment['transcript_ID'])
+       assert annot_dict["NIC_transcript"] == "TRUE"
+       assert annot_dict["transcript_status"] == "NOVEL"
+       conn.close()
+
+    def test_NNC_of_annot_single_gene_2(self):
+        """ cenps_nic shares all sss w/ annotated cenps. I named the read wrong oops
+        validated by looking for the shared sss of the weird exon w/ known models
+        (cenps-204 and cenps-205) """
+
+        conn = sqlite3.connect("scratch/readthrough.db")
+        conn.row_factory = sqlite3.Row
+        cursor = conn.cursor()
+
+        dataset = "hl60_1_1"
+        read_ID = "cenps_nnc"
+
+        # Fetch observed entry from table
+        query = """SELECT * from observed WHERE dataset = ? AND read_name = ?"""
+        assignment = cursor.execute(query, [dataset, read_ID]).fetchall()[0]
+        correct_gene_ID = fetch_correct_ID("CENPS", "gene", cursor)
+        assert assignment['gene_ID'] == correct_gene_ID
+
+        # Now make sure that the novel transcript was annotated correctly
+        annot_dict = make_annot_dict(cursor, assignment['transcript_ID'])
+        assert annot_dict["NNC_transcript"] == "TRUE"
+        assert annot_dict["transcript_status"] == "NOVEL"
+        conn.close()
+
+
+
 
 def make_annot_dict_gene(cursor, gene_ID):
     """ Extracts all gene annotations for the transcript ID and puts
