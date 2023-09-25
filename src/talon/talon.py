@@ -996,6 +996,32 @@ def process_NIC(chrom, positions, strand, edge_IDs, vertex_IDs, transcript_dict,
 
     return gene_ID, transcript_ID, novelty, start_end_info, fusion
 
+def get_vertex_2_gene_df(vertex_2_gene):
+    """
+    Get a DataFrame mapping each unique combination of vertex:gene_ID
+
+    Parameters:
+        vertex_2_gene (dict): Dictionary mapping each vertex ID to a list of
+            gene IDs that the vertex is found in
+
+    Returns:
+        df (pandas DataFrame): DataFrame of unique vertex:gene combinations
+    """
+    gids = []
+    vids = []
+    for key, item in vertex_2_gene.items():
+        for item2 in item:
+            gids.append(item2[0])
+            vids.append(key)
+    # df = pd.DataFrame.from_dict(vertex_2_gene, orient='index')
+    df = pd.DataFrame()
+    df['gid'] = gids
+    df['vid'] = vids
+    print(df.head())
+    print(len(df.index))
+    print(len(df.vid.unique().tolist()))
+    print(df.loc[df.vid.duplicated(keep=False)].sort_values(by='vid'))
+    return df
 
 def find_gene_match_on_vertex_basis(vertex_IDs, strand, vertex_2_gene):
     """ Use vertices in a transcript to try to pinpoint the gene it belongs to.
@@ -1025,9 +1051,22 @@ def find_gene_match_on_vertex_basis(vertex_IDs, strand, vertex_2_gene):
 
             # how many genes have this splice site?
             n_gene_matches.append(len(matches))
+    print('curr_matches)')
+    print(curr_matches)
+
+    df = get_vertex_2_gene_df(vertex_2_gene)
+
+    print('eeps epps')
+    print(vertex_IDs)
+    print(df.head())
 
     # how many splice sites are from each gene
     gene_tally = dict((x, gene_matches.count(x)) for x in set(gene_matches))
+    print(gene_tally)
+    print(len(gene_tally))
+    print(n_gene_matches)
+    print(' genes')
+    print(gene_matches)
 
     # no shared splice junctions
     if len(gene_matches) == 0:
@@ -1038,7 +1077,28 @@ def find_gene_match_on_vertex_basis(vertex_IDs, strand, vertex_2_gene):
     # when there are no shared splice sites between gene hits but we did
     # hit more than one gene
     elif max(n_gene_matches) <= 1 and len(gene_tally) > 1:
+        print(' went here')
         return None, True
+
+    # if we hit more than one gene and they have overlapping sjs,
+    # tiebreak based on % of SJs from each
+    # gene that we hit. pick gene w/ greatest percentage
+    elif len(gene_tally) > 1:
+        temp = df.loc[df.gid.isin(gene_matches)].copy(deep=True)
+        temp = temp.drop_duplicates()
+
+        # get total # vertices / gene
+        temp1 = temp.groupby('gid').count().reset_index().rename({'vid': 'n_vert'}, axis=1)
+
+        # get total # detected vertices / gene
+        temp2 = temp.loc[temp.vid.isin(vertex_IDs)].copy(deep=True)
+        temp2 = temp2.groupby('gid').count().reset_index().rename({'vid': 'n_vert_in_t'}, axis=1)
+
+        # merge
+        temp3 = temp1.merge(temp2, on='gid')
+        print(temp3)
+
+
 
     # For the main assignment, pick the gene that is observed the most
     else:
