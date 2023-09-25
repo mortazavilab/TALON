@@ -1,7 +1,7 @@
 # TALON: Techonology-Agnostic Long Read Analysis Pipeline
 # Author: Dana Wyman
 # -----------------------------------------------------------------------------
-# Contains functions that query the database to initialize various data 
+# Contains functions that query the database to initialize various data
 # structures for the TALON run.
 # ---------------------------------------------------------------------
 # make_temp_novel_gene_table
@@ -13,8 +13,9 @@
 # make_gene_start_and_end_dict
 
 from string import Template
+import pandas as pd
 
-def make_temp_novel_gene_table(cursor, build, chrom = None, start = None, 
+def make_temp_novel_gene_table(cursor, build, chrom = None, start = None,
                                end = None, tmp_tab = "temp_gene"):
     """ Attaches a temporary database with a table that has the following fields:
             - gene_ID
@@ -137,7 +138,7 @@ def make_temp_monoexonic_transcript_table(cursor, build, chrom = None,
                                        OR (max_pos >= $start AND max_pos <= $end))""")
 
     command = command.substitute({'build':build, 'chrom':chrom,
-                                  'start':start, 'end':end, 
+                                  'start':start, 'end':end,
                                   'tmp_tab':tmp_tab})
     cursor.execute(command)
 
@@ -292,8 +293,8 @@ def make_vertex_2_gene_dict(cursor, build = None, chrom = None, start = None, en
     return vertex_2_gene
 
 def make_gene_start_or_end_dict(cursor, build, mode, chrom = None, start = None, end = None):
-    """ Select the starts (or ends) of known genes in the database and store 
-        in a dict. 
+    """ Select the starts (or ends) of known genes in the database and store
+        in a dict.
         Format of dict:
             Key: gene ID from database
             Value: dict mapping positions to start vertices (or end vertices) of
@@ -350,4 +351,3 @@ def make_gene_start_or_end_dict(cursor, build, mode, chrom = None, start = None,
             output_dict[gene_ID][pos] = vertex
 
     return output_dict
-

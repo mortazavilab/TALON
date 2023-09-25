@@ -611,10 +611,12 @@ def search_for_overlap_with_gene(chromosome, start, end, strand,
         If there is more than one same-strand option, prioritize amount of
         overlap. Antisense matches may be returned if there is no same strand
         match. """
-
+    print('in search for overlap with gene')
     min_start = min(start, end)
     max_end = max(start, end)
     query_interval = [min_start, max_end]
+    print('query interval')
+    print(query_interval)
 
     query = Template(""" SELECT gene_ID,
                        chromosome,
@@ -637,6 +639,9 @@ def search_for_overlap_with_gene(chromosome, start, end, strand,
 
     # Among multiple matches, preferentially return the same-strand gene with
     # the greatest amount of overlap
+    # print('start+end')
+    # print(start)
+    # print(end)
     same_strand_matches = len([x for x in matches if x["strand"] == strand])
     # for m in matches:
     #     print()
@@ -663,16 +668,28 @@ def get_best_match(matches, query_interval):
     """ Given a set of gene matches and a query interval, return the match
         that has the greatest amount of overlap with the query."""
 
+    print('matching based on overlap')
     max_overlap = 0
+    max_perc_overlap = 0
     best_match = None
-
     for match in matches:
+        print(match['gene_ID'])
         match_interval = [match['start'], match['end']]
-        overlap = get_overlap(query_interval, match_interval)
-        if overlap >= max_overlap:
+        overlap, perc_overlap = get_overlap(query_interval, match_interval)
+        print(overlap)
+        print(perc_overlap)
+        if overlap > max_overlap:
             max_overlap = overlap
+            max_perc_overlap = perc_overlap
             best_match = match
+        elif overlap == max_overlap:
+            if perc_overlap > max_perc_overlap:
+                max_overlap = overlap
+                max_perc_overlap = perc_overlap
+                best_match = match
 
+    print('best match')
+    print(best_match['gene_ID'])
     return best_match
 
 
@@ -682,11 +699,15 @@ def get_overlap(a, b):
         ends of each interval as inclusive, meaning that if a = b = [10, 20],
         the overlap reported would be 11, not 10.
         Args:
-            a: First interval, formattted as a list
-            b: Second interval, formatted as a list
+            a: First interval, formattted as a list (query)
+            b: Second interval, formatted as a list (reference)
+            perc_overlap: Percent overlap from the reference interval that the
+               query interval consumed
     """
     overlap = max(0, min(a[1], b[1]) - max(a[0], b[0]) + 1)
-    return overlap
+    ref_len = abs(b[1]-b[0])
+    perc_overlap = (overlap/ref_len)*100
+    return overlap, perc_overlap
 
 
 def search_for_transcript(edge_IDs, transcript_dict):
@@ -1017,10 +1038,10 @@ def get_vertex_2_gene_df(vertex_2_gene):
     df = pd.DataFrame()
     df['gid'] = gids
     df['vid'] = vids
-    print(df.head())
-    print(len(df.index))
-    print(len(df.vid.unique().tolist()))
-    print(df.loc[df.vid.duplicated(keep=False)].sort_values(by='vid'))
+    # print(df.head())
+    # print(len(df.index))
+    # print(len(df.vid.unique().tolist()))
+    # print(df.loc[df.vid.duplicated(keep=False)].sort_values(by='vid'))
     return df
 
 def find_gene_match_on_vertex_basis(vertex_IDs, strand, vertex_2_gene):
@@ -1051,22 +1072,23 @@ def find_gene_match_on_vertex_basis(vertex_IDs, strand, vertex_2_gene):
 
             # how many genes have this splice site?
             n_gene_matches.append(len(matches))
-    print('curr_matches)')
-    print(curr_matches)
+    # print('curr_matches)')
+    # print(curr_matches)
 
     df = get_vertex_2_gene_df(vertex_2_gene)
 
-    print('eeps epps')
-    print(vertex_IDs)
-    print(df.head())
+    # print('eeps epps')
+    # print(vertex_IDs)
+    # print(df.head())
 
     # how many splice sites are from each gene
     gene_tally = dict((x, gene_matches.count(x)) for x in set(gene_matches))
-    print(gene_tally)
-    print(len(gene_tally))
-    print(n_gene_matches)
-    print(' genes')
-    print(gene_matches)
+    # print('tally')
+    # print(gene_tally)
+    # print(len(gene_tally))
+    # print(n_gene_matches)
+    # print(' genes')
+    # print(gene_matches)
 
     # no shared splice junctions
     if len(gene_matches) == 0:
@@ -1081,22 +1103,23 @@ def find_gene_match_on_vertex_basis(vertex_IDs, strand, vertex_2_gene):
         return None, True
 
     # if we hit more than one gene and they have overlapping sjs,
-    # tiebreak based on % of SJs from each
-    # gene that we hit. pick gene w/ greatest percentage
+    # tie break based on ?????
     elif len(gene_tally) > 1:
-        temp = df.loc[df.gid.isin(gene_matches)].copy(deep=True)
-        temp = temp.drop_duplicates()
-
-        # get total # vertices / gene
-        temp1 = temp.groupby('gid').count().reset_index().rename({'vid': 'n_vert'}, axis=1)
-
-        # get total # detected vertices / gene
-        temp2 = temp.loc[temp.vid.isin(vertex_IDs)].copy(deep=True)
-        temp2 = temp2.groupby('gid').count().reset_index().rename({'vid': 'n_vert_in_t'}, axis=1)
-
-        # merge
-        temp3 = temp1.merge(temp2, on='gid')
-        print(temp3)
+        print('i am here')
+        return None, False
+        # temp = df.loc[df.gid.isin(gene_matches)].copy(deep=True)
+        # temp = temp.drop_duplicates()
+        #
+        # # get total # vertices / gene
+        # temp1 = temp.groupby('gid').count().reset_index().rename({'vid': 'n_vert'}, axis=1)
+        #
+        # # get total # detected vertices / gene
+        # temp2 = temp.loc[temp.vid.isin(vertex_IDs)].copy(deep=True)
+        # temp2 = temp2.groupby('gid').count().reset_index().rename({'vid': 'n_vert_in_t'}, axis=1)
+        #
+        # # merge
+        # temp3 = temp1.merge(temp2, on='gid')
+        # print(temp3)
 
 
 
@@ -1109,16 +1132,26 @@ def find_gene_match_on_vertex_basis(vertex_IDs, strand, vertex_2_gene):
 
 
 def process_NNC(chrom, positions, strand, edge_IDs, vertex_IDs, transcript_dict,
-                gene_starts, gene_ends, edge_dict, locations, vertex_2_gene, run_info):
+                gene_starts, gene_ends, edge_dict, locations, vertex_2_gene, run_info,
+                cursor, tmp_gene):
     """ Novel not in catalog case """
 
     novelty = []
     start_end_info = {}
 
+    # first try to assign gene based on vertex concordance
     gene_ID, fusion = find_gene_match_on_vertex_basis(
         vertex_IDs, strand, vertex_2_gene)
+
+    # otherwise look for genomic overlap with existing genes
     if gene_ID == None:
-        return None, None, [], None, False
+        gene_ID, match_strand = search_for_overlap_with_gene(chrom, positions[0],
+                                                             positions[-1], strand,
+                                                             cursor, run_info, tmp_gene)
+        print('geneid from search for overlap with gene')
+        print(gene_ID)
+        if gene_ID == None:
+            return None, None, [], None, False
 
     # Get matches for the ends
     start_vertex, start_exon, start_novelty, known_start, diff_5p = process_5p(chrom,
@@ -1232,7 +1265,6 @@ def process_remaining_mult_cases(chrom, positions, strand, edge_IDs, vertex_IDs,
     gene_novelty = []
     transcript_novelty = []
     start_end_info = {}
-
     if not run_info.create_novel_spliced_genes and not fusion:
         gene_ID, match_strand = search_for_overlap_with_gene(chrom, positions[0],
                                                              positions[-1], strand,
@@ -1443,7 +1475,9 @@ def identify_transcript(chrom, positions, strand, cursor, location_dict, edge_di
                                                                                  vertex_IDs, transcript_dict,
                                                                                  gene_starts, gene_ends,
                                                                                  edge_dict, location_dict,
-                                                                                 vertex_2_gene, run_info)
+                                                                                 vertex_2_gene, run_info,
+                                                                                 cursor, tmp_gene)
+    print(f'geneID from process_nnc: {gene_ID}')
     # Transcripts that don't match the previous categories end up here
     if gene_ID == None:
         print('looking for this other stuff')
@@ -1458,6 +1492,8 @@ def identify_transcript(chrom, positions, strand, cursor, location_dict, edge_di
                                          cursor, tmp_gene,
                                          fusion)
 
+    print('this is the gene id it decided on')
+    print(gene_ID)
     # Add all novel vertices to vertex_2_gene now that we have the gene ID
     vertex_IDs = start_end_info["vertex_IDs"]
     edge_IDs = start_end_info["edge_IDs"]
@@ -1885,7 +1921,7 @@ def identify_monoexon_transcript(chrom, positions, strand, cursor, location_dict
         for match in matches:
             # get overlap and compare
             match_interval = [match['start'], match['end']]
-            overlap = get_overlap([start, end], match_interval)
+            overlap, perc_overlap = get_overlap([start, end], match_interval)
             if overlap >= best_overlap:
                 best_overlap = overlap
                 best_match = match
