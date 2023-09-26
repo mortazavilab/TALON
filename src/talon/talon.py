@@ -604,7 +604,8 @@ def search_for_ISM(edge_IDs, transcript_dict):
 
 
 def search_for_overlap_with_gene(chromosome, start, end, strand,
-                                 cursor, run_info, tmp_gene):
+                                 cursor, run_info, tmp_gene,
+                                 gene_starts, gene_ends):
     """ Given a start and an end value for an interval, query the database to
         determine whether the interval overlaps with any genes. If it there is
         more than one match, prioritize same-strand first and foremost.
@@ -615,8 +616,8 @@ def search_for_overlap_with_gene(chromosome, start, end, strand,
     min_start = min(start, end)
     max_end = max(start, end)
     query_interval = [min_start, max_end]
-    print('query interval')
-    print(query_interval)
+    # print('query interval')
+    # print(query_interval)
 
     query = Template(""" SELECT gene_ID,
                        chromosome,
@@ -655,42 +656,74 @@ def search_for_overlap_with_gene(chromosome, start, end, strand,
             strand == "-" and same_strand_matches == 0:
 
         matches = [x for x in matches if x["strand"] == "+"]
-        best_match = get_best_match(matches, query_interval)
+        # best_match = get_best_match(matches, query_interval)
+        best_match = get_best_match(matches, start, end,
+                                    gene_starts, gene_ends)
 
     else:
         matches = [x for x in matches if x["strand"] == "-"]
-        best_match = get_best_match(matches, query_interval)
+        # best_match = get_best_match(matches, query_interval)
+        best_match = get_best_match(matches, start, end,
+                                    gene_starts, gene_ends)
 
     return best_match['gene_ID'], best_match['strand']
 
-
-def get_best_match(matches, query_interval):
-    """ Given a set of gene matches and a query interval, return the match
-        that has the greatest amount of overlap with the query."""
-
-    print('matching based on overlap')
-    max_overlap = 0
-    max_perc_overlap = 0
+def get_best_match(matches, start, end,
+                   gene_starts, gene_ends):
+    """
+    Get the best gene match based on distances of start and end of
+    read to starts and ends from transcripts of genes. The gene with the
+    lowest absolute genomic distance between 5' ends and 3' ends will win.
+    """
+    min_dist = sys.maxsize
     best_match = None
+
+    print(f'read start: {start}')
+    print(f'read end: {end}')
+
+    # TODO - maybe don't need gene_starts + gene_ends?
     for match in matches:
-        print(match['gene_ID'])
-        match_interval = [match['start'], match['end']]
-        overlap, perc_overlap = get_overlap(query_interval, match_interval)
-        print(overlap)
-        print(perc_overlap)
-        if perc_overlap > max_perc_overlap:
-            max_overlap = overlap
-            max_perc_overlap = perc_overlap
+        print()
+        print(f"gene: {match['gene_ID']}")
+        end_dist = abs(match['end']-end)
+        start_dist = abs(match['start']-start)
+
+        print(f"gene start: {match['start']}")
+        print(f"gene end: {match['end']}")
+        dist = end_dist+start_dist
+        print(f'dist: {dist}')
+        if dist < min_dist:
+            min_dist = dist
             best_match = match
-        # elif overlap == max_overlap:
-        #     if perc_overlap > max_perc_overlap:
-        #         max_overlap = overlap
-        #         max_perc_overlap = perc_overlap
-        #         best_match = match
 
     print('best match')
     print(best_match['gene_ID'])
     return best_match
+
+
+
+# def get_best_match(matches, query_interval):
+#     """ Given a set of gene matches and a query interval, return the match
+#         that has the greatest amount of overlap with the query."""
+#
+#     print('matching based on overlap')
+#     max_overlap = 0
+#     max_perc_overlap = 0
+#     best_match = None
+#     for match in matches:
+#         print(match['gene_ID'])
+#         match_interval = [match['start'], match['end']]
+#         overlap, perc_overlap = get_overlap(query_interval, match_interval)
+#         print(overlap)
+#         print(perc_overlap)
+#         if overlap > max_overlap:
+#             max_overlap = overlap
+#             max_perc_overlap = perc_overlap
+#             best_match = match
+#
+#     print('best match')
+#     print(best_match['gene_ID'])
+#     return best_match
 
 
 def get_overlap(a, b):
@@ -965,7 +998,8 @@ def process_ISM(chrom, positions, strand, edge_IDs, vertex_IDs, all_matches, tra
 
 
 def process_NIC(chrom, positions, strand, edge_IDs, vertex_IDs, transcript_dict,
-                gene_starts, gene_ends, edge_dict, locations, vertex_2_gene, run_info):
+                gene_starts, gene_ends, edge_dict, locations, vertex_2_gene, run_info,
+                cursor, tmp_gene):
     """ For a transcript that has been determined to be novel in catalog, find
         the proper gene match (documenting fusion event if applicable). To do
         this, look up each vertex in the vertex_2_gene dict, and keep track of all
@@ -976,6 +1010,14 @@ def process_NIC(chrom, positions, strand, edge_IDs, vertex_IDs, transcript_dict,
     gene_ID, fusion = find_gene_match_on_vertex_basis(vertex_IDs,
                                                       strand,
                                                       vertex_2_gene)
+    # otherwise look for closest gene based on end differences
+    if gene_ID == None:
+      gene_ID, match_strand = search_for_overlap_with_gene(chrom, positions[0],
+                                                           positions[-1], strand,
+                                                           cursor, run_info, tmp_gene,
+                                                           gene_starts, gene_ends)
+      print('geneid from search for overlap with gene  9NIC)')
+      print(gene_ID)
     if gene_ID == None:
       return None, None, [], None, fusion
 
@@ -1143,11 +1185,12 @@ def process_NNC(chrom, positions, strand, edge_IDs, vertex_IDs, transcript_dict,
     gene_ID, fusion = find_gene_match_on_vertex_basis(
         vertex_IDs, strand, vertex_2_gene)
 
-    # otherwise look for genomic overlap with existing genes
+    # otherwise look for closest gene based on end differences
     if gene_ID == None:
         gene_ID, match_strand = search_for_overlap_with_gene(chrom, positions[0],
                                                              positions[-1], strand,
-                                                             cursor, run_info, tmp_gene)
+                                                             cursor, run_info, tmp_gene,
+                                                             gene_starts, gene_ends)
         print('geneid from search for overlap with gene')
         print(gene_ID)
         if gene_ID == None:
@@ -1268,7 +1311,8 @@ def process_remaining_mult_cases(chrom, positions, strand, edge_IDs, vertex_IDs,
     if not run_info.create_novel_spliced_genes and not fusion:
         gene_ID, match_strand = search_for_overlap_with_gene(chrom, positions[0],
                                                              positions[-1], strand,
-                                                             cursor, run_info, tmp_gene)
+                                                             cursor, run_info, tmp_gene,
+                                                             gene_starts, gene_ends)
     else:
         gene_ID = None
         match_strand = None
@@ -1437,7 +1481,8 @@ def identify_transcript(chrom, positions, strand, cursor, location_dict, edge_di
                                                                                      vertex_IDs, transcript_dict,
                                                                                      gene_starts, gene_ends,
                                                                                      edge_dict, location_dict,
-                                                                                     vertex_2_gene, run_info)
+                                                                                     vertex_2_gene, run_info,
+                                                                                     cursor, tmp_gene)
 
     # Novel in catalog transcripts have known splice donors and acceptors,
     # but new connections between them.
@@ -1449,7 +1494,8 @@ def identify_transcript(chrom, positions, strand, cursor, location_dict, edge_di
                                                                                  vertex_IDs, transcript_dict,
                                                                                  gene_starts, gene_ends,
                                                                                  edge_dict, location_dict,
-                                                                                 vertex_2_gene, run_info)
+                                                                                 vertex_2_gene, run_info,
+                                                                                 cursor, tmp_gene)
 
     # Antisense transcript with splice junctions matching known gene
     if splice_vertices_known and gene_ID == None and not fusion:
@@ -1964,7 +2010,8 @@ def identify_monoexon_transcript(chrom, positions, strand, cursor, location_dict
             # Find best gene match using overlap search if the ISM/NIC check didn't work
             gene_ID, match_strand = search_for_overlap_with_gene(chrom, positions[0],
                                                                  positions[1], strand,
-                                                                 cursor, run_info, tmp_gene)
+                                                                 cursor, run_info, tmp_gene,
+                                                                 gene_starts, gene_ends)
             # Intergenic case
             if gene_ID == None:
                 gene_ID = create_gene(chrom, positions[0], positions[-1],
