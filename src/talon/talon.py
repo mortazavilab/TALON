@@ -678,15 +678,15 @@ def get_best_match(matches, query_interval):
         overlap, perc_overlap = get_overlap(query_interval, match_interval)
         print(overlap)
         print(perc_overlap)
-        if overlap > max_overlap:
+        if perc_overlap > max_perc_overlap:
             max_overlap = overlap
             max_perc_overlap = perc_overlap
             best_match = match
-        elif overlap == max_overlap:
-            if perc_overlap > max_perc_overlap:
-                max_overlap = overlap
-                max_perc_overlap = perc_overlap
-                best_match = match
+        # elif overlap == max_overlap:
+        #     if perc_overlap > max_perc_overlap:
+        #         max_overlap = overlap
+        #         max_perc_overlap = perc_overlap
+        #         best_match = match
 
     print('best match')
     print(best_match['gene_ID'])
