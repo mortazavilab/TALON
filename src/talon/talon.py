@@ -1010,8 +1010,9 @@ def process_NIC(chrom, positions, strand, edge_IDs, vertex_IDs, transcript_dict,
     gene_ID, fusion = find_gene_match_on_vertex_basis(vertex_IDs,
                                                       strand,
                                                       vertex_2_gene)
-    # otherwise look for closest gene based on end differences
-    if gene_ID == None:
+    # otherwise look for closest gene based on end differences,
+    # only if it wasn't previously labeled as fusion
+    if gene_ID == None and fusion == False:
       gene_ID, match_strand = search_for_overlap_with_gene(chrom, positions[0],
                                                            positions[-1], strand,
                                                            cursor, run_info, tmp_gene,
