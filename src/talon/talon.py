@@ -1326,6 +1326,12 @@ def process_spliced_antisense(chrom, positions, strand, edge_IDs, vertex_IDs,
         anti_strand = "+"
     anti_gene_ID, fusion = find_gene_match_on_vertex_basis(vertex_IDs, anti_strand,
                                                    vertex_2_gene)
+    if type(anti_gene_ID) == list and fusion == False:
+        anti_gene_ID, match_strand = search_for_overlap_with_gene(chrom, positions[0],
+                                                           positions[-1], strand,
+                                                           cursor, run_info, tmp_gene,
+                                                                                                           gene_starts, gene_ends,
+                                                                                                           gene_IDs=gene_ID)
     if anti_gene_ID == None:
         return None, None, gene_novelty, transcript_novelty, start_end_info
 
