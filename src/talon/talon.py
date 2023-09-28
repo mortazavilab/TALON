@@ -641,13 +641,14 @@ def search_for_overlap_with_gene(chromosome, start, end, strand,
     cursor.execute(query)
     matches = cursor.fetchall()
 
-    if len(matches) == 0:
-        return None, None
-
     # restrict to just the genes we care about
     if gene_IDs:
         print(f'restricting just to {gene_IDs}')
         matches = [match for match in matches if match['gene_ID'] in gene_IDs]
+
+
+    if len(matches) == 0:
+        return None, None
 
     # Among multiple matches, preferentially return the same-strand gene with
     # the greatest amount of overlap
