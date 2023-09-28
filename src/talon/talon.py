@@ -1332,8 +1332,6 @@ def process_spliced_antisense(chrom, positions, strand, edge_IDs, vertex_IDs,
                                                            cursor, run_info, tmp_gene,
                                                            gene_starts, gene_ends,
                                                            gene_IDs=anti_gene_ID)
-                                                                                                           gene_starts, gene_ends,
-                                                                                                           gene_IDs=gene_ID)
     if anti_gene_ID == None:
         return None, None, gene_novelty, transcript_novelty, start_end_info
 
