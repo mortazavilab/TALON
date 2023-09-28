@@ -456,7 +456,9 @@ def create_transcript(chromosome, start_pos, end_pos, gene_ID, edge_IDs, vertex_
                       transcript_dict):
     """Creates a novel transcript and adds it to the transcript data structure.
     """
+    print('creating new transcript')
     new_ID = transcript_counter.increment()
+    print(f'new tid:{new_ID}')
     if len(edge_IDs) > 1:
         jn_path = ",".join(map(str, edge_IDs[1:-1]))
     else:
@@ -605,13 +607,17 @@ def search_for_ISM(edge_IDs, transcript_dict):
 
 def search_for_overlap_with_gene(chromosome, start, end, strand,
                                  cursor, run_info, tmp_gene,
-                                 gene_starts, gene_ends):
+                                 gene_starts, gene_ends, gene_IDs=None):
     """ Given a start and an end value for an interval, query the database to
         determine whether the interval overlaps with any genes. If it there is
         more than one match, prioritize same-strand first and foremost.
-        If there is more than one same-strand option, prioritize amount of
-        overlap. Antisense matches may be returned if there is no same strand
-        match. """
+        If there is more than one same-strand option, prioritize distance from 3' / 5'.
+        Antisense matches may be returned if there is no same strand
+        match.
+
+        Parameters:
+            gene_ID (list of str or None): Restrict results to genes in this list
+    """
     print('in search for overlap with gene')
     min_start = min(start, end)
     max_end = max(start, end)
@@ -637,6 +643,11 @@ def search_for_overlap_with_gene(chromosome, start, end, strand,
 
     if len(matches) == 0:
         return None, None
+
+    # restrict to just the genes we care about
+    if gene_IDs:
+        print(f'restricting just to {gene_IDs}')
+        matches = [match for match in matches if match['gene_ID'] in gene_IDs]
 
     # Among multiple matches, preferentially return the same-strand gene with
     # the greatest amount of overlap
@@ -665,6 +676,8 @@ def search_for_overlap_with_gene(chromosome, start, end, strand,
         # best_match = get_best_match(matches, query_interval)
         best_match = get_best_match(matches, start, end,
                                     gene_starts, gene_ends)
+
+    print(f"but right here it says {best_match['gene_ID']}")
 
     return best_match['gene_ID'], best_match['strand']
 
@@ -886,7 +899,8 @@ def process_3p(chrom, positions, strand, vertex_IDs, gene_ID, gene_ends, edge_di
 
 
 def process_ISM(chrom, positions, strand, edge_IDs, vertex_IDs, all_matches, transcript_dict,
-                gene_starts, gene_ends, edge_dict, locations, run_info):
+                gene_starts, gene_ends, edge_dict, locations, run_info,
+                cursor, tmp_gene):
     """ Given a transcript, try to find an ISM match for it. If the
         best match is an ISM with known ends, that will be promoted to NIC. """
 
@@ -899,7 +913,26 @@ def process_ISM(chrom, positions, strand, edge_IDs, vertex_IDs, all_matches, tra
     ISM = []
     suffix = []
     prefix = []
-    gene_ID = all_matches[0]['gene_ID']
+
+    # choose gene to assign it to
+    gene_matches = list(set([match['gene_ID'] for match in all_matches]))
+    print(gene_matches)
+
+    # tie break based on distance to 5' / 3' ends
+    if len(gene_matches) > 1:
+        gene_ID, _ = search_for_overlap_with_gene(chrom, positions[0],
+                        positions[-1], strand, cursor, run_info, tmp_gene,
+                        gene_starts, gene_ends, gene_IDs=gene_matches)
+        all_matches = [m for m in all_matches if m['gene_ID'] == gene_ID]
+    else:
+        gene_ID = all_matches[0]['gene_ID']
+
+    # print('edge IDs')
+    # print(edge_IDs)
+    # for match in all_matches:
+    #     print(f"gene id:{match['gene_ID']}")
+    #     print(match['jn_path'])
+
     # Get matches for the ends
     if n_exons > 1:
         start_vertex, start_exon, start_novelty, known_start, diff_5p = process_5p(chrom,
@@ -932,7 +965,7 @@ def process_ISM(chrom, positions, strand, edge_IDs, vertex_IDs, all_matches, tra
         known_start = 0
         known_end = 0
 
-    # Iterate over matches to characterize ISMs
+    # Iterate over all matches from assigned gene to characterize ISMs
     for match in all_matches:
 
         # Add ISM
@@ -996,6 +1029,36 @@ def process_ISM(chrom, positions, strand, edge_IDs, vertex_IDs, all_matches, tra
 
     return gene_ID, transcript_ID, novelty, start_end_info
 
+def assign_gene(vertex_IDs, strand, vertex_2_gene,
+                             chrom, start, end, cursor, run_info,
+                             tmp_gene, gene_starts, gene_ends):
+    """
+    Assign a gene to a transcript. First do this on the basis of splice site
+    matching. If this yields more than one gene, then choose the gene with the
+    closest 5' / 3' ends. If the splice site matching returns multiple matches
+    between non-overlapping genes, mark as fusion and do not assign a gene.
+
+    Returns:
+    gene_ID (str or None): Gene ID of assigned gene, None if not fount
+    fusion (bool): Whether read appears to come from a novel fusion gene
+    """
+
+    # first attempt to assign based on matching vertices
+    gene_ID, fusion = find_gene_match_on_vertex_basis(vertex_IDs,
+                                                       strand,
+                                                       vertex_2_gene)
+
+    # if previous function returned more than one gene that we need to tiebreak,
+    # look for closest gene based on end differences, out of candidate genes
+    # only if it wasn't previously labeled as fusion
+    if type(gene_ID) == list and fusion == False:
+        gene_ID, match_strand = search_for_overlap_with_gene(chrom, start,
+                                                            end, strand,
+                                                            cursor, run_info, tmp_gene,
+                                                            gene_starts, gene_ends,
+                                                            gene_IDs=gene_ID)
+    return gene_ID, fusion
+
 
 def process_NIC(chrom, positions, strand, edge_IDs, vertex_IDs, transcript_dict,
                 gene_starts, gene_ends, edge_dict, locations, vertex_2_gene, run_info,
@@ -1006,19 +1069,23 @@ def process_NIC(chrom, positions, strand, edge_IDs, vertex_IDs, transcript_dict,
         same-strand genes. """
 
     start_end_info = {}
+    gene_ID, fusion = assign_gene(vertex_IDs, strand, vertex_2_gene,
+                                 chrom, positions[0], positions[-1], cursor, run_info,
+                                 tmp_gene, gene_starts, gene_ends)
 
-    gene_ID, fusion = find_gene_match_on_vertex_basis(vertex_IDs,
-                                                      strand,
-                                                      vertex_2_gene)
-    # otherwise look for closest gene based on end differences,
-    # only if it wasn't previously labeled as fusion
-    if gene_ID == None and fusion == False:
-      gene_ID, match_strand = search_for_overlap_with_gene(chrom, positions[0],
-                                                           positions[-1], strand,
-                                                           cursor, run_info, tmp_gene,
-                                                           gene_starts, gene_ends)
-      print('geneid from search for overlap with gene  9NIC)')
-      print(gene_ID)
+    # gene_ID, fusion = find_gene_match_on_vertex_basis(vertex_IDs,
+    #                                                   strand,
+    #                                                   vertex_2_gene)
+    # # otherwise look for closest gene based on end differences,
+    # # only if it wasn't previously labeled as fusion
+    # if gene_ID == None and fusion == False:
+    #   gene_ID, match_strand = search_for_overlap_with_gene(chrom, positions[0],
+    #                                                        positions[-1], strand,
+    #                                                        cursor, run_info, tmp_gene,
+    #                                                        gene_starts, gene_ends)
+    #   print('geneid from search for overlap with gene  9NIC)')
+    #   print(gene_ID)
+
     if gene_ID == None:
       return None, None, [], None, fusion
 
@@ -1148,8 +1215,10 @@ def find_gene_match_on_vertex_basis(vertex_IDs, strand, vertex_2_gene):
     # if we hit more than one gene and they have overlapping sjs,
     # tie break based on ?????
     elif len(gene_tally) > 1:
-        print('i am here')
-        return None, False
+        print('i found more than one gene')
+        print(gene_tally)
+        print(n_gene_matches)
+        return list(gene_tally.keys()), False
         # temp = df.loc[df.gid.isin(gene_matches)].copy(deep=True)
         # temp = temp.drop_duplicates()
         #
@@ -1182,20 +1251,27 @@ def process_NNC(chrom, positions, strand, edge_IDs, vertex_IDs, transcript_dict,
     novelty = []
     start_end_info = {}
 
-    # first try to assign gene based on vertex concordance
-    gene_ID, fusion = find_gene_match_on_vertex_basis(
-        vertex_IDs, strand, vertex_2_gene)
+    # # first try to assign gene based on vertex concordance
+    # gene_ID, fusion = find_gene_match_on_vertex_basis(
+    #     vertex_IDs, strand, vertex_2_gene)
+    #
+    # # otherwise look for closest gene based on end differences
+    # if gene_ID == None and fusion == False:
+    #     gene_ID, match_strand = search_for_overlap_with_gene(chrom, positions[0],
+    #                                                          positions[-1], strand,
+    #                                                          cursor, run_info, tmp_gene,
+    #                                                          gene_starts, gene_ends)
+    #     print('geneid from search for overlap with gene')
+    #     print(gene_ID)
+    gene_ID, fusion = assign_gene(vertex_IDs, strand, vertex_2_gene,
+                                 chrom, positions[0], positions[-1], cursor, run_info,
+                                 tmp_gene, gene_starts, gene_ends)
+    print('gene id process_nnc')
+    print(gene_ID)
+    print(fusion)
 
-    # otherwise look for closest gene based on end differences
     if gene_ID == None:
-        gene_ID, match_strand = search_for_overlap_with_gene(chrom, positions[0],
-                                                             positions[-1], strand,
-                                                             cursor, run_info, tmp_gene,
-                                                             gene_starts, gene_ends)
-        print('geneid from search for overlap with gene')
-        print(gene_ID)
-        if gene_ID == None:
-            return None, None, [], None, False
+        return None, None, [], None, fusion
 
     # Get matches for the ends
     start_vertex, start_exon, start_novelty, known_start, diff_5p = process_5p(chrom,
@@ -1346,11 +1422,13 @@ def process_remaining_mult_cases(chrom, positions, strand, edge_IDs, vertex_IDs,
     start_end_info["vertex_IDs"] = vertex_IDs
 
     if gene_ID == None:
-
+        print(f'fusion: {fusion}')
         if fusion:
+            print('i should be here')
             t_nov = 'fusion_transcript'
             g_nov = 'fusion_novel'
         else:
+            print('but I think im going here')
             t_nov = 'intergenic_transcript'
             g_nov = 'intergenic_novel'
 
@@ -1446,6 +1524,7 @@ def identify_transcript(chrom, positions, strand, cursor, location_dict, edge_di
     all_exons_known = check_all_exons_known(e_novelty)
     splice_vertices_known = (sum(v_novelty) == 0)
     all_exons_novel = (reduce(operator.mul, e_novelty, 1) == 1)
+    print(f'all exons novel : {all_exons_novel}')
     fusion = False
 
     # Look for FSM or ISM.
@@ -1472,7 +1551,9 @@ def identify_transcript(chrom, positions, strand, cursor, location_dict, edge_di
                                                                                          transcript_dict,
                                                                                          gene_starts, gene_ends,
                                                                                          edge_dict, location_dict,
-                                                                                         run_info)
+                                                                                         run_info, cursor, tmp_gene)
+                print(f'gene id from process ism {gene_ID}')
+
         # Look for NIC
         if gene_ID == None:
             print('looking for nic')
@@ -1513,8 +1594,9 @@ def identify_transcript(chrom, positions, strand, cursor, location_dict, edge_di
                                       cursor, tmp_gene)
 
     # Novel not in catalog transcripts contain new splice donors/acceptors
-    # and contain at least one splice junction.
-    elif not(splice_vertices_known) and not fusion:
+    # and contain at least one splice junction. There should also be at least
+    # one shared exon from existing transcripts to even try assigning a gene
+    elif not(splice_vertices_known) and not fusion and not all_exons_novel:
         print('lookign for NNCs')
         gene_ID, transcript_ID, transcript_novelty, start_end_info, fusion = process_NNC(chrom,
                                                                                  positions,
@@ -1524,7 +1606,7 @@ def identify_transcript(chrom, positions, strand, cursor, location_dict, edge_di
                                                                                  edge_dict, location_dict,
                                                                                  vertex_2_gene, run_info,
                                                                                  cursor, tmp_gene)
-    print(f'geneID from process_nnc: {gene_ID}')
+        print(f'geneID from process_nnc: {gene_ID}')
     # Transcripts that don't match the previous categories end up here
     if gene_ID == None:
         print('looking for this other stuff')
@@ -2006,7 +2088,7 @@ def identify_monoexon_transcript(chrom, positions, strand, cursor, location_dict
                                                                                transcript_dict,
                                                                                gene_starts, gene_ends,
                                                                                edge_dict, location_dict,
-                                                                               run_info)
+                                                                               run_info, cursor, tmp_gene)
         if gene_ID == None:
             # Find best gene match using overlap search if the ISM/NIC check didn't work
             gene_ID, match_strand = search_for_overlap_with_gene(chrom, positions[0],
