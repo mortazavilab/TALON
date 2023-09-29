@@ -648,6 +648,7 @@ def search_for_overlap_with_gene(chromosome, start, end, strand,
 
 
     if len(matches) == 0:
+        print('uwu here')
         return None, None
 
     # Among multiple matches, preferentially return the same-strand gene with
@@ -928,6 +929,10 @@ def process_ISM(chrom, positions, strand, edge_IDs, vertex_IDs, all_matches, tra
     else:
         gene_ID = all_matches[0]['gene_ID']
 
+    # if we didn't assign a gene ID
+    if gene_ID == None:
+      return None, None, [], None
+
     # print('edge IDs')
     # print(edge_IDs)
     # for match in all_matches:
@@ -1040,7 +1045,7 @@ def assign_gene(vertex_IDs, strand, vertex_2_gene,
     between non-overlapping genes, mark as fusion and do not assign a gene.
 
     Returns:
-    gene_ID (str or None): Gene ID of assigned gene, None if not fount
+    gene_ID (str or None): Gene ID of assigned gene, None if not found
     fusion (bool): Whether read appears to come from a novel fusion gene
     """
 
@@ -1392,7 +1397,8 @@ def process_remaining_mult_cases(chrom, positions, strand, edge_IDs, vertex_IDs,
     gene_novelty = []
     transcript_novelty = []
     start_end_info = {}
-    if not run_info.create_novel_spliced_genes and not fusion:
+    if not run_info.create_novel_spliced_genes or not fusion:
+        print('did i get here?')
         gene_ID, match_strand = search_for_overlap_with_gene(chrom, positions[0],
                                                              positions[-1], strand,
                                                              cursor, run_info, tmp_gene,
