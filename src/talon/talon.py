@@ -655,10 +655,10 @@ def search_for_overlap_with_gene(chromosome, start, end, strand,
                            strand
                     FROM $tmp_t
                     WHERE (chromosome = '$chrom') AND
-                          ((start <= $min_start AND end >= $max_end) OR
-                          (start >= $min_start AND end <= $max_end) OR
-                          (start >= $min_start AND start <= $max_end) OR
-                          (end >= $min_start AND end <= $max_end))
+                          ((min_pos <= $min_start AND max_pos >= $max_end) OR
+                          (min_pos >= $min_start AND max_pos <= $max_end) OR
+                          (min_pos >= $min_start AND min_pos <= $max_end) OR
+                          (max_pos >= $min_start AND max_pos <= $max_end))
                      GROUP BY gene_ID;""").substitute({'tmp_t': tmp_t, 'chrom': chromosome,
                                                        'min_start': min_start, 'max_end': max_end})
     cursor.execute(query)
