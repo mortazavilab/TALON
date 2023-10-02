@@ -606,8 +606,8 @@ def search_for_ISM(edge_IDs, transcript_dict):
 
 
 def search_for_overlap_with_gene(chromosome, start, end, strand,
-                                 cursor, run_info, tmp_gene,
-                                 gene_starts, gene_ends, gene_IDs=None):
+                                 cursor, run_info, tmp_gene, tmp_t,
+                                 gene_IDs=None):
     """ Given a start and an end value for an interval, query the database to
         determine whether the interval overlaps with any genes. If it there is
         more than one match, prioritize same-strand first and foremost.
@@ -625,21 +625,46 @@ def search_for_overlap_with_gene(chromosome, start, end, strand,
     # print('query interval')
     # print(query_interval)
 
-    query = Template(""" SELECT gene_ID,
-                       chromosome,
-                       MIN(start) AS start,
-                       MAX(end) AS end,
-                       strand
-                FROM $tmp_gene
-                WHERE (chromosome = '$chrom') AND
-                      ((start <= $min_start AND end >= $max_end) OR
-                      (start >= $min_start AND end <= $max_end) OR
-                      (start >= $min_start AND start <= $max_end) OR
-                      (end >= $min_start AND end <= $max_end))
-                 GROUP BY gene_ID;""").substitute({'tmp_gene': tmp_gene, 'chrom': chromosome,
-                                                   'min_start': min_start, 'max_end': max_end})
+    # query = Template(""" SELECT gene_ID,
+    #                    chromosome,
+    #                    MIN(start) AS start,
+    #                    MAX(end) AS end,
+    #                    strand
+    #             FROM $tmp_gene
+    #             WHERE (chromosome = '$chrom') AND
+    #                   ((start <= $min_start AND end >= $max_end) OR
+    #                   (start >= $min_start AND end <= $max_end) OR
+    #                   (start >= $min_start AND start <= $max_end) OR
+    #                   (end >= $min_start AND end <= $max_end))
+    #              GROUP BY gene_ID;""").substitute({'tmp_gene': tmp_gene, 'chrom': chromosome,
+    #                                                'min_start': min_start, 'max_end': max_end})
+    if isinstance(gene_IDs, list):
+        query = Template("""SELECT gene_ID,
+                           chromosome,
+                           min_pos,
+                           max_pos,
+                           strand
+                    FROM $tmp_t
+                    WHERE gene_ID IN $gene_ids""").substitute({'tmp_t': tmp_t, \
+                                                               'gene_ids': qutils.format_for_IN(gene_IDs)})
+    elif not gene_IDs:
+        query = Template("""SELECT gene_ID,
+                           chromosome,
+                           min_pos,
+                           max_pos,
+                           strand
+                    FROM $tmp_t
+                    WHERE (chromosome = '$chrom') AND
+                          ((start <= $min_start AND end >= $max_end) OR
+                          (start >= $min_start AND end <= $max_end) OR
+                          (start >= $min_start AND start <= $max_end) OR
+                          (end >= $min_start AND end <= $max_end))
+                     GROUP BY gene_ID;""").substitute({'tmp_t': tmp_t, 'chrom': chromosome,
+                                                       'min_start': min_start, 'max_end': max_end})
     cursor.execute(query)
     matches = cursor.fetchall()
+    print('quwewy:')
+    print(query)
 
     # restrict to just the genes we care about
     if gene_IDs:
@@ -648,7 +673,7 @@ def search_for_overlap_with_gene(chromosome, start, end, strand,
 
 
     if len(matches) == 0:
-        print('uwu here')
+        print('herere here')
         return None, None
 
     # Among multiple matches, preferentially return the same-strand gene with
@@ -670,21 +695,18 @@ def search_for_overlap_with_gene(chromosome, start, end, strand,
 
         matches = [x for x in matches if x["strand"] == "+"]
         # best_match = get_best_match(matches, query_interval)
-        best_match = get_best_match(matches, start, end,
-                                    gene_starts, gene_ends)
+        best_match = get_best_match(matches, min_start, max_end)
 
     else:
         matches = [x for x in matches if x["strand"] == "-"]
         # best_match = get_best_match(matches, query_interval)
-        best_match = get_best_match(matches, start, end,
-                                    gene_starts, gene_ends)
+        best_match = get_best_match(matches, min_start, max_end)
 
     print(f"but right here it says {best_match['gene_ID']}")
 
     return best_match['gene_ID'], best_match['strand']
 
-def get_best_match(matches, start, end,
-                   gene_starts, gene_ends):
+def get_best_match(matches, min_end, max_end):
     """
     Get the best gene match based on distances of start and end of
     read to starts and ends from transcripts of genes. The gene with the
@@ -693,18 +715,17 @@ def get_best_match(matches, start, end,
     min_dist = sys.maxsize
     best_match = None
 
-    print(f'read start: {start}')
-    print(f'read end: {end}')
+    print(f'read min: {min_end}')
+    print(f'read end: {max_end}')
 
-    # TODO - maybe don't need gene_starts + gene_ends?
     for match in matches:
         print()
         print(f"gene: {match['gene_ID']}")
-        end_dist = abs(match['end']-end)
-        start_dist = abs(match['start']-start)
+        end_dist = abs(match['max_pos']-max_end)
+        start_dist = abs(match['min_pos']-min_end)
 
-        print(f"gene start: {match['start']}")
-        print(f"gene end: {match['end']}")
+        print(f"gene start: {match['min_pos']}")
+        print(f"gene end: {match['max_pos']}")
         dist = end_dist+start_dist
         print(f'dist: {dist}')
         if dist < min_dist:
@@ -902,7 +923,7 @@ def process_3p(chrom, positions, strand, vertex_IDs, gene_ID, gene_ends, edge_di
 
 def process_ISM(chrom, positions, strand, edge_IDs, vertex_IDs, all_matches, transcript_dict,
                 gene_starts, gene_ends, edge_dict, locations, run_info,
-                cursor, tmp_gene):
+                cursor, tmp_gene, tmp_t):
     """ Given a transcript, try to find an ISM match for it. If the
         best match is an ISM with known ends, that will be promoted to NIC. """
 
@@ -924,7 +945,7 @@ def process_ISM(chrom, positions, strand, edge_IDs, vertex_IDs, all_matches, tra
     if len(gene_matches) > 1:
         gene_ID, _ = search_for_overlap_with_gene(chrom, positions[0],
                         positions[-1], strand, cursor, run_info, tmp_gene,
-                        gene_starts, gene_ends, gene_IDs=gene_matches)
+                        tmp_t, gene_IDs=gene_matches)
         all_matches = [m for m in all_matches if m['gene_ID'] == gene_ID]
     else:
         gene_ID = all_matches[0]['gene_ID']
@@ -1037,7 +1058,7 @@ def process_ISM(chrom, positions, strand, edge_IDs, vertex_IDs, all_matches, tra
 
 def assign_gene(vertex_IDs, strand, vertex_2_gene,
                              chrom, start, end, cursor, run_info,
-                             tmp_gene, gene_starts, gene_ends):
+                             tmp_gene, tmp_t, gene_starts, gene_ends):
     """
     Assign a gene to a transcript. First do this on the basis of splice site
     matching. If this yields more than one gene, then choose the gene with the
@@ -1061,14 +1082,14 @@ def assign_gene(vertex_IDs, strand, vertex_2_gene,
         gene_ID, match_strand = search_for_overlap_with_gene(chrom, start,
                                                             end, strand,
                                                             cursor, run_info, tmp_gene,
-                                                            gene_starts, gene_ends,
+                                                            tmp_t,
                                                             gene_IDs=gene_ID)
     return gene_ID, fusion
 
 
 def process_NIC(chrom, positions, strand, edge_IDs, vertex_IDs, transcript_dict,
                 gene_starts, gene_ends, edge_dict, locations, vertex_2_gene, run_info,
-                cursor, tmp_gene):
+                cursor, tmp_gene, tmp_t):
     """ For a transcript that has been determined to be novel in catalog, find
         the proper gene match (documenting fusion event if applicable). To do
         this, look up each vertex in the vertex_2_gene dict, and keep track of all
@@ -1077,7 +1098,7 @@ def process_NIC(chrom, positions, strand, edge_IDs, vertex_IDs, transcript_dict,
     start_end_info = {}
     gene_ID, fusion = assign_gene(vertex_IDs, strand, vertex_2_gene,
                                  chrom, positions[0], positions[-1], cursor, run_info,
-                                 tmp_gene, gene_starts, gene_ends)
+                                 tmp_gene, tmp_t, gene_starts, gene_ends)
 
     # gene_ID, fusion = find_gene_match_on_vertex_basis(vertex_IDs,
     #                                                   strand,
@@ -1251,7 +1272,7 @@ def find_gene_match_on_vertex_basis(vertex_IDs, strand, vertex_2_gene):
 
 def process_NNC(chrom, positions, strand, edge_IDs, vertex_IDs, transcript_dict,
                 gene_starts, gene_ends, edge_dict, locations, vertex_2_gene, run_info,
-                cursor, tmp_gene):
+                cursor, tmp_gene, tmp_t):
     """ Novel not in catalog case """
 
     novelty = []
@@ -1271,7 +1292,7 @@ def process_NNC(chrom, positions, strand, edge_IDs, vertex_IDs, transcript_dict,
     #     print(gene_ID)
     gene_ID, fusion = assign_gene(vertex_IDs, strand, vertex_2_gene,
                                  chrom, positions[0], positions[-1], cursor, run_info,
-                                 tmp_gene, gene_starts, gene_ends)
+                                 tmp_gene, tmp_t, gene_starts, gene_ends)
     print('gene id process_nnc')
     print(gene_ID)
     print(fusion)
@@ -1319,7 +1340,8 @@ def process_NNC(chrom, positions, strand, edge_IDs, vertex_IDs, transcript_dict,
 
 def process_spliced_antisense(chrom, positions, strand, edge_IDs, vertex_IDs,
                               transcript_dict, gene_starts, gene_ends, edge_dict,
-                              locations, vertex_2_gene, run_info, cursor, tmp_gene):
+                              locations, vertex_2_gene, run_info, cursor, tmp_gene,
+                              tmp_t):
     """ Annotate a transcript as antisense with splice junctions """
 
     gene_novelty = []
@@ -1336,7 +1358,7 @@ def process_spliced_antisense(chrom, positions, strand, edge_IDs, vertex_IDs,
         anti_gene_ID, match_strand = search_for_overlap_with_gene(chrom, positions[0],
                                                            positions[-1], strand,
                                                            cursor, run_info, tmp_gene,
-                                                           gene_starts, gene_ends,
+                                                           tmp_t,
                                                            gene_IDs=anti_gene_ID)
     if anti_gene_ID == None:
         return None, None, gene_novelty, transcript_novelty, start_end_info
@@ -1390,6 +1412,7 @@ def process_spliced_antisense(chrom, positions, strand, edge_IDs, vertex_IDs,
 def process_remaining_mult_cases(chrom, positions, strand, edge_IDs, vertex_IDs,
                                  transcript_dict, gene_starts, gene_ends, edge_dict,
                                  locations, vertex_2_gene, run_info, cursor, tmp_gene,
+                                 tmp_t,
                                  fusion):
     """ This function is a catch-all for multiexonic transcripts that were not
         FSM, ISM, NIC, NNC, or spliced antisense.
@@ -1402,7 +1425,7 @@ def process_remaining_mult_cases(chrom, positions, strand, edge_IDs, vertex_IDs,
         gene_ID, match_strand = search_for_overlap_with_gene(chrom, positions[0],
                                                              positions[-1], strand,
                                                              cursor, run_info, tmp_gene,
-                                                             gene_starts, gene_ends)
+                                                             tmp_t)
     else:
         gene_ID = None
         match_strand = None
@@ -1496,7 +1519,7 @@ def update_vertex_2_gene(gene_ID, vertex_IDs, strand, vertex_2_gene):
 
 def identify_transcript(chrom, positions, strand, cursor, location_dict, edge_dict,
                         transcript_dict, vertex_2_gene, gene_starts, gene_ends,
-                        run_info, tmp_gene):
+                        run_info, tmp_gene, tmp_t):
     """ Inputs:
         - Information about the query transcript
           - chromosome
@@ -1564,7 +1587,7 @@ def identify_transcript(chrom, positions, strand, cursor, location_dict, edge_di
                                                                                          transcript_dict,
                                                                                          gene_starts, gene_ends,
                                                                                          edge_dict, location_dict,
-                                                                                         run_info, cursor, tmp_gene)
+                                                                                         run_info, cursor, tmp_gene, tmp_t)
                 print(f'gene id from process ism {gene_ID}')
 
         # Look for NIC
@@ -1577,7 +1600,8 @@ def identify_transcript(chrom, positions, strand, cursor, location_dict, edge_di
                                                                                      gene_starts, gene_ends,
                                                                                      edge_dict, location_dict,
                                                                                      vertex_2_gene, run_info,
-                                                                                     cursor, tmp_gene)
+                                                                                     cursor, tmp_gene,
+                                                                                     tmp_t)
 
     # Novel in catalog transcripts have known splice donors and acceptors,
     # but new connections between them.
@@ -1590,7 +1614,8 @@ def identify_transcript(chrom, positions, strand, cursor, location_dict, edge_di
                                                                                  gene_starts, gene_ends,
                                                                                  edge_dict, location_dict,
                                                                                  vertex_2_gene, run_info,
-                                                                                 cursor, tmp_gene)
+                                                                                 cursor, tmp_gene,
+                                                                                 tmp_t)
 
     # Antisense transcript with splice junctions matching known gene
     if splice_vertices_known and gene_ID == None and not fusion:
@@ -1604,7 +1629,7 @@ def identify_transcript(chrom, positions, strand, cursor, location_dict, edge_di
                                       gene_ends,
                                       edge_dict, location_dict,
                                       vertex_2_gene, run_info,
-                                      cursor, tmp_gene)
+                                      cursor, tmp_gene, tmp_t)
 
     # Novel not in catalog transcripts contain new splice donors/acceptors
     # and contain at least one splice junction. There should also be at least
@@ -1618,7 +1643,8 @@ def identify_transcript(chrom, positions, strand, cursor, location_dict, edge_di
                                                                                  gene_starts, gene_ends,
                                                                                  edge_dict, location_dict,
                                                                                  vertex_2_gene, run_info,
-                                                                                 cursor, tmp_gene)
+                                                                                 cursor, tmp_gene,
+                                                                                 tmp_t)
         print(f'geneID from process_nnc: {gene_ID}')
     # Transcripts that don't match the previous categories end up here
     if gene_ID == None:
@@ -1632,6 +1658,7 @@ def identify_transcript(chrom, positions, strand, cursor, location_dict, edge_di
                                          edge_dict, location_dict,
                                          vertex_2_gene, run_info,
                                          cursor, tmp_gene,
+                                         tmp_t,
                                          fusion)
 
     print('this is the gene id it decided on')
@@ -1970,6 +1997,11 @@ def prepare_data_structures(cursor, run_info, chrom=None, start=None,
                                                                                      start=start, end=end,
                                                                                      tmp_tab="temp_monoexon_" + tmp_id)
 
+    struct_collection.tmp_t = init_refs.make_temp_transcript_table(cursor,
+                                                                   build, chrom=chrom,
+                                                                   start=start, end=end,
+                                                                   tmp_tab="temp_t_" + tmp_id)
+
     location_dict = init_refs.make_location_dict(build, cursor, chrom=chrom,
                                                  start=start, end=end)
 
@@ -2027,6 +2059,7 @@ def compute_delta(orig_pos, new_pos, strand):
 def identify_monoexon_transcript(chrom, positions, strand, cursor, location_dict,
                                  edge_dict, transcript_dict, vertex_2_gene,
                                  gene_starts, gene_ends, run_info, tmp_gene,
+                                 tmp_t,
                                  tmp_monoexon):
     gene_novelty = []
     transcript_novelty = []
@@ -2101,13 +2134,13 @@ def identify_monoexon_transcript(chrom, positions, strand, cursor, location_dict
                                                                                transcript_dict,
                                                                                gene_starts, gene_ends,
                                                                                edge_dict, location_dict,
-                                                                               run_info, cursor, tmp_gene)
+                                                                               run_info, cursor, tmp_gene, tmp_t)
         if gene_ID == None:
             # Find best gene match using overlap search if the ISM/NIC check didn't work
             gene_ID, match_strand = search_for_overlap_with_gene(chrom, positions[0],
                                                                  positions[1], strand,
                                                                  cursor, run_info, tmp_gene,
-                                                                 gene_starts, gene_ends)
+                                                                 tmp_t)
             # Intergenic case
             if gene_ID == None:
                 gene_ID = create_gene(chrom, positions[0], positions[-1],
@@ -2776,7 +2809,8 @@ def annotate_read(sam_record: pysam.AlignedSegment, cursor, run_info,
                                               vertex_2_gene,
                                               gene_starts, gene_ends,
                                               run_info,
-                                              struct_collection.tmp_gene)
+                                              struct_collection.tmp_gene,
+                                              struct_collection.tmp_t)
     else:
         annotation_info = identify_monoexon_transcript(chrom, positions, strand,
                                                        cursor, location_dict,
@@ -2784,6 +2818,7 @@ def annotate_read(sam_record: pysam.AlignedSegment, cursor, run_info,
                                                        vertex_2_gene,
                                                        gene_starts, gene_ends,
                                                        run_info, struct_collection.tmp_gene,
+                                                       struct_collection.tmp_t,
                                                        struct_collection.tmp_monoexon)
 
     annotation_info.read_ID = read_ID

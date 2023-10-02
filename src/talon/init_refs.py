@@ -72,6 +72,67 @@ def make_temp_novel_gene_table(cursor, build, chrom = None, start = None,
 
     return tmp_tab
 
+def make_temp_transcript_table(cursor, build, chrom = None,
+                                          start = None, end = None,
+                                          tmp_tab = "temp_transcript"):
+    """ Attaches a temporary database with a table that has the following fields:
+            - gene_ID
+            - transcript_ID
+            - chromosome
+            - start (min position)
+            - end (max position)
+            - strand
+        The purpose is to allow location-based matching tiebreaking
+        transcripts. """
+
+    if any(val == None for val in [chrom, start, end]):
+        command = Template(""" CREATE TEMPORARY TABLE IF NOT EXISTS $tmp_tab AS
+                                   SELECT t.gene_ID,
+                                      t.transcript_ID,
+                                      loc1.chromosome,
+                                      genes.strand,
+                                      MIN(loc1.position, loc2.position) as min_pos,
+                                      MAX(loc1.position, loc2.position) as max_pos
+                                   FROM transcripts as t
+                                   LEFT JOIN location as loc1
+                                       ON loc1.location_ID = t.start_vertex
+                                   LEFT JOIN location as loc2
+                                       ON loc2.location_ID = t.end_vertex
+                                   LEFT JOIN genes
+                                       ON genes.gene_ID = t.gene_ID
+                                   WHERE loc1.genome_build = '$build'
+                                       AND loc2.genome_build = '$build' """)
+    else:
+        command = Template(""" CREATE TEMPORARY TABLE IF NOT EXISTS $tmp_tab AS
+                                   SELECT t.gene_ID,
+                                      t.transcript_ID,
+                                      loc1.chromosome,
+                                      genes.strand,
+                                      t.start_exon as exon_ID,
+                                      MIN(loc1.position, loc2.position) as min_pos,
+                                      MAX(loc1.position, loc2.position) as max_pos
+                                   FROM transcripts as t
+                                   LEFT JOIN location as loc1
+                                       ON loc1.location_ID = t.start_vertex
+                                   LEFT JOIN location as loc2
+                                       ON loc2.location_ID = t.end_vertex
+                                   LEFT JOIN genes
+                                       ON genes.gene_ID = t.gene_ID
+                                   WHERE loc1.genome_build = '$build'
+                                   AND loc2.genome_build = '$build'
+                                   AND loc1.chromosome = '$chrom'
+                                   AND ((min_pos <= $start AND max_pos >= $end)
+                                       OR (min_pos >= $start AND max_pos <= $end)
+                                       OR (min_pos >= $start AND min_pos <= $end)
+                                       OR (max_pos >= $start AND max_pos <= $end))""")
+
+    command = command.substitute({'build':build, 'chrom':chrom,
+                                  'start':start, 'end':end,
+                                  'tmp_tab':tmp_tab})
+    cursor.execute(command)
+
+    return tmp_tab
+
 def make_temp_monoexonic_transcript_table(cursor, build, chrom = None,
                                           start = None, end = None,
                                           tmp_tab = "temp_monoexon"):
