@@ -452,13 +452,16 @@ def create_gene(chromosome, start, end, strand, memory_cursor, tmp_gene):
     return new_ID
 
 
-def create_transcript(chromosome, start_pos, end_pos, gene_ID, edge_IDs, vertex_IDs,
-                      transcript_dict):
-    """Creates a novel transcript and adds it to the transcript data structure.
+def create_transcript(strand, chromosome, start_pos, end_pos, gene_ID, edge_IDs, vertex_IDs,
+                      transcript_dict, tmp_t, memory_cursor):
+    """Creates a novel transcript, add it to the transcript data structure,
+       and add to tmp_t
     """
     print('creating new transcript')
     new_ID = transcript_counter.increment()
     print(f'new tid:{new_ID}')
+
+    # updating the dict
     if len(edge_IDs) > 1:
         jn_path = ",".join(map(str, edge_IDs[1:-1]))
     else:
@@ -478,6 +481,12 @@ def create_transcript(chromosome, start_pos, end_pos, gene_ID, edge_IDs, vertex_
 
     path_key = frozenset(edge_IDs)
     transcript_dict[path_key] = new_transcript
+
+    # updating tmp_t
+    new_t = (gene_ID, new_ID, chromosome, strand, min(start_pos, end_pos), max(start_pos, end_pos))
+    cols = ' ("gene_ID", "transcript_ID", "chromosome", "strand", "min_pos", "max_pos")'
+    command = 'INSERT INTO ' + tmp_t + cols + ' VALUES ' + '(?,?,?,?,?,?)'
+    memory_cursor.execute(command, new_t)
 
     return new_transcript
 
@@ -1030,9 +1039,9 @@ def process_ISM(chrom, positions, strand, edge_IDs, vertex_IDs, all_matches, tra
             gene_ID = match['gene_ID']
             suffix.append(str(match['transcript_ID']))
 
-    novel_transcript = create_transcript(chrom, positions[0], positions[-1],
+    novel_transcript = create_transcript(strand, chrom, positions[0], positions[-1],
                                          gene_ID, edge_IDs, vertex_IDs,
-                                         transcript_dict)
+                                         transcript_dict, tmp_t, cursor)
 
     transcript_ID = novel_transcript['transcript_ID']
 
@@ -1144,9 +1153,9 @@ def process_NIC(chrom, positions, strand, edge_IDs, vertex_IDs, transcript_dict,
     start_end_info["vertex_IDs"] = vertex_IDs
 
     # Create a new transcript of that gene
-    novel_transcript = create_transcript(chrom, positions[0], positions[-1],
+    novel_transcript = create_transcript(strand, chrom, positions[0], positions[-1],
                                          gene_ID, edge_IDs, vertex_IDs,
-                                         transcript_dict)
+                                         transcript_dict, tmp_t, cursor)
     transcript_ID = novel_transcript["transcript_ID"]
     novelty = [(transcript_ID, run_info.idprefix, "TALON",
                 "NIC_transcript", "TRUE")]
@@ -1327,9 +1336,9 @@ def process_NNC(chrom, positions, strand, edge_IDs, vertex_IDs, transcript_dict,
     start_end_info["edge_IDs"] = edge_IDs
     start_end_info["vertex_IDs"] = vertex_IDs
 
-    transcript_ID = create_transcript(chrom, positions[0], positions[-1],
+    transcript_ID = create_transcript(strand, chrom, positions[0], positions[-1],
                                       gene_ID, edge_IDs, vertex_IDs,
-                                      transcript_dict)["transcript_ID"]
+                                      transcript_dict, tmp_t, cursor)["transcript_ID"]
 
     novelty.append((transcript_ID, run_info.idprefix, "TALON",
                     "NNC_transcript", "TRUE"))
@@ -1392,9 +1401,9 @@ def process_spliced_antisense(chrom, positions, strand, edge_IDs, vertex_IDs,
 
     gene_ID = create_gene(chrom, positions[0], positions[-1],
                           strand, cursor, tmp_gene)
-    transcript_ID = create_transcript(chrom, positions[0], positions[-1],
+    transcript_ID = create_transcript(strand, chrom, positions[0], positions[-1],
                                       gene_ID, edge_IDs, vertex_IDs,
-                                      transcript_dict)["transcript_ID"]
+                                      transcript_dict, tmp_t, cursor)["transcript_ID"]
 
     # Handle gene annotations
     gene_novelty.append((gene_ID, run_info.idprefix, "TALON",
@@ -1474,9 +1483,9 @@ def process_remaining_mult_cases(chrom, positions, strand, edge_IDs, vertex_IDs,
         gene_novelty.append((gene_ID, run_info.idprefix, "TALON",
                              g_nov, "TRUE"))
 
-        transcript_ID = create_transcript(chrom, positions[0], positions[-1],
+        transcript_ID = create_transcript(strand, chrom, positions[0], positions[-1],
                                           gene_ID, edge_IDs, vertex_IDs,
-                                          transcript_dict)["transcript_ID"]
+                                          transcript_dict, tmp_t, cursor)["transcript_ID"]
         transcript_novelty.append((transcript_ID, run_info.idprefix, "TALON",
                                    t_nov, "TRUE"))
 
@@ -1484,9 +1493,9 @@ def process_remaining_mult_cases(chrom, positions, strand, edge_IDs, vertex_IDs,
         anti_gene_ID = gene_ID
         gene_ID = create_gene(chrom, positions[0], positions[-1], strand,
                               cursor, tmp_gene)
-        transcript_ID = create_transcript(chrom, positions[0], positions[-1],
+        transcript_ID = create_transcript(strand, chrom, positions[0], positions[-1],
                                           gene_ID, edge_IDs, vertex_IDs,
-                                          transcript_dict)["transcript_ID"]
+                                          transcript_dict, tmp_t, cursor)["transcript_ID"]
 
         gene_novelty.append((gene_ID, run_info.idprefix, "TALON",
                              "antisense_gene", "TRUE"))
@@ -1495,9 +1504,9 @@ def process_remaining_mult_cases(chrom, positions, strand, edge_IDs, vertex_IDs,
         transcript_novelty.append((transcript_ID, run_info.idprefix, "TALON",
                                    "antisense_transcript", "TRUE"))
     else:
-        transcript_ID = create_transcript(chrom, positions[0], positions[-1],
+        transcript_ID = create_transcript(strand, chrom, positions[0], positions[-1],
                                           gene_ID, edge_IDs, vertex_IDs,
-                                          transcript_dict)["transcript_ID"]
+                                          transcript_dict, tmp_t, cursor)["transcript_ID"]
         transcript_novelty.append((transcript_ID, run_info.idprefix, "TALON",
                                    "genomic_transcript", "TRUE"))
 
@@ -2148,9 +2157,9 @@ def identify_monoexon_transcript(chrom, positions, strand, cursor, location_dict
 
                 gene_novelty.append((gene_ID, run_info.idprefix, "TALON",
                                      "intergenic_novel", "TRUE"))
-                transcript_ID = create_transcript(chrom, positions[0], positions[-1],
+                transcript_ID = create_transcript(strand, chrom, positions[0], positions[-1],
                                                   gene_ID, edge_IDs, vertex_IDs,
-                                                  transcript_dict)["transcript_ID"]
+                                                  transcript_dict, tmp_t, cursor)["transcript_ID"]
                 transcript_novelty.append((transcript_ID, run_info.idprefix, "TALON",
                                            "intergenic_transcript", "TRUE"))
             # Antisense case
@@ -2158,9 +2167,9 @@ def identify_monoexon_transcript(chrom, positions, strand, cursor, location_dict
                 anti_gene_ID = gene_ID
                 gene_ID = create_gene(chrom, positions[0], positions[-1],
                                       strand, cursor, tmp_gene)
-                transcript_ID = create_transcript(chrom, positions[0], positions[-1],
+                transcript_ID = create_transcript(strand, chrom, positions[0], positions[-1],
                                                   gene_ID, edge_IDs, vertex_IDs,
-                                                  transcript_dict)["transcript_ID"]
+                                                  transcript_dict, tmp_t, cursor)["transcript_ID"]
 
                 gene_novelty.append((gene_ID, run_info.idprefix, "TALON",
                                      "antisense_gene", "TRUE"))
@@ -2171,9 +2180,9 @@ def identify_monoexon_transcript(chrom, positions, strand, cursor, location_dict
 
             # Same strand
             else:
-                transcript_ID = create_transcript(chrom, positions[0], positions[-1],
+                transcript_ID = create_transcript(strand, chrom, positions[0], positions[-1],
                                                   gene_ID, edge_IDs, vertex_IDs,
-                                                  transcript_dict)["transcript_ID"]
+                                                  transcript_dict, tmp_t, cursor)["transcript_ID"]
                 transcript_novelty.append((transcript_ID, run_info.idprefix, "TALON",
                                            "genomic_transcript", "TRUE"))
 
