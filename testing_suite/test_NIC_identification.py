@@ -16,6 +16,8 @@ class TestIdentifyNIC(object):
         edge_dict = init_refs.make_edge_dict(cursor)
         location_dict = init_refs.make_location_dict(build, cursor)
         run_info = talon.init_run_info(database, build)
+        init_refs.make_temp_novel_gene_table(cursor, build)
+        init_refs.make_temp_transcript_table(cursor, build)
         transcript_dict = init_refs.make_transcript_dict(cursor, build)
         vertex_2_gene = init_refs.make_vertex_2_gene_dict(cursor)
         gene_starts = init_refs.make_gene_start_or_end_dict(cursor, build, "start")
@@ -32,9 +34,12 @@ class TestIdentifyNIC(object):
                                                             positions,
                                                             strand, edge_IDs,
                                                             vertex_IDs, transcript_dict,
-                                                            gene_starts, gene_ends,
-                                                            edge_dict, location_dict,
-                                                            vertex_2_gene, run_info)
+                                                            gene_starts, gene_ends,                                                          edge_dict, location_dict,
+                                                            vertex_2_gene,
+                                                            run_info,
+                                                            cursor,
+                                                            "temp_gene",
+                                                            "temp_transcript")
 
         correct_gene_ID = fetch_correct_ID("TG1", "gene", cursor)
         assert gene_ID == correct_gene_ID
@@ -54,6 +59,8 @@ class TestIdentifyNIC(object):
         edge_dict = init_refs.make_edge_dict(cursor)
         locations = init_refs.make_location_dict(build, cursor)
         run_info = talon.init_run_info(database, build)
+        init_refs.make_temp_novel_gene_table(cursor, build)
+        init_refs.make_temp_transcript_table(cursor, build)
         transcript_dict = init_refs.make_transcript_dict(cursor, build)
         vertex_2_gene = init_refs.make_vertex_2_gene_dict(cursor)
         gene_starts = init_refs.make_gene_start_or_end_dict(cursor, build, "start")
@@ -82,7 +89,7 @@ class TestIdentifyNIC(object):
                                                                   gene_ends,
                                                                   edge_dict, locations,
                                                                   vertex_2_gene, run_info,
-                                                                  cursor, "temp_gene")
+                                                                  cursor, "temp_gene", "temp_transcript")
         #anti_gene_ID = talon.find_gene_match_on_vertex_basis(vertex_IDs,
         #                                                     anti_strand,
         #                                                     vertex_2_gene)

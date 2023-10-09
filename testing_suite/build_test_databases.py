@@ -232,7 +232,8 @@ try:
         "--3p", "300",
         "--idprefix", "TALON",
         "--l", "0",
-        "--g",  "hg38", "--o", "scratch/readthrough"])
+        "--g",  "hg38",
+        "--o", "scratch/readthrough"])
 except Exception as e:
     print(e)
     sys.exit("Database initialization failed on readthrough annotation")
@@ -246,6 +247,8 @@ try:
         "--build", "hg38",
         "--cov", "0",
         "--identity", "0",
+        "--create_novel_spliced_genes",
+        '-v', '2',
         "--o", "scratch/readthrough" ])
 except Exception as e:
     print(e)

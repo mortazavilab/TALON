@@ -534,12 +534,29 @@ def check_all_exons_known(novelty):
     exons are known or not. Return True if all are known, and False
     otherwise. Input should not include first or last exon."""
 
+
     if len(novelty) == 1:
         return novelty[0] == 0
 
     exons = novelty[1::2]
 
     if sum(exons) > 0:
+        return False
+    else:
+        return True
+
+def check_all_exons_novel(novelty):
+    """Given a list in which each element represents the novelty (1) or
+    known-ness of a transcript edge (0), determine whether all of the
+    exons are novel or not. Return True if all are novel, and False
+    otherwise. Input should not include first or last exon."""
+
+    if len(novelty) == 1:
+        return 0 # we have no exons to analyze
+
+    exons = novelty[1::2]
+
+    if sum(exons) != len(exons):
         return False
     else:
         return True
@@ -694,7 +711,7 @@ def search_for_overlap_with_gene(chromosome, start, end, strand, cursor, run_inf
     # restrict to just the genes we care about
     if gene_IDs:
         # print(f'restricting just to {gene_IDs}')
-        logging.debug(f"Restricing gene tiebreak to {gene_IDs}")
+        logging.debug(f"Restricting gene tiebreak to {gene_IDs}")
         matches = [match for match in matches if match["gene_ID"] in gene_IDs]
 
     if len(matches) == 0:
@@ -728,9 +745,10 @@ def get_best_match(matches, min_end, max_end):
 
     # print(f'read min: {min_end}')
     # print(f'read end: {max_end}')
-    logging.debug(f"Read start / end: ({min_end}, {min_end})")
+    logging.debug(f"Read start / end: ({min_end}, {max_end})")
 
     for match in matches:
+        logging.debug('')
         logging.debug(f"Matching with transcripts from gene {match['gene_ID']}, transcript {match['transcript_ID']}")
         end_dist = abs(match["max_pos"] - max_end)
         start_dist = abs(match["min_pos"] - min_end)
@@ -1052,8 +1070,7 @@ def process_ISM(
 
 
 def assign_gene(
-    vertex_IDs, strand, vertex_2_gene, chrom, start, end, cursor, run_info, tmp_gene, tmp_t, gene_starts, gene_ends
-):
+    vertex_IDs, strand, vertex_2_gene, chrom, start, end, cursor, run_info, tmp_gene, tmp_t):
     """
     Assign a gene to a transcript. First do this on the basis of splice site
     matching. If this yields more than one gene, then choose the gene with the
@@ -1111,9 +1128,7 @@ def process_NIC(
         cursor,
         run_info,
         tmp_gene,
-        tmp_t,
-        gene_starts,
-        gene_ends,
+        tmp_t
     )
 
     # gene_ID, fusion = find_gene_match_on_vertex_basis(vertex_IDs,
@@ -1326,9 +1341,7 @@ def process_NNC(
         cursor,
         run_info,
         tmp_gene,
-        tmp_t,
-        gene_starts,
-        gene_ends,
+        tmp_t
     )
     # print("gene id process_nnc")
     # print(gene_ID)
@@ -1466,7 +1479,6 @@ def process_remaining_mult_cases(
     transcript_novelty = []
     start_end_info = {}
     if not run_info.create_novel_spliced_genes or not fusion:
-        # print("did i get here?")
         gene_ID, match_strand = search_for_overlap_with_gene(
             chrom, positions[0], positions[-1], strand, cursor, run_info, tmp_gene, tmp_t
         )
@@ -1496,7 +1508,7 @@ def process_remaining_mult_cases(
     start_end_info["vertex_IDs"] = vertex_IDs
 
     if gene_ID == None:
-        # print(f"fusion: {fusion}")
+        logging.debug(f"Fusion: {fusion}")
         if fusion:
             # print("i should be here")
             t_nov = "fusion_transcript"
@@ -1590,18 +1602,24 @@ def identify_transcript(
 
     # Get vertex matches for the transcript positions
     vertex_IDs, v_novelty = match_splice_vertices(chrom, positions, strand, location_dict, run_info)
+    logging.debug(f'Vertex IDs: {vertex_IDs}')
+    logging.debug(f'Vertex novelties: {v_novelty}')
+
 
     # Get edge matches for transcript exons and introns based on the vertices
     edge_IDs, e_novelty = match_all_splice_edges(vertex_IDs, strand, edge_dict, run_info)
+    logging.debug(f'Edge IDs: {edge_IDs}')
+    logging.debug(f'Exon novelty: {e_novelty}')
 
     # Check novelty of exons and splice jns. This will help us categorize
     # what type of novelty the transcript has
     all_SJs_known = check_all_SJs_known(e_novelty)
     all_exons_known = check_all_exons_known(e_novelty)
-    splice_vertices_known = sum(v_novelty) == 0
-    all_exons_novel = reduce(operator.mul, e_novelty, 1) == 1
+    all_exons_novel = check_all_exons_novel(e_novelty)
+    splice_vertices_known = (sum(v_novelty) == 0)
+    # all_exons_novel = reduce(operator.mul, e_novelty, 1) == 1
     # print(f"all exons novel : {all_exons_novel}")
-    logging.debug(f'All exons novel?: {all_exons_novel}')
+    logging.debug(f'All internal exons novel?: {all_exons_novel}')
     fusion = False
 
     # Look for FSM or ISM.
@@ -1673,7 +1691,7 @@ def identify_transcript(
     # but new connections between them.
     elif splice_vertices_known and gene_ID == None:
         # print("looking for nic (again?)")
-        logging.info('Looking for NIC (2)')
+        logging.debug('Looking for NIC (2)')
         gene_ID, transcript_ID, transcript_novelty, start_end_info, fusion = process_NIC(
             chrom,
             positions,
@@ -2945,6 +2963,8 @@ def annotate_read(sam_record: pysam.AlignedSegment, cursor, run_info, struct_col
     """
     # Parse attributes to determine the chromosome, positions, and strand of the transcript
     read_ID = sam_record.query_name
+    logging.debug('')
+    logging.debug('')
     logging.debug(read_ID)
     if not run_info.use_cb_tag:
         dataset = sam_record.get_tag("RG")

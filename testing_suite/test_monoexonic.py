@@ -14,6 +14,7 @@ class TestIdentifyMonoexonic(object):
         talon.get_counters(database)
         init_refs.make_temp_novel_gene_table(cursor, build)
         init_refs.make_temp_monoexonic_transcript_table(cursor, build)
+        init_refs.make_temp_transcript_table(cursor, build)
         edge_dict = init_refs.make_edge_dict(cursor)
         location_dict = init_refs.make_location_dict(build, cursor)
         run_info = talon.init_run_info(database, build)
@@ -26,12 +27,12 @@ class TestIdentifyMonoexonic(object):
         strand = "-"
         positions = ( 3900, 1100 )
 
-        annotation = talon.identify_monoexon_transcript(chrom, positions, 
+        annotation = talon.identify_monoexon_transcript(chrom, positions,
                                                strand, cursor,
                                                location_dict, edge_dict,
                                                transcript_dict, vertex_2_gene,
                                                gene_starts, gene_ends, run_info,
-                                               'temp_gene', 'temp_monoexon')
+                                               'temp_gene', 'temp_transcript', 'temp_monoexon')
 
         correct_gene_ID = fetch_correct_ID("TG6", "gene", cursor)
         correct_transcript_ID = fetch_correct_ID("TG6-001", "transcript", cursor)
@@ -43,7 +44,7 @@ class TestIdentifyMonoexonic(object):
 
     def test_partial_match(self):
         """ Example where the transcript overlaps a single-exon transcript,
-            but is shorter. In the past, the start would be assigned to the 
+            but is shorter. In the past, the start would be assigned to the
             annotated start, and the end would be novel. This is no longer
             the case- at this time, the transcript will be assigned to
             the annotated match. """
@@ -53,6 +54,7 @@ class TestIdentifyMonoexonic(object):
         database = "scratch/toy.db"
         talon.get_counters(database)
         init_refs.make_temp_novel_gene_table(cursor, build)
+        init_refs.make_temp_transcript_table(cursor, build)
         init_refs.make_temp_monoexonic_transcript_table(cursor, build)
         edge_dict = init_refs.make_edge_dict(cursor)
         location_dict = init_refs.make_location_dict(build, cursor)
@@ -71,7 +73,7 @@ class TestIdentifyMonoexonic(object):
                                                location_dict, edge_dict,
                                                transcript_dict, vertex_2_gene,
                                                gene_starts, gene_ends, run_info,
-                                               'temp_gene', 'temp_monoexon')
+                                               'temp_gene', 'temp_transcript', 'temp_monoexon')
 
         correct_gene_ID = fetch_correct_ID("TG6", "gene", cursor)
         correct_transcript_ID = fetch_correct_ID("TG6-001", "transcript", cursor)
@@ -82,7 +84,7 @@ class TestIdentifyMonoexonic(object):
 
         conn.close()
 
-# Commenting out these tests for now because they are redundant. But saving in 
+# Commenting out these tests for now because they are redundant. But saving in
 # case they might be useful down the line.
 
 #    def test_partial_match_3prime(self):
@@ -176,6 +178,7 @@ class TestIdentifyMonoexonic(object):
         database = "scratch/toy.db"
         talon.get_counters(database)
         init_refs.make_temp_novel_gene_table(cursor, build)
+        init_refs.make_temp_transcript_table(cursor, build)
         init_refs.make_temp_monoexonic_transcript_table(cursor, build)
         edge_dict = init_refs.make_edge_dict(cursor)
         location_dict = init_refs.make_location_dict(build, cursor)
@@ -194,7 +197,7 @@ class TestIdentifyMonoexonic(object):
                                                location_dict, edge_dict,
                                                transcript_dict, vertex_2_gene,
                                                gene_starts, gene_ends, run_info,
-                                               'temp_gene', 'temp_monoexon')
+                                               'temp_gene', 'temp_transcript', 'temp_monoexon')
 
         anti_gene_ID = fetch_correct_ID("TG6", "gene", cursor)
         gene_novelty_types = [ x[-2] for x in annotation['gene_novelty']]
@@ -203,4 +206,4 @@ class TestIdentifyMonoexonic(object):
         assert "antisense_gene" in gene_novelty_types
         assert "antisense_transcript" in t_novelty_types
 
-        conn.close() 
+        conn.close()
