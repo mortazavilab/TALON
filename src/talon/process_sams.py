@@ -8,6 +8,7 @@ import pyranges as pr
 import pysam
 import os
 import time
+import logging
 
 save = pysam.set_verbosity(0)
 # pysam.set_verbosity(save)
@@ -23,8 +24,11 @@ def convert_to_bam(sam, bam, threads):
             outfile.write(s)
 
     except Exception as e:
-        print(e)
-        raise RuntimeError("Problem converting sam file '%s' to bam." % (sam))
+        logging.error(e)
+        msg = f'Problem converting SAM file {sam} to BAM'
+        logging.error(msg)
+        raise RuntimeError(msg)
+        # raise RuntimeError("Problem converting sam file '%s' to bam." % (sam))
 
 
 def preprocess_sam(sam_files, datasets, use_cb_tag,
@@ -90,13 +94,18 @@ def preprocess_sam(sam_files, datasets, use_cb_tag,
         sorted_bam = tmp_dir + "merged_sorted.bam"
         pysam.sort("-@", str(n_threads), "-o", sorted_bam, merged_bam)
         pysam.index(sorted_bam)
-        ts = time.strftime("%Y-%m-%d %H:%M:%S", time.gmtime())
-        print("[ %s ] Merged input SAM/BAM files" % (ts))
+        # ts = time.strftime("%Y-%m-%d %H:%M:%S", time.gmtime())
+        # print("[ %s ] Merged input SAM/BAM files" % (ts))
+        logging.info('Merged input SAM/BAM files')
     except:
-        raise RuntimeError(("Problem merging and indexing SAM/BAM files. "
-                            "Check your file paths and make sure that all "
-                            "files have headers."))
-
+        # raise RuntimeError(("Problem merging and indexing SAM/BAM files. "
+        #                     "Check your file paths and make sure that all "
+        #                     "files have headers."))
+        msg = "Problem merging and indexing SAM/BAM files. "+\
+                            "Check your file paths and make sure that all "+\
+                            "files have headers."
+        logging.error(msg)
+        raise RuntimeError(msg)
     return sorted_bam
 
 
@@ -117,8 +126,11 @@ def partition_reads(sam_files, datasets, use_cb_tag,
     try:
         gr = pr.read_bam(merged_bam)
     except Exception as e:
-        print(e)
-        raise RuntimeError("Problem opening sam file %s" % (merged_bam))
+        # print(e)
+        logging.error(e)
+        msg = f'Problem opening SAM file {merged_bam}'
+        logging.error(msg)
+        raise RuntimeError(msg)
 
     gr = gr.merge(slack=100000000, strand=False)
 

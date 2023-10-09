@@ -13,11 +13,14 @@ import os
 from pathlib import Path
 import pandas as pd
 import warnings
+import logging
+
 from . import dstruct
 from . import process_sams as procsams
 from . import transcript_utils as tutils
 from . import query_utils as qutils
 from . import init_refs as init_refs
+from . import logger as logger
 from talon.post import get_read_annotations
 import pysam
 from string import Template
@@ -120,6 +123,8 @@ def get_args():
     parser.add_argument("--tmpDir", dest="tmp_dir",
                         help="Path to directory for tmp files. Default = `talon_tmp/`",
                         type=str,  default="talon_tmp/")
+    parser.add_argument("--verbosity", "-v", type=int, default=1,
+                        help="Verbosity of TALON output. Higher numbers = more verbose.")
     parser.add_argument("--o", dest="outprefix",
                         help="Prefix for output files", type=str)
 
@@ -294,9 +299,13 @@ def permissive_match_with_gene_priority(chromosome, position, strand, sj_pos,
     """
     # Check inputs
     if pos_type != "start" and pos_type != "end":
-        raise ValueError("Please set pos_type to either 'start' or 'end'.")
+        msg = "Please set pos_type to either 'start' or 'end'."
+        logging.error(msg)
+        raise ValueError(msg)
     if strand != "+" and strand != "-":
-        raise ValueError("Invalid strand specified: %s" % strand)
+        msg = f'Invalid strand specified: {strand}'
+        logging.error(msg)
+        raise ValueError(msg)
 
     # Try exact match first
     if chromosome in locations and position in locations[chromosome]:
@@ -365,9 +374,13 @@ def permissive_vertex_search(chromosome, position, strand, sj_pos, pos_type,
         return match['location_ID'], dist
 
     if pos_type != "start" and pos_type != "end":
-        raise ValueError("Please set pos_type to either 'start' or 'end'.")
+        msg = "Please set pos_type to either 'start' or 'end'."
+        logging.error(msg)
+        raise ValueError(msg)
     if strand != "+" and strand != "-":
-        raise ValueError("Invalid strand specified: %s" % strand)
+        msg = f"Invalid strand specified: {s}"
+        logging.error(msg)
+        raise ValueError(msg)
 
     # If there is no strict match, look for vertices that are
     #     (1) On the correct chromosome
@@ -627,28 +640,14 @@ def search_for_overlap_with_gene(chromosome, start, end, strand,
         Parameters:
             gene_ID (list of str or None): Restrict results to genes in this list
     """
-    print('in search for overlap with gene')
+    logging.debug('Tiebreaking for gene assignment')
     min_start = min(start, end)
     max_end = max(start, end)
     query_interval = [min_start, max_end]
-    # print('query interval')
-    # print(query_interval)
 
-    # query = Template(""" SELECT gene_ID,
-    #                    chromosome,
-    #                    MIN(start) AS start,
-    #                    MAX(end) AS end,
-    #                    strand
-    #             FROM $tmp_gene
-    #             WHERE (chromosome = '$chrom') AND
-    #                   ((start <= $min_start AND end >= $max_end) OR
-    #                   (start >= $min_start AND end <= $max_end) OR
-    #                   (start >= $min_start AND start <= $max_end) OR
-    #                   (end >= $min_start AND end <= $max_end))
-    #              GROUP BY gene_ID;""").substitute({'tmp_gene': tmp_gene, 'chrom': chromosome,
-    #                                                'min_start': min_start, 'max_end': max_end})
     if isinstance(gene_IDs, list):
         query = Template("""SELECT gene_ID,
+                           transcript_ID,
                            chromosome,
                            min_pos,
                            max_pos,
@@ -658,6 +657,7 @@ def search_for_overlap_with_gene(chromosome, start, end, strand,
                                                                'gene_ids': qutils.format_for_IN(gene_IDs)})
     elif not gene_IDs:
         query = Template("""SELECT gene_ID,
+                           transcript_ID,
                            chromosome,
                            min_pos,
                            max_pos,
@@ -672,46 +672,32 @@ def search_for_overlap_with_gene(chromosome, start, end, strand,
                                                        'min_start': min_start, 'max_end': max_end})
     cursor.execute(query)
     matches = cursor.fetchall()
-    print('quwewy:')
-    print(query)
 
     # restrict to just the genes we care about
     if gene_IDs:
-        print(f'restricting just to {gene_IDs}')
+        # print(f'restricting just to {gene_IDs}')
+        logging.debug(f'Restricing gene tiebreak to {gene_IDs}')
         matches = [match for match in matches if match['gene_ID'] in gene_IDs]
 
 
     if len(matches) == 0:
-        print('herere here')
+        # print('herere here')
+        logging.debug(f'Unable to tiebreak')
         return None, None
 
     # Among multiple matches, preferentially return the same-strand gene with
     # the greatest amount of overlap
-    # print('start+end')
-    # print(start)
-    # print(end)
     same_strand_matches = len([x for x in matches if x["strand"] == strand])
-    # for m in matches:
-    #     print()
-    #     print(m['gene_ID'])
-    #     print(m['start'])
-    #     print(m['end'])
-    #
-    # print(same_strand_matches)
 
     if strand == "+" and same_strand_matches > 0 or \
             strand == "-" and same_strand_matches == 0:
 
         matches = [x for x in matches if x["strand"] == "+"]
-        # best_match = get_best_match(matches, query_interval)
         best_match = get_best_match(matches, min_start, max_end)
 
     else:
         matches = [x for x in matches if x["strand"] == "-"]
-        # best_match = get_best_match(matches, query_interval)
         best_match = get_best_match(matches, min_start, max_end)
-
-    print(f"but right here it says {best_match['gene_ID']}")
 
     return best_match['gene_ID'], best_match['strand']
 
@@ -724,25 +710,24 @@ def get_best_match(matches, min_end, max_end):
     min_dist = sys.maxsize
     best_match = None
 
-    print(f'read min: {min_end}')
-    print(f'read end: {max_end}')
+    # print(f'read min: {min_end}')
+    # print(f'read end: {max_end}')
+    logging.debug(f'Read start / end: ({min_end}, {min_end})')
 
     for match in matches:
-        print()
-        print(f"gene: {match['gene_ID']}")
+        logging.debug(f"Matching with transcripts from gene {match['gene_ID']}, transcript {match['transcript_ID']}")
         end_dist = abs(match['max_pos']-max_end)
         start_dist = abs(match['min_pos']-min_end)
 
-        print(f"gene start: {match['min_pos']}")
-        print(f"gene end: {match['max_pos']}")
+        logging.debug(f"Transcript start / end: ({match['min_pos']}, {match['max_pos']})")
         dist = end_dist+start_dist
-        print(f'dist: {dist}')
+        logging.debug(f'Distance between read and transcript ends: {dist}')
         if dist < min_dist:
             min_dist = dist
             best_match = match
 
-    print('best match')
-    print(best_match['gene_ID'])
+    logging.debug(f"Best gene match: {best_match['gene_ID']}")
+    # print(best_match['gene_ID'])
     return best_match
 
 
@@ -1747,7 +1732,9 @@ def check_inputs(options):
     # Make sure that the input database exists!
     database = options.database
     if not Path(database).exists():
-        raise ValueError("Database file '%s' does not exist!" % database)
+        msg = f"Database file '{s}' does not exist!"
+        logging.error(msg)
+        raise ValueError(msg)
 
     # Make sure that the genome build exists in the provided TALON database.
     with sqlite3.connect(database) as conn:
@@ -1756,8 +1743,10 @@ def check_inputs(options):
         builds = [str(x[0]) for x in cursor.fetchall()]
         if options.build not in builds:
             build_names = ", ".join(list(builds))
-            raise ValueError("Please specify a genome build that exists in the" +
-                             " database. The choices are: " + build_names)
+            msg = "Please specify a genome build that exists in the" +\
+                             " database. The choices are: " + build_names
+            logging.error(msg)
+            raise ValueError(msg)
 
         # Make sure that each input dataset is not already in the database, and
         # also make sure that each dataset name is unique
@@ -1774,33 +1763,37 @@ def check_inputs(options):
                     line = line.strip().split(',')
                     curr_sam = line[3]
                     if len(line) != 4:
-                        raise ValueError('Incorrect number of comma-separated fields' +
-                                         ' in config file. There should be four: ' +
-                                         '(dataset name, sample description, ' +
-                                         'platform, associated sam/bam file).')
+                        msg = 'Incorrect number of comma-separated fields' +\
+                                         ' in config file. There should be four: ' +\
+                                         '(dataset name, sample description, ' +\
+                                         'platform, associated sam/bam file).'
+                        logging.error(msg)
+                        raise ValueError(msg)
 
                     # Make sure that the sam file exists
                     if not Path(curr_sam).exists():
-                        raise ValueError(
-                            "SAM/BAM file '%s' does not exist!" % curr_sam)
+                        msg = f"SAM/BAM file '{curr_sam}' does not exist!"
+                        logging.error(msg)
+                        raise ValueError(msg)
 
                     metadata = (line[0], line[1], line[2])
                     dataname = metadata[0]
                     if dataname in existing_datasets:
-                        warnings.warn("Ignoring dataset with name '" + dataname +
+                        logging.warning("Ignoring dataset with name '" + dataname +
                                       "' because it is already in the database.")
                     elif dataname in curr_datasets:
-                        warnings.warn("Skipping duplicated instance of dataset '" +
+                        logging.warning("Skipping duplicated instance of dataset '" +
                                       dataname + "'.")
                     elif curr_sam in sam_files:
-                        warnings.warn("Skipping duplicated instance of sam file '" +
+                        logging.warning("Skipping duplicated instance of sam file '" +
                                       curr_sam + "'.")
                     else:
                         dataset_metadata.append(metadata)
                         curr_datasets.append(dataname)
                     if not curr_sam.endswith(".sam") and not curr_sam.endswith(".bam"):
-                        raise ValueError(
-                            'Last field in config file must be a .sam/.bam file')
+                        msg =  'Last field in config file must be a .sam/.bam file'
+                        logging.error(msg)
+                        raise ValueError(msg)
                     sam_files.append(curr_sam)
 
         # if we are using the RG tag, check that the config file adheres to the
@@ -1825,15 +1818,18 @@ def check_inputs(options):
                     line = line.strip().split(',')
                     curr_sam = line[2]
                     if len(line) != 3:
-                        raise ValueError('Incorrect number of comma-separated fields' +
-                                         ' in config file. There should be three: ' +
-                                         '(sample description, ' +
-                                         'platform, associated sam/bam file).')
+                        msg = 'Incorrect number of comma-separated fields' +\
+                                         ' in config file. There should be three: ' +\
+                                         '(sample description, ' +\
+                                         'platform, associated sam/bam file).'
+                        logging.error(msg)
+                        raise ValueError(msg)
 
                     # Make sure that the sam file exists
                     if not Path(curr_sam).exists():
-                        raise ValueError(
-                            "SAM/BAM file '%s' does not exist!" % curr_sam)
+                        msg = f"SAM/BAM file '{curr_sam}' does not exist!"
+                        logging.error(msg)
+                        raise ValueError(msg)
                     metadata = ['', line[0], line[1]]
 
                     # get list of dataset names from the CB tag in the sam file
@@ -1854,8 +1850,9 @@ def check_inputs(options):
                                          names=['cb_tag'], engine='python')
                         # is the df empty?
                         if df.empty:
-                            raise RuntimeError(
-                                "SAM/BAM file contains no CB tags")
+                            msg = 'SAM/BAM file contains no CB tags'
+                            logging.error(msg)
+                            raise RuntimeError(msg)
                         df['dataset'] = df.cb_tag.str.split(
                             pat='\t', n=1, expand=True)[0]
                         datasets = df.dataset.unique().tolist()
@@ -1876,24 +1873,29 @@ def check_inputs(options):
                         metadata[0] = dataname
 
                         if dataname in existing_datasets:
-                            raise RuntimeError((f"Dataset for read group {f} " +
-                                                "already in database."))
+                            msg = f"Dataset for read group {f} " +\
+                                                "already in database."
+                            logging.error(msg)
+                            raise RuntimeError(msg)
                             # warnings.warn("Ignoring dataset with name '" + dataname + \
                             #               "' because it is already in the database.")
                         elif dataname in curr_datasets:
-                            raise RuntimeError((f"Dataset for read group {f} " +
-                                                "already in config file."))
+                            msg = f"Dataset for read group {f} " +\
+                                                "already in config file."
+                            logging.error(msg)
+                            raise RuntimeError(msg)
                             # warnings.warn("Skipping duplicated instance of dataset '" + \
                             #                dataname + "'.")
                         else:
                             dataset_metadata.append(tuple(metadata))
                             curr_datasets.append(dataname)
                     if curr_sam in sam_files:
-                        warnings.warn("Skipping duplicated instance of sam/bam file '" +
+                        logging.warning("Skipping duplicated instance of sam/bam file '" +
                                       curr_sam + "'.")
                     if not curr_sam.endswith(".sam") and not curr_sam.endswith(".bam"):
-                        raise ValueError(
-                            'Last field in config file must be a .sam/.bam file')
+                        msg = 'Last field in config file must be a .sam/.bam file'
+                        logging.error(msg)
+                        raise ValueError(msg)
                     sam_files.append(curr_sam)
 
                     # else:
@@ -1904,8 +1906,10 @@ def check_inputs(options):
                     #     sam_files.append(curr_sam)
 
     if sam_files == []:
-        raise RuntimeError(("All of the provided dataset names are already in "
-                            "the database. Please check your config file."))
+        msg = "All of the provided dataset names are already in "+\
+              "the database. Please check your config file."
+        logging.error(msg)
+        raise RuntimeError(msg)
 
     return sam_files, dataset_metadata
 
@@ -2062,7 +2066,9 @@ def compute_delta(orig_pos, new_pos, strand):
         else:
             return -1*abs_dist
     else:
-        raise ValueError("Strand must be either + or -")
+        msg = 'Strand must be either + or -'
+        logging.error(msg)
+        raise ValueError(msg)
 
 
 def identify_monoexon_transcript(chrom, positions, strand, cursor, location_dict,
@@ -2445,8 +2451,10 @@ def batch_add_annotations(cursor, annot_file, annot_type, batch_size):
     """
     batch_size = 1
     if annot_type not in ["gene", "transcript", "exon"]:
-        raise ValueError("When running batch annot update, must specify " +
-                         "annot_type as 'gene', 'exon', or 'transcript'.")
+        msg = "When running batch annot update, must specify " +\
+                "annot_type as 'gene', 'exon', or 'transcript'."
+        logging.error(msg)
+        raise ValueError(msg)
 
     with open(annot_file, 'r') as f:
         while True:
@@ -2566,8 +2574,9 @@ def batch_add_abundance(cursor, entries, batch_size):
 def check_database_integrity(cursor):
     """ Perform some checks on the database. Run before committing changes"""
 
-    ts = time.strftime("%Y-%m-%d %H:%M:%S", time.gmtime())
-    print("[ %s ] Validating database........" % (ts))
+    # ts = time.strftime("%Y-%m-%d %H:%M:%S", time.gmtime())
+    # print("[ %s ] Validating database........" % (ts))
+    logging.info('Validating database')
 
     # For each category, check that the number of table entries matches the counter
     counter_query = "SELECT * FROM counters"
@@ -2588,15 +2597,17 @@ def check_database_integrity(cursor):
 
         if actual_count != curr_counter:
             fail = 1
-            print("Database counter for '" + table_name +
+            logging.error("Database counter for '" + table_name +
                   "' does not match the number of entries in the table." +
                   " Discarding changes to database and exiting...")
-            print("table_count: " + str(actual_count))
-            print("counter_value: " + str(curr_counter))
+            logging.debug("table_count: " + str(actual_count))
+            logging.debug("counter_value: " + str(curr_counter))
 
     if fail == 1:
-        raise RuntimeError("Discrepancy found in database. " +
-                           "Discarding changes to database and exiting...")
+        msg = "Discrepancy found in database. " +\
+                           "Discarding changes to database and exiting..."
+        logging.error(msg)
+        raise RuntimeError(msg)
 
     return
 
@@ -2609,9 +2620,10 @@ def parallel_talon(read_file, interval, database, run_info, queue):
         added to the database, OR alternately, pickle them and write to file
         where they can be accessed later. """
 
-    ts = time.strftime("%Y-%m-%d %H:%M:%S", time.gmtime())
-    print("[ %s ] Annotating reads in interval %s:%d-%d..." %
-          (ts, interval[0], interval[1], interval[2]))
+    # ts = time.strftime("%Y-%m-%d %H:%M:%S", time.gmtime())
+    # print("[ %s ] Annotating reads in interval %s:%d-%d..." %
+    #       (ts, interval[0], interval[1], interval[2]))
+    logging.info(f'Annotating reads in interval {interval[0]}:{interval[1]}-{interval[2]}...')
 
     with sqlite3.connect(database) as conn:
         conn.row_factory = sqlite3.Row
@@ -2887,8 +2899,9 @@ def listener(queue, outfiles, QC_header, timeout=72):
         msg_fname = msg[0]
         msg_value = msg[1]
         if datetime.now() > wait_until or msg_value == 'complete':
-            ts = time.strftime("%Y-%m-%d %H:%M:%S", time.gmtime())
-            print("[ %s ] Shutting down message queue..." % (ts))
+            # ts = time.strftime("%Y-%m-%d %H:%M:%S", time.gmtime())
+            # print("[ %s ] Shutting down message queue..." % (ts))
+            logging.info('Shutting down message queue...')
             for f in open_files.values():
                 f.close()
             break
@@ -2914,10 +2927,14 @@ def make_QC_header(coverage, identity, length):
 
 def main():
     """ Runs program """
-    ts = time.strftime("%Y-%m-%d %H:%M:%S", time.gmtime())
-    print("[ %s ] Started TALON run" % (ts))
-
     options = get_args()
+    logger._init_logger(options.verbosity)
+
+    # ts = time.strftime("%Y-%m-%d %H:%M:%S", time.gmtime())
+    # print("[ %s ] Started TALON run" % (ts))
+    logging.info('Started TALON run')
+
+
     sam_files, dset_metadata = check_inputs(options)
     # print(sam_files)
     # print(dset_metadata[:5])
@@ -2969,8 +2986,8 @@ def main():
 
         read_files = procsams.write_reads_to_file(
             read_groups, intervals, header_file, tmp_dir=tmp_dir)
-        ts = time.strftime("%Y-%m-%d %H:%M:%S", time.gmtime())
-        print("[ %s ] Split reads into %d intervals" % (ts, len(read_groups)))
+        # ts = time.strftime("%Y-%m-%d %H:%M:%S", time.gmtime())
+        logging.info(f'Split reads into {len(read_groups)} intervals')
 
         # Set up a queue specifically for writing to outfiles
         manager = mp.Manager()
@@ -2981,8 +2998,9 @@ def main():
         for read_file, interval in zip(read_files, intervals):
             jobs.append((read_file, interval, database, run_info, queue))
 
-        ts = time.strftime("%Y-%m-%d %H:%M:%S", time.gmtime())
-        print("[ %s ] Launching parallel annotation jobs" % (ts))
+        # ts = time.strftime("%Y-%m-%d %H:%M:%S", time.gmtime())
+        # print("[ %s ] Launching parallel annotation jobs" % (ts))
+        logging.info('Launching parallel annotation jobs')
 
         # Start running listener, which will monitor queue for messages
         QC_header = make_QC_header(run_info.min_coverage, run_info.min_identity,
@@ -2998,19 +3016,22 @@ def main():
         pool.close()
         pool.join()
 
-    ts = time.strftime("%Y-%m-%d %H:%M:%S", time.gmtime())
-    print("[ %s ] All jobs complete. Starting database update." % (ts))
+    # ts = time.strftime("%Y-%m-%d %H:%M:%S", time.gmtime())
+    # print("[ %s ] All jobs complete. Starting database update." % (ts))
+    logging.info('All jobs complete. Starting database update')
 
     # Update the database
     batch_size = 10000
     update_database(database, batch_size,
                     run_info.outfiles, dataset_db_entries)
-    ts = time.strftime("%Y-%m-%d %H:%M:%S", time.gmtime())
-    print("[ %s ] Database update complete." % (ts))
+    # ts = time.strftime("%Y-%m-%d %H:%M:%S", time.gmtime())
+    # print("[ %s ] Database update complete." % (ts))
+    logging.info('Database update complete.')
 
     # Write output reads file
-    ts = time.strftime("%Y-%m-%d %H:%M:%S", time.gmtime())
-    print("[ %s ] Creating read-wise annotation file." % (ts))
+    # ts = time.strftime("%Y-%m-%d %H:%M:%S", time.gmtime())
+    # print("[ %s ] Creating read-wise annotation file." % (ts))
+    logging.info('Creating read-wise annotation file')
     get_read_annotations.make_read_annot_file(database, build,
                                               outprefix, datasets=datasets)
 
@@ -3019,8 +3040,9 @@ def main():
     #print("Transcripts: %d" % transcript_counter.value())
     #print("Observed: %d" % observed_counter.value())
 
-    ts = time.strftime("%Y-%m-%d %H:%M:%S", time.gmtime())
-    print("[ %s ] DONE" % (ts))
+    # ts = time.strftime("%Y-%m-%d %H:%M:%S", time.gmtime())
+    # print("[ %s ] DONE" % (ts))
+    logging.info('DONE')
 
 
 if __name__ == '__main__':
