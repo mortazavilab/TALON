@@ -9,7 +9,7 @@ def _init_logger(verbosity):
     level = levels[min(verbosity, len(levels) - 1)]  # cap to last level index
 
     # set defaults
-    msg_fmt = "%(asctime)s : %(levelname)s : [%(filename)s:%(lineno)d] : %(message)s"
+    msg_fmt = "%(asctime)s : %(levelname)s : [%(filename)s:%(lineno)d:%(funcName)s] : %(message)s"
     date_fmt = "[ %Y-%m-%d %H:%M:%S ]"
 
     logging.basicConfig(level=level, format=msg_fmt, datefmt=date_fmt)

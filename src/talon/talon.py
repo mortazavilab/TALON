@@ -475,6 +475,8 @@ def create_edge(vertex_1, vertex_2, edge_type, strand, edge_dict):
 def create_gene(chromosome, start, end, strand, memory_cursor, tmp_gene):
     """Create a novel gene and add it to the temporary table."""
     new_ID = gene_counter.increment()
+    logging.debug(f'Creating new gene with id {new_ID}')
+
 
     new_gene = (new_ID, chromosome, min(start, end), max(start, end), strand)
     cols = ' ("gene_ID", "chromosome", "start", "end", "strand")'
@@ -489,9 +491,10 @@ def create_transcript(
     """Creates a novel transcript, add it to the transcript data structure,
     and add to tmp_t
     """
-    print("creating new transcript")
+    # print("creating new transcript")
     new_ID = transcript_counter.increment()
-    print(f"new tid:{new_ID}")
+    # print(f"new tid:{new_ID}")
+    logging.debug(f'Creating new transcript with id {new_ID}')
 
     # updating the dict
     if len(edge_IDs) > 1:
@@ -942,7 +945,8 @@ def process_ISM(
 
     # choose gene to assign it to
     gene_matches = list(set([match["gene_ID"] for match in all_matches]))
-    print(gene_matches)
+    logging.debug(f'Genes with matching vertices: {gene_matches}')
+    # print(gene_matches)
 
     # tie break based on distance to 5' / 3' ends
     if len(gene_matches) > 1:
@@ -1202,6 +1206,8 @@ def find_gene_match_on_vertex_basis(vertex_IDs, strand, vertex_2_gene):
             needs to be created
         fusion (bool): Whether gene read is from might be fusion / read through
     """
+    logging.debug('Attempting to assign gene based on vertex concordance')
+
     gene_matches = []
     n_gene_matches = []
 
@@ -1243,15 +1249,14 @@ def find_gene_match_on_vertex_basis(vertex_IDs, strand, vertex_2_gene):
     # when there are no shared splice sites between gene hits but we did
     # hit more than one gene
     elif max(n_gene_matches) <= 1 and len(gene_tally) > 1:
-        print(" went here")
+        logging.debug('Found a potential fusion transcript')
         return None, True
 
     # if we hit more than one gene and they have overlapping sjs,
-    # tie break based on ?????
     elif len(gene_tally) > 1:
-        print("i found more than one gene")
-        print(gene_tally)
-        print(n_gene_matches)
+        logging.debug('Found more than one gene w/ overlapping vertices')
+        # print(gene_tally)
+        # print(n_gene_matches)
         return list(gene_tally.keys()), False
         # temp = df.loc[df.gid.isin(gene_matches)].copy(deep=True)
         # temp = temp.drop_duplicates()
@@ -1271,6 +1276,8 @@ def find_gene_match_on_vertex_basis(vertex_IDs, strand, vertex_2_gene):
     else:
         gene_ID = max(gene_tally, key=gene_tally.get)
         fusion = False
+        logging.debug(f'Assigning this read to gene {gene_ID}')
+
 
     return gene_ID, fusion
 
@@ -1323,12 +1330,14 @@ def process_NNC(
         gene_starts,
         gene_ends,
     )
-    print("gene id process_nnc")
-    print(gene_ID)
-    print(fusion)
+    # print("gene id process_nnc")
+    # print(gene_ID)
+    # print(fusion)
 
     if gene_ID == None:
         return None, None, [], None, fusion
+
+    logging.debug(f'Assigning this read to gene {gene_ID}')
 
     # Get matches for the ends
     start_vertex, start_exon, start_novelty, known_start, diff_5p = process_5p(
@@ -1457,7 +1466,7 @@ def process_remaining_mult_cases(
     transcript_novelty = []
     start_end_info = {}
     if not run_info.create_novel_spliced_genes or not fusion:
-        print("did i get here?")
+        # print("did i get here?")
         gene_ID, match_strand = search_for_overlap_with_gene(
             chrom, positions[0], positions[-1], strand, cursor, run_info, tmp_gene, tmp_t
         )
@@ -1487,13 +1496,13 @@ def process_remaining_mult_cases(
     start_end_info["vertex_IDs"] = vertex_IDs
 
     if gene_ID == None:
-        print(f"fusion: {fusion}")
+        # print(f"fusion: {fusion}")
         if fusion:
-            print("i should be here")
+            # print("i should be here")
             t_nov = "fusion_transcript"
             g_nov = "fusion_novel"
         else:
-            print("but I think im going here")
+            # print("but I think im going here")
             t_nov = "intergenic_transcript"
             g_nov = "intergenic_novel"
 
@@ -1591,7 +1600,8 @@ def identify_transcript(
     all_exons_known = check_all_exons_known(e_novelty)
     splice_vertices_known = sum(v_novelty) == 0
     all_exons_novel = reduce(operator.mul, e_novelty, 1) == 1
-    print(f"all exons novel : {all_exons_novel}")
+    # print(f"all exons novel : {all_exons_novel}")
+    logging.debug(f'All exons novel?: {all_exons_novel}')
     fusion = False
 
     # Look for FSM or ISM.
@@ -1600,7 +1610,8 @@ def identify_transcript(
         all_matches = search_for_ISM(edge_IDs, transcript_dict)
         if all_matches != None:
             # Look for FSM first
-            print("looking for fsm")
+            # print("looking for fsm")
+            logging.debug('Looking for FSMs')
             gene_ID, transcript_ID, transcript_novelty, start_end_info = process_FSM(
                 chrom,
                 positions,
@@ -1616,7 +1627,8 @@ def identify_transcript(
             )
             if gene_ID == None:
                 # Now look for ISM
-                print("looking for ism")
+                # print("looking for ism")
+                logging.debug('Looking for ISM')
                 gene_ID, transcript_ID, transcript_novelty, start_end_info = process_ISM(
                     chrom,
                     positions,
@@ -1634,11 +1646,11 @@ def identify_transcript(
                     tmp_gene,
                     tmp_t,
                 )
-                print(f"gene id from process ism {gene_ID}")
 
         # Look for NIC
         if gene_ID == None:
-            print("looking for nic")
+            # print("looking for nic")
+            logging.debug('Looking for NIC')
             gene_ID, transcript_ID, transcript_novelty, start_end_info, fusion = process_NIC(
                 chrom,
                 positions,
@@ -1660,7 +1672,8 @@ def identify_transcript(
     # Novel in catalog transcripts have known splice donors and acceptors,
     # but new connections between them.
     elif splice_vertices_known and gene_ID == None:
-        print("looking for nic (again?)")
+        # print("looking for nic (again?)")
+        logging.info('Looking for NIC (2)')
         gene_ID, transcript_ID, transcript_novelty, start_end_info, fusion = process_NIC(
             chrom,
             positions,
@@ -1681,7 +1694,8 @@ def identify_transcript(
 
     # Antisense transcript with splice junctions matching known gene
     if splice_vertices_known and gene_ID == None and not fusion:
-        print("looking for spliced antisese")
+        # print("looking for spliced antisese")
+        logging.debug('Looking for splice antisense')
         gene_ID, transcript_ID, gene_novelty, transcript_novelty, start_end_info = process_spliced_antisense(
             chrom,
             positions,
@@ -1704,7 +1718,8 @@ def identify_transcript(
     # and contain at least one splice junction. There should also be at least
     # one shared exon from existing transcripts to even try assigning a gene
     elif not (splice_vertices_known) and not fusion and not all_exons_novel:
-        print("lookign for NNCs")
+        # print("lookign for NNCs")
+        logging.debug('Looking for NNC')
         gene_ID, transcript_ID, transcript_novelty, start_end_info, fusion = process_NNC(
             chrom,
             positions,
@@ -1722,10 +1737,11 @@ def identify_transcript(
             tmp_gene,
             tmp_t,
         )
-        print(f"geneID from process_nnc: {gene_ID}")
+        # print(f"geneID from process_nnc: {gene_ID}")
     # Transcripts that don't match the previous categories end up here
     if gene_ID == None:
-        print("looking for this other stuff")
+        # print("looking for this other stuff")
+        logging.debug('Looking for everything else')
         gene_ID, transcript_ID, gene_novelty, transcript_novelty, start_end_info = process_remaining_mult_cases(
             chrom,
             positions,
@@ -1745,8 +1761,8 @@ def identify_transcript(
             fusion,
         )
 
-    print("this is the gene id it decided on")
-    print(gene_ID)
+    logging.debug(f'Gene ID for this read: {gene_ID}')
+
     # Add all novel vertices to vertex_2_gene now that we have the gene ID
     vertex_IDs = start_end_info["vertex_IDs"]
     edge_IDs = start_end_info["edge_IDs"]
@@ -2434,7 +2450,7 @@ def batch_add_vertex2gene(cursor, v2g_file, batch_size):
                 cursor.executemany(command, batch)
 
             except Exception as e:
-                print(e)
+                logging.error(e)
                 sys.exit(1)
     return
 
@@ -2459,7 +2475,7 @@ def batch_add_locations(cursor, location_file, batch_size):
                 cursor.executemany(command, batch)
 
             except Exception as e:
-                print(e)
+                logging.error(e)
                 sys.exit(1)
     return
 
@@ -2484,7 +2500,7 @@ def batch_add_edges(cursor, edge_file, batch_size):
                 cursor.executemany(command, batch)
 
             except Exception as e:
-                print(e)
+                logging.error(e)
                 sys.exit(1)
 
     return
@@ -2530,7 +2546,7 @@ def batch_add_transcripts(cursor, transcript_file, batch_size):
                 cursor.executemany(command, batch)
 
             except Exception as e:
-                print(e)
+                logging.error(e)
                 sys.exit(1)
 
     return
@@ -2552,7 +2568,7 @@ def batch_add_genes(cursor, gene_file, batch_size):
                 cursor.executemany(command, batch)
 
             except Exception as e:
-                print(e)
+                logging.error(e)
                 sys.exit(1)
     return
 
@@ -2568,7 +2584,7 @@ def add_datasets(cursor, datasets):
         cursor.executemany(command, datasets)
 
     except Exception as e:
-        print(e)
+        logging.error(e)
         sys.exit(1)
     return
 
@@ -2598,7 +2614,7 @@ def batch_add_annotations(cursor, annot_file, annot_type, batch_size):
                 cursor.executemany(command, batch)
 
             except Exception as e:
-                print(e)
+                logging.error(e)
                 sys.exit(1)
     return
 
@@ -2682,7 +2698,7 @@ def batch_add_observed(cursor, observed_file, batch_size):
                 cursor.executemany(command, batch)
 
             except Exception as e:
-                print(e)
+                logging.error(e)
                 sys.exit(1)
 
     # Now create abundance tuples and add to DB
@@ -2712,7 +2728,7 @@ def batch_add_abundance(cursor, entries, batch_size):
             command = 'INSERT INTO "abundance"' + cols + "VALUES " + "(?,?,?)"
             cursor.executemany(command, batch)
         except Exception as e:
-            print(e)
+            logging.error(e)
             sys.exit(1)
     return
 
@@ -2929,8 +2945,7 @@ def annotate_read(sam_record: pysam.AlignedSegment, cursor, run_info, struct_col
     """
     # Parse attributes to determine the chromosome, positions, and strand of the transcript
     read_ID = sam_record.query_name
-    print()
-    print(read_ID)
+    logging.debug(read_ID)
     if not run_info.use_cb_tag:
         dataset = sam_record.get_tag("RG")
     else:
