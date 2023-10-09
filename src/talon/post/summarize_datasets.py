@@ -4,61 +4,76 @@ from pathlib import Path
 
 from .. import query_utils as qutils
 
+
 def get_args():
-    """ Fetches the arguments for the program """
+    """Fetches the arguments for the program"""
 
     program_desc = """Generates a tab-delimited file of gene and transcript
                       counts for each dataset in the database (broken down
                       by category)."""
     parser = argparse.ArgumentParser(description=program_desc)
-    parser.add_argument('--db', dest = 'database', metavar='FILE,', type = str,
-        help='TALON database')
-    parser.add_argument('--groups', dest = 'groups', metavar='FILE,', type = str,
-        help='Optional: file of comma-delimited dataset groups to process together', default = None)
-    parser.add_argument("--verbose",
-                        help = "Verbose mode: print out the counts in terminal",
-                        action="store_true")
-    parser.add_argument("--o", dest = "outprefix",
-                        help = "Prefix for output file", type = str)
+    parser.add_argument("--db", dest="database", metavar="FILE,", type=str, help="TALON database")
+    parser.add_argument(
+        "--groups",
+        dest="groups",
+        metavar="FILE,",
+        type=str,
+        help="Optional: file of comma-delimited dataset groups to process together",
+        default=None,
+    )
+    parser.add_argument("--verbose", help="Verbose mode: print out the counts in terminal", action="store_true")
+    parser.add_argument("--o", dest="outprefix", help="Prefix for output file", type=str)
 
     args = parser.parse_args()
     return args
 
-def write_counts_file(cursor, outprefix, datasets, verbose = False):
-    """ Create a log file with the following columns:
-            - dataset name
-            - Number of reads annotated
-            - Number of known genes detected (total)
-            - Number of novel genes detected (total)
-            - Number of known transcripts detected (total)
-            - Number of novel transcripts detected (total)
-            Breakdowns by category
-            - Number of antisense genes detected
-            - Number of intergenic genes detected
-            - Number of known transcripts
-            - Number of FSM transcripts detected (perfect + with novelty)
-            - Number of total ISM transcripts detected
-            - Number of suffix ISMs detected
-            - Number of antisense transcripts detected
-            - Number of genomic transcripts detected
+
+def write_counts_file(cursor, outprefix, datasets, verbose=False):
+    """Create a log file with the following columns:
+    - dataset name
+    - Number of reads annotated
+    - Number of known genes detected (total)
+    - Number of novel genes detected (total)
+    - Number of known transcripts detected (total)
+    - Number of novel transcripts detected (total)
+    Breakdowns by category
+    - Number of antisense genes detected
+    - Number of intergenic genes detected
+    - Number of known transcripts
+    - Number of FSM transcripts detected (perfect + with novelty)
+    - Number of total ISM transcripts detected
+    - Number of suffix ISMs detected
+    - Number of antisense transcripts detected
+    - Number of genomic transcripts detected
     """
-    o = open(outprefix + "_talon_summary.tsv", 'w')
+    o = open(outprefix + "_talon_summary.tsv", "w")
 
     d = dict()
-    columns = [ "dataset", "reads_annotated", "known_genes", "antisense_genes",
-                "other_novel_genes", "known_transcripts", "novel_transcripts",
-                 "ISMs", "prefix_ISMs", "suffix_ISMs", "NICs", "NNCs",
-                "antisense_transcripts", "genomic_transcripts" ]
+    columns = [
+        "dataset",
+        "reads_annotated",
+        "known_genes",
+        "antisense_genes",
+        "other_novel_genes",
+        "known_transcripts",
+        "novel_transcripts",
+        "ISMs",
+        "prefix_ISMs",
+        "suffix_ISMs",
+        "NICs",
+        "NNCs",
+        "antisense_transcripts",
+        "genomic_transcripts",
+    ]
 
     o.write("\t".join(columns) + "\n")
 
     # Get dataset names
     if datasets == None:
         cursor.execute(""" SELECT dataset_name FROM dataset """)
-        datasets = [ str(x[0]) for x in cursor.fetchall() ]
+        datasets = [str(x[0]) for x in cursor.fetchall()]
 
     for dataset in datasets:
-
         # Get number of reads in the dataset
         reads = qutils.count_observed_reads(cursor, dataset)
 
@@ -97,10 +112,22 @@ def write_counts_file(cursor, outprefix, datasets, verbose = False):
         # Get genomic novel transcripts
         genomic_transcripts = len(qutils.fetch_genomic_transcripts(cursor, dataset))
 
-        outputs = [ dataset, reads, known_genes, antisense_genes,
-                intergenic_genes, known_transcripts, novel_transcripts, ISMs, prefix_ISMs,
-                suffix_ISMs, NICs, NNCs, antisense_transcripts,
-                genomic_transcripts ]
+        outputs = [
+            dataset,
+            reads,
+            known_genes,
+            antisense_genes,
+            intergenic_genes,
+            known_transcripts,
+            novel_transcripts,
+            ISMs,
+            prefix_ISMs,
+            suffix_ISMs,
+            NICs,
+            NNCs,
+            antisense_transcripts,
+            genomic_transcripts,
+        ]
 
         if verbose == True:
             print("---------------%s---------------" % dataset)
@@ -123,17 +150,19 @@ def write_counts_file(cursor, outprefix, datasets, verbose = False):
 
     o.close()
 
+
 def process_groups(group_file):
-    """ Read in a comma-delimited file of dataset groups and format them
-        as a list of lists """
+    """Read in a comma-delimited file of dataset groups and format them
+    as a list of lists"""
 
     datasets = []
-    with open(group_file, 'r') as f:
+    with open(group_file, "r") as f:
         for line in f:
             line = line.strip()
             datasets.append(line.split(","))
 
     return datasets
+
 
 def main():
     options = get_args()
@@ -157,5 +186,5 @@ def main():
     conn.close()
 
 
-if __name__ == '__main__':
+if __name__ == "__main__":
     main()

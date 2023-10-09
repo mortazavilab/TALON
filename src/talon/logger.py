@@ -12,6 +12,4 @@ def _init_logger(verbosity):
     msg_fmt = "%(asctime)s : %(levelname)s : [%(filename)s:%(lineno)d] : %(message)s"
     date_fmt = "[ %Y-%m-%d %H:%M:%S ]"
 
-    logging.basicConfig(level=level,
-                        format=msg_fmt,
-                        datefmt=date_fmt)
+    logging.basicConfig(level=level, format=msg_fmt, datefmt=date_fmt)

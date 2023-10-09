@@ -5,66 +5,80 @@
 # for each transcript in the TALON database across datasets. Modified by
 # filtering option.
 
-import sqlite3
 import itertools
 import operator
+import sqlite3
 from optparse import OptionParser
 from pathlib import Path
 
-from . import filter_talon_transcripts as filt
 from .. import dstruct as dstruct
 from .. import length_utils as lu
-from . import post_utils as putils
-from . import ab_utils as autils
 from .. import query_utils as qutils
 from .. import talon as talon
+from . import ab_utils as autils
+from . import filter_talon_transcripts as filt
+from . import post_utils as putils
 
 
 def getOptions():
     parser = OptionParser()
 
-    parser.add_option("--db", dest = "database",
-        help = "TALON database", metavar = "FILE", type = "string")
+    parser.add_option("--db", dest="database", help="TALON database", metavar="FILE", type="string")
 
-    parser.add_option("--annot", "-a", dest = "annot",
-        help = """Which annotation version to use. Will determine which
+    parser.add_option(
+        "--annot",
+        "-a",
+        dest="annot",
+        help="""Which annotation version to use. Will determine which
                   annotation transcripts are considered known or novel
                   relative to. Note: must be in the TALON database.""",
-        type = "string")
+        type="string",
+    )
 
-    parser.add_option("--whitelist", dest = "whitelist",
-                      help = "Whitelist file of transcripts to include in the \
+    parser.add_option(
+        "--whitelist",
+        dest="whitelist",
+        help="Whitelist file of transcripts to include in the \
                               output. First column should be TALON gene ID, \
                               second column should be TALON transcript ID",
-                      metavar = "FILE", type = "string", default = None)
+        metavar="FILE",
+        type="string",
+        default=None,
+    )
 
-    parser.add_option("--build", "-b", dest = "build",
-        help = "Genome build to use. Note: must be in the TALON database.",
-        type = "string")
+    parser.add_option(
+        "--build", "-b", dest="build", help="Genome build to use. Note: must be in the TALON database.", type="string"
+    )
 
-    parser.add_option("--datasets", "-d",  dest = "datasets_file",
-        help = """Optional: A file indicating which datasets should be
+    parser.add_option(
+        "--datasets",
+        "-d",
+        dest="datasets_file",
+        help="""Optional: A file indicating which datasets should be
                   included (one dataset name per line). Default is to include
                   all datasets.""",
-        metavar = "FILE", type = "string", default = None)
+        metavar="FILE",
+        type="string",
+        default=None,
+    )
 
-    parser.add_option("--o", dest = "outprefix", help = "Prefix for output file",
-        metavar = "FILE", type = "string")
-
+    parser.add_option("--o", dest="outprefix", help="Prefix for output file", metavar="FILE", type="string")
 
     (options, args) = parser.parse_args()
     return options
 
+
 def create_outname(options):
-    """ Creates filename for the output abundance that reflects the input options that
-        were used. """
+    """Creates filename for the output abundance that reflects the input options that
+    were used."""
 
     outname = options.outprefix + "_talon_abundance"
     if options.whitelist != None:
-        outname = "_".join([ outname, "filtered" ])
+        outname = "_".join([outname, "filtered"])
 
     outname += ".tsv"
     return outname
+
 
 # def fetch_dataset_list(dataset_file, database):
 #     """ Gets a list of all datasets in the database """
@@ -90,10 +104,11 @@ def create_outname(options):
 #
 #         return datasets
 
+
 def create_abundance_dict(database, datasets):
     """Process the abundance table by dataset in order to create a dictionary
-       data structure organized like this:
-           transcript_ID -> dataset -> abundance in that dataset
+    data structure organized like this:
+        transcript_ID -> dataset -> abundance in that dataset
     """
     abundance = {}
 
@@ -102,8 +117,11 @@ def create_abundance_dict(database, datasets):
     cursor = conn.cursor()
 
     for dataset in datasets:
-        query = """ SELECT transcript_ID, count FROM abundance
-                    WHERE dataset = '%s' """ % dataset
+        query = (
+            """ SELECT transcript_ID, count FROM abundance
+                    WHERE dataset = '%s' """
+            % dataset
+        )
         cursor.execute(query)
 
         for transcript in cursor.fetchall():
@@ -119,18 +137,19 @@ def create_abundance_dict(database, datasets):
     conn.close()
     return abundance
 
+
 def fetch_abundances(database, datasets, annot, whitelist):
     """Constructs a query to get the following information for every
-       whitelisted transcript:
-           1) TALON gene ID
-           2) TALON transcript ID
-           3) Gene ID (from annotation specified in 'annot', None otherwise)
-           4) Transcript ID (from annotation specified in 'annot', None otherwise)
-           5) Gene name (from annotation specified in 'annot', None otherwise)
-           6) Transcript name (from annotation specified in 'annot', None otherwise)
-           7) number of exons in transcript
+    whitelisted transcript:
+        1) TALON gene ID
+        2) TALON transcript ID
+        3) Gene ID (from annotation specified in 'annot', None otherwise)
+        4) Transcript ID (from annotation specified in 'annot', None otherwise)
+        5) Gene name (from annotation specified in 'annot', None otherwise)
+        6) Transcript name (from annotation specified in 'annot', None otherwise)
+        7) number of exons in transcript
 
-        Returns a list of tuples (one tuple per transcript)
+     Returns a list of tuples (one tuple per transcript)
     """
 
     # datasets = fetch_dataset_list(database)
@@ -149,7 +168,7 @@ def fetch_abundances(database, datasets, annot, whitelist):
     conn.row_factory = sqlite3.Row
     cursor = conn.cursor()
 
-    whitelist_string = "WHERE t.transcript_ID IN (" + ','.join(whitelist) + ");"
+    whitelist_string = "WHERE t.transcript_ID IN (" + ",".join(whitelist) + ");"
 
     name_status_query = """
                 FROM transcripts t
@@ -165,7 +184,12 @@ def fetch_abundances(database, datasets, annot, whitelist):
                 LEFT JOIN transcript_annotations ta_name ON t.transcript_ID = ta_name.ID
 	            AND ta_name.annot_name = '%s'
                     AND ta_name.attribute = 'transcript_name'
-                """ % (annot, annot, annot, annot)
+                """ % (
+        annot,
+        annot,
+        annot,
+        annot,
+    )
 
     full_query = "\n".join([col_query, name_status_query, whitelist_string])
 
@@ -201,11 +225,11 @@ def fetch_abundances(database, datasets, annot, whitelist):
 
     return final_abundance, colnames
 
-def write_abundance_file(abundances, col_names, prefix, n_places, datasets,
-                         novelty_types, transcript_lengths, outfile):
-    """ Writes abundances and metadata to an output file """
 
-    o = open(outfile, 'w')
+def write_abundance_file(abundances, col_names, prefix, n_places, datasets, novelty_types, transcript_lengths, outfile):
+    """Writes abundances and metadata to an output file"""
+
+    o = open(outfile, "w")
 
     novelty_type_cols = ["gene_novelty", "transcript_novelty", "ISM_subtype"]
 
@@ -224,22 +248,24 @@ def write_abundance_file(abundances, col_names, prefix, n_places, datasets,
     annot_transcript_ID_index = all_colnames.index("annot_transcript_id")
     gene_name_index = all_colnames.index("annot_gene_name")
     transcript_name_index = all_colnames.index("annot_transcript_name")
-    dataset_indices = [i for i,s in enumerate(all_colnames) if s in set(datasets)]
+    dataset_indices = [i for i, s in enumerate(all_colnames) if s in set(datasets)]
 
     # Iterate over abundances, fixing Nones, and write to file
     for transcript in abundances:
-        curr_novelty = get_gene_and_transcript_novelty_types(transcript[gene_ID_index],
-                                                             transcript[transcript_ID_index],
-                                                             novelty_types)
+        curr_novelty = get_gene_and_transcript_novelty_types(
+            transcript[gene_ID_index], transcript[transcript_ID_index], novelty_types
+        )
         transcript = list(transcript)
-        transcript = transcript[0:first_dataset_index] + \
-                     [transcript_lengths[transcript[transcript_ID_index]]] + \
-                     [ curr_novelty[x] for x in novelty_type_cols] + \
-                     transcript[first_dataset_index:]
+        transcript = (
+            transcript[0:first_dataset_index]
+            + [transcript_lengths[transcript[transcript_ID_index]]]
+            + [curr_novelty[x] for x in novelty_type_cols]
+            + transcript[first_dataset_index:]
+        )
 
-        alt_gene_name, alt_transcript_name = talon.construct_names(transcript[gene_ID_index], \
-                                                             transcript[transcript_ID_index], \
-                                                             prefix, n_places)
+        alt_gene_name, alt_transcript_name = talon.construct_names(
+            transcript[gene_ID_index], transcript[transcript_ID_index], prefix, n_places
+        )
 
         if transcript[annot_gene_ID_index] == None:
             transcript[annot_gene_ID_index] = alt_gene_name
@@ -263,8 +289,8 @@ def write_abundance_file(abundances, col_names, prefix, n_places, datasets,
 
 
 def get_gene_and_transcript_novelty_types(gene_ID, transcript_ID, novelty_type):
-    """ Look up gene and transcript IDs in data structure to determine which types
-        of novelty are present """
+    """Look up gene and transcript IDs in data structure to determine which types
+    of novelty are present"""
 
     curr_novel = {}
 
@@ -297,8 +323,7 @@ def get_gene_and_transcript_novelty_types(gene_ID, transcript_ID, novelty_type):
         print("Warning: Could not locate novelty type for transcript %s" % transcript_ID)
 
     # Look for ISM subtype
-    if transcript_ID in novelty_type.ISM_prefix and \
-       transcript_ID in novelty_type.ISM_suffix:
+    if transcript_ID in novelty_type.ISM_prefix and transcript_ID in novelty_type.ISM_suffix:
         curr_novel["ISM_subtype"] = "Both"
     elif transcript_ID in novelty_type.ISM_prefix:
         curr_novel["ISM_subtype"] = "Prefix"
@@ -308,6 +333,7 @@ def get_gene_and_transcript_novelty_types(gene_ID, transcript_ID, novelty_type):
         curr_novel["ISM_subtype"] = "None"
 
     return curr_novel
+
 
 # def check_annot_validity(annot, database):
 #     """ Make sure that the user has entered a correct annotation name """
@@ -360,9 +386,10 @@ def get_gene_and_transcript_novelty_types(gene_ID, transcript_ID, novelty_type):
 #
 #     return
 
+
 def make_novelty_type_struct(database, datasets):
-    """ Create a data structure where it is possible to look up whether a gene
-        or transcript belongs to a particular category of novelty"""
+    """Create a data structure where it is possible to look up whether a gene
+    or transcript belongs to a particular category of novelty"""
 
     conn = sqlite3.connect(database)
     conn.row_factory = sqlite3.Row
@@ -384,6 +411,7 @@ def make_novelty_type_struct(database, datasets):
 
     conn.close()
     return novelty_type
+
 
 # def fetch_naming_prefix(database):
 #     """ Get naming prefix from the database run_info table """
@@ -448,15 +476,11 @@ def main():
     autils.check_build_validity(build, database)
 
     # Determine which transcripts to include
-    whitelist = putils.handle_filtering(database,
-                                        annot,
-                                        False,
-                                        whitelist_file,
-                                        dataset_file)
+    whitelist = putils.handle_filtering(database, annot, False, whitelist_file, dataset_file)
 
     # create transcript whitelist
     transcript_whitelist = []
-    for key,group in itertools.groupby(whitelist,operator.itemgetter(0)):
+    for key, group in itertools.groupby(whitelist, operator.itemgetter(0)):
         for id_tuple in list(group):
             transcript_whitelist.append(str(id_tuple[1]))
 
@@ -471,5 +495,6 @@ def main():
     n_places = autils.fetch_n_places(database)
     write_abundance_file(abundances, colnames, prefix, n_places, datasets, novelty_type, transcript_lengths, outfile)
 
-if __name__ == '__main__':
+
+if __name__ == "__main__":
     main()
