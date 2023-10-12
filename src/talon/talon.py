@@ -802,7 +802,10 @@ def get_overlap(a, b):
     """
     overlap = max(0, min(a[1], b[1]) - max(a[0], b[0]) + 1)
     ref_len = abs(b[1] - b[0])
-    perc_overlap = (overlap / ref_len) * 100
+    if ref_len != 0:
+        perc_overlap = (overlap / ref_len) * 100
+    else:
+        perc_overlap = None
     return overlap, perc_overlap
 
 
