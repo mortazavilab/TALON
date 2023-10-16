@@ -52,7 +52,6 @@ setup(
         "pyranges",
         "bamread>=0.0.11",
         "pysam>=0.15.4",
-        "pybedtools",
         "pyfaidx",
         "scanpy"
     ],

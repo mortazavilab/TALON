@@ -7,7 +7,6 @@ python:
 
 install:
   - sudo apt update && sudo apt install bedtools
-  - pip install pybedtools
   - pip install tox
 
 script:
