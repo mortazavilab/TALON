@@ -11,3 +11,4 @@ class OptParseMockFilt(object):
          self.outprefix = outprefix
          self.allow_genomic = allow_genomic
          self.exclude_ISMs = exclude_ISMs
+         self.include_annot = False

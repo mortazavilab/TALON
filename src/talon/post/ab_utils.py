@@ -1,20 +1,22 @@
-import sqlite3
 import itertools
 import operator
+import sqlite3
 from optparse import OptionParser
 from pathlib import Path
-import scanpy
-import numpy as np
 
-from . import filter_talon_transcripts as filt
+import numpy as np
+import scanpy
+
 from .. import dstruct as dstruct
 from .. import length_utils as lu
-from . import post_utils as putils
 from .. import query_utils as qutils
 from .. import talon as talon
+from . import filter_talon_transcripts as filt
+from . import post_utils as putils
+
 
 def check_annot_validity(annot, database):
-    """ Make sure that the user has entered a correct annotation name """
+    """Make sure that the user has entered a correct annotation name"""
 
     conn = sqlite3.connect(database)
     cursor = conn.cursor()
@@ -27,21 +29,25 @@ def check_annot_validity(annot, database):
         annotations.remove("TALON")
 
     if annot == None:
-        message = "Please provide a valid annotation name. " + \
-                  "In this database, your options are: " + \
-                  ", ".join(annotations)
+        message = (
+            "Please provide a valid annotation name. " + "In this database, your options are: " + ", ".join(annotations)
+        )
         raise ValueError(message)
 
     if annot not in annotations:
-        message = "Annotation name '" + annot + \
-                  "' not found in this database. Try one of the following: " + \
-                  ", ".join(annotations)
+        message = (
+            "Annotation name '"
+            + annot
+            + "' not found in this database. Try one of the following: "
+            + ", ".join(annotations)
+        )
         raise ValueError(message)
 
     return
 
+
 def check_build_validity(build, database):
-    """ Make sure that the user has entered a correct build name """
+    """Make sure that the user has entered a correct build name"""
 
     conn = sqlite3.connect(database)
     cursor = conn.cursor()
@@ -51,21 +57,22 @@ def check_build_validity(build, database):
     conn.close()
 
     if build == None:
-        message = "Please provide a valid genome build name. " + \
-                  "In this database, your options are: " + \
-                  ", ".join(builds)
+        message = (
+            "Please provide a valid genome build name. " + "In this database, your options are: " + ", ".join(builds)
+        )
         raise ValueError(message)
 
     if build not in builds:
-        message = "Build name '" + build + \
-                  "' not found in this database. Try one of the following: " + \
-                  ", ".join(builds)
+        message = (
+            "Build name '" + build + "' not found in this database. Try one of the following: " + ", ".join(builds)
+        )
         raise ValueError(message)
 
     return
 
+
 def fetch_naming_prefix(database):
-    """ Get naming prefix from the database run_info table """
+    """Get naming prefix from the database run_info table"""
     conn = sqlite3.connect(database)
     conn.row_factory = sqlite3.Row
     cursor = conn.cursor()
@@ -75,8 +82,9 @@ def fetch_naming_prefix(database):
     conn.close()
     return prefix
 
+
 def fetch_n_places(database):
-    """ Get length of name field from the database run_info table """
+    """Get length of name field from the database run_info table"""
     conn = sqlite3.connect(database)
     conn.row_factory = sqlite3.Row
     cursor = conn.cursor()
@@ -86,9 +94,10 @@ def fetch_n_places(database):
     conn.close()
     return int(n_places)
 
+
 def get_transcript_lengths(database, build):
-    """ Read the transcripts from the database. Then compute the lengths.
-        Store in a dictionary """
+    """Read the transcripts from the database. Then compute the lengths.
+    Store in a dictionary"""
 
     transcript_lengths = {}
 
@@ -101,15 +110,16 @@ def get_transcript_lengths(database, build):
 
     cursor.execute("SELECT * FROM transcripts")
     for transcript_row in cursor.fetchall():
-        transcript_ID = transcript_row['transcript_ID']
+        transcript_ID = transcript_row["transcript_ID"]
         length = lu.get_transcript_length(transcript_row, exon_lens)
         transcript_lengths[transcript_ID] = length
 
     conn.close()
     return transcript_lengths
 
+
 def fetch_dataset_list(dataset_file, database):
-    """ Gets a list of all datasets in the database """
+    """Gets a list of all datasets in the database"""
 
     conn = sqlite3.connect(database)
     cursor = conn.cursor()
@@ -117,17 +127,15 @@ def fetch_dataset_list(dataset_file, database):
     conn.close()
 
     if dataset_file == None:
-
         return all_db_datasets
 
     else:
         datasets = []
-        with open(dataset_file, 'r') as f:
+        with open(dataset_file, "r") as f:
             for line in f:
                 dataset = line.strip()
                 if dataset not in all_db_datasets:
-                    raise ValueError("Dataset name '%s' not found in database" \
-                                      % (dataset))
+                    raise ValueError("Dataset name '%s' not found in database" % (dataset))
                 datasets.append(dataset)
 
         return datasets

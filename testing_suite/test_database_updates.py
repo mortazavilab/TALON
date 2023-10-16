@@ -55,7 +55,7 @@ class TestDatabaseUpdates(object):
         with open("scratch/db_updates/observed.tsv", 'w') as f:
             for obs in observed:
                 f.write("\t".join([str(x) for x in obs]) + "\n")
-                
+
 
         batch_size = 1
         talon.batch_add_observed(cursor, "scratch/db_updates/observed.tsv", batch_size)
@@ -100,7 +100,7 @@ class TestDatabaseUpdates(object):
                 f.write("\t".join([str(x) for x in entry]) + "\n")
 
         batch_size = 1
-        talon.batch_add_annotations(cursor, "scratch/db_updates/gene_annot.tsv", 
+        talon.batch_add_annotations(cursor, "scratch/db_updates/gene_annot.tsv",
                                     "gene", batch_size)
 
         # Test if items are there
@@ -125,7 +125,7 @@ class TestDatabaseUpdates(object):
                 f.write("\t".join([str(x) for x in entry]) + "\n")
 
         batch_size = 2
-        talon.batch_add_annotations(cursor, "scratch/db_updates/transcript_annot.tsv", 
+        talon.batch_add_annotations(cursor, "scratch/db_updates/transcript_annot.tsv",
                                     "transcript", batch_size)
 
         # Test if items are there
@@ -150,7 +150,7 @@ class TestDatabaseUpdates(object):
                 f.write("\t".join([str(x) for x in entry]) + "\n")
 
         batch_size = 3
-        talon.batch_add_annotations(cursor, "scratch/db_updates/exon_annot.tsv", 
+        talon.batch_add_annotations(cursor, "scratch/db_updates/exon_annot.tsv",
                                     "exon", batch_size)
 
         # Test if items are there
@@ -180,7 +180,7 @@ class TestDatabaseUpdates(object):
 
         talon.batch_add_genes(cursor, "scratch/db_updates/genes.tsv", 10)
 
-        # Test if gene with ID 6 is there, but make sure we didn't add 
+        # Test if gene with ID 6 is there, but make sure we didn't add
         # duplicates of the other genes
         query = "SELECT * FROM genes"
         gene_IDs = [ x['gene_ID'] for x in cursor.execute(query)]
@@ -189,15 +189,18 @@ class TestDatabaseUpdates(object):
         conn.close()
 
     def test_transcript_update(self):
-        """ Try to add novel transcript entries to database while ignoring 
+        """ Try to add novel transcript entries to database while ignoring
             duplicates
         """
         conn, cursor = get_db_cursor()
         build = "toy_build"
         transcript_dict = init_refs.make_transcript_dict(cursor, build)
+        init_refs.make_temp_transcript_table(cursor, build)
+        
         database = "scratch/toy.db"
         talon.get_counters(database)
-        talon.create_transcript("chr1", 1, 1000, 1, (1,), (1,2), transcript_dict)
+        talon.create_transcript('+', "chr1", 1, 1000, 1, (1,), (1,2), transcript_dict,
+            "temp_transcript", cursor)
 
         # Write to file
         os.system("mkdir -p scratch/db_updates/")
@@ -257,7 +260,7 @@ class TestDatabaseUpdates(object):
 
         batch_size = 10
         talon.batch_add_edges(cursor, "scratch/db_updates/edges.tsv", batch_size)
-        
+
         # Test if the edge table has the correct number of edges now
         query = "SELECT * FROM edge"
         cursor.execute(query)
@@ -277,7 +280,7 @@ class TestDatabaseUpdates(object):
         orig_n_pos = talon.vertex_counter.value()
 
         talon.create_vertex("chr4", 2000, location_dict, run_info)
-   
+
         # Write to file
         os.system("mkdir -p scratch/db_updates/")
         with open("scratch/db_updates/loc.tsv", 'w') as f:
@@ -307,12 +310,12 @@ class TestDatabaseUpdates(object):
         build = "toy_build"
         vertex_2_gene = init_refs.make_vertex_2_gene_dict(cursor)
 
-        talon.update_vertex_2_gene(2, (1,2), "-", vertex_2_gene) 
+        talon.update_vertex_2_gene(2, (1,2), "-", vertex_2_gene)
         talon.update_vertex_2_gene(1, (1,2,3,4,5,6), "+", vertex_2_gene)
 
         # Write to file
         os.system("mkdir -p scratch/db_updates/")
-        with open("scratch/db_updates/v2g.tsv", 'w') as f: 
+        with open("scratch/db_updates/v2g.tsv", 'w') as f:
             for vertex_ID, gene_set in vertex_2_gene.items():
                 for gene in gene_set:
                     entry = "\t".join([ str(x) for x in (vertex_ID, gene[0])])

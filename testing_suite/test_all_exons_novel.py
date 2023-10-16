@@ -2,7 +2,7 @@ import pytest
 from talon import talon
 @pytest.mark.dbunit
 
-class TestAllExonsKnown(object):
+class TestAllExonsNovel(object):
 
     def test_find_true(self):
         """ Example where all of the exons are known.
@@ -11,7 +11,7 @@ class TestAllExonsKnown(object):
         novelty = [0, 0, 0, 0, 0 ]
 
         # Make sure that no match got returned
-        assert talon.check_all_exons_known(novelty) == True
+        assert talon.check_all_exons_novel(novelty) == False
 
     def test_find_true_with_novel_exons(self):
         """ Example where all of the exons are known, but the introns are not.
@@ -20,7 +20,7 @@ class TestAllExonsKnown(object):
         novelty = [1, 0, 1, 0, 1]
 
         # Make sure that no match got returned
-        assert talon.check_all_exons_known(novelty) == True
+        assert talon.check_all_exons_novel(novelty) == False
 
     def test_find_false(self):
         """ Example with novel exons
@@ -28,16 +28,16 @@ class TestAllExonsKnown(object):
         novelty = [0, 1, 0, 1, 0]
 
         # Make sure that no match got returned
-        assert talon.check_all_exons_known(novelty) == False
+        assert talon.check_all_exons_novel(novelty) == True
 
     def test_monoexonic(self):
         """ Monoexonic known exon """
         novelty = [0]
 
-        assert talon.check_all_exons_known(novelty) == True
+        assert talon.check_all_exons_novel(novelty) == False
 
     def test_no_internal_exons(self):
         """ No internal exons """
         novelty = [0, 0, 0]
 
-        assert talon.check_all_exons_known(novelty) == True
+        assert talon.check_all_exons_novel(novelty) == False

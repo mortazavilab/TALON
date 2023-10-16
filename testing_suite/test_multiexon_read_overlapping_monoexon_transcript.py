@@ -14,7 +14,7 @@ class TestMultExonReadOverlapsMonoGene(object):
             when it was actually supposed to be genomic """
 
         # Set up references
-        database = "scratch/multiexon_read_overlapping_monoexon_transcript/talon.db" 
+        database = "scratch/multiexon_read_overlapping_monoexon_transcript/talon.db"
         conn = sqlite3.connect(database)
         conn.row_factory = sqlite3.Row
         cursor = conn.cursor()
@@ -23,6 +23,7 @@ class TestMultExonReadOverlapsMonoGene(object):
         talon.get_counters(database)
         run_info = talon.init_run_info(database, build)
         struct_collection = talon.prepare_data_structures(cursor, run_info)
+        init_refs.make_temp_transcript_table(cursor, "toy_build")
 
         # Use pysam to get the read from the SAM file
         sam_file = "input_files/multiexon_read_overlapping_monoexon_transcript/read.sam"
@@ -34,21 +35,21 @@ class TestMultExonReadOverlapsMonoGene(object):
         # Get read attributes
         chrom = sam_record.reference_name
         strand = "-" if sam_record.is_reverse else "+"
-        sam_start = sam_record.reference_start 
+        sam_start = sam_record.reference_start
         sam_end = sam_record.reference_end
 
         # Do we get any overlap with the reference gene?
         best_gene, match_strand = talon.search_for_overlap_with_gene(chrom, min(sam_start, sam_end),
-                                                                     max(sam_start, sam_end), strand, 
-                                                                     cursor, run_info, 
-                                                                     struct_collection.tmp_gene)
+                                                                     max(sam_start, sam_end), strand,
+                                                                     cursor, run_info,
+                                                                     struct_collection.tmp_gene,
+                                                                     struct_collection.tmp_t)
         assert best_gene == 1
         assert match_strand == "-"
 
-        annotation_info = talon.annotate_read(sam_record, cursor, run_info, 
+        annotation_info = talon.annotate_read(sam_record, cursor, run_info,
                                               struct_collection, mode = 0)
-        
+
         assert annotation_info['gene_ID'] == 1
         assert annotation_info['transcript_ID'] == 2
         assert 'genomic_transcript' in annotation_info['transcript_novelty'][0]
-

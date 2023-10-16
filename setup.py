@@ -46,13 +46,12 @@ setup(
         "License :: OSI Approved :: MIT License",
         "Topic :: Scientific/Engineering :: Bio-Informatics"
     ],
-    python_requires=">=3.6",
+    python_requires=">=3.6,<3.8",
     install_requires=[
         "pandas",
         "pyranges",
         "bamread>=0.0.11",
         "pysam>=0.15.4",
-        "pybedtools",
         "pyfaidx",
         "scanpy"
     ],

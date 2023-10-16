@@ -13,7 +13,8 @@ class TestIdentifyISM(object):
         database = "scratch/toy.db"
         run_info = talon.init_run_info(database, build)
         talon.get_counters(database)
-
+        init_refs.make_temp_novel_gene_table(cursor, build)
+        init_refs.make_temp_transcript_table(cursor, build)
         edge_dict = init_refs.make_edge_dict(cursor)
         location_dict = init_refs.make_location_dict(build, cursor)
         transcript_dict = init_refs.make_transcript_dict(cursor, build)
@@ -28,17 +29,20 @@ class TestIdentifyISM(object):
         v_novelty = [0, 0]
 
         all_matches = talon.search_for_ISM(edge_IDs, transcript_dict)
-        gene_ID, transcript_ID, novelty, start_end_info = talon.process_ISM(chrom, 
-                                                            positions, 
+        gene_ID, transcript_ID, novelty, start_end_info = talon.process_ISM(chrom,
+                                                            positions,
                                                             strand, edge_IDs,
-                                                            vertex_IDs, 
-                                                            all_matches, 
+                                                            vertex_IDs,
+                                                            all_matches,
                                                             transcript_dict,
-                                                            gene_starts, gene_ends, 
-                                                            edge_dict, location_dict, 
-                                                            run_info)
+                                                            gene_starts, gene_ends,
+                                                            edge_dict, location_dict,
+                                                            run_info,
+                                                            cursor,
+                                                            "temp_gene",
+                                                            "temp_transcript")
 
-        correct_gene_ID = fetch_correct_ID("TG1", "gene", cursor) 
+        correct_gene_ID = fetch_correct_ID("TG1", "gene", cursor)
 
         assert gene_ID == correct_gene_ID
         assert start_end_info["vertex_IDs"] == [3, 4, 5, 6]
@@ -56,7 +60,8 @@ class TestIdentifyISM(object):
         database = "scratch/toy.db"
         run_info = talon.init_run_info(database, build)
         talon.get_counters(database)
-
+        init_refs.make_temp_novel_gene_table(cursor, build)
+        init_refs.make_temp_transcript_table(cursor, build)
         edge_dict = init_refs.make_edge_dict(cursor)
         location_dict = init_refs.make_location_dict(build, cursor)
         transcript_dict = init_refs.make_transcript_dict(cursor, build)
@@ -79,12 +84,15 @@ class TestIdentifyISM(object):
                                                             transcript_dict,
                                                             gene_starts, gene_ends,
                                                             edge_dict, location_dict,
-                                                            run_info)
+                                                            run_info,
+                                                            cursor,
+                                                            "temp_gene",
+                                                            "temp_transcript")
 
         correct_gene_ID = fetch_correct_ID("TG1", "gene", cursor)
         assert gene_ID == correct_gene_ID
         assert start_end_info["vertex_IDs"] == [1, 2, 3, 4]
-        assert start_end_info["edge_IDs"] == [1, 2, 3] 
+        assert start_end_info["edge_IDs"] == [1, 2, 3]
         conn.close()
 
 
@@ -112,5 +120,4 @@ class TestIdentifyISM(object):
 
         all_matches = talon.search_for_ISM(edge_IDs, transcript_dict)
         assert all_matches == None
-        conn.close()       
-
+        conn.close()

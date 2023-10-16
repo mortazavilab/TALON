@@ -1,7 +1,7 @@
 # TALON: Techonology-Agnostic Long Read Analysis Pipeline
 # Author: Dana Wyman
 # -----------------------------------------------------------------------------
-# Contains functions that query the database to initialize various data 
+# Contains functions that query the database to initialize various data
 # structures for the TALON run.
 # ---------------------------------------------------------------------
 # make_temp_novel_gene_table
@@ -14,19 +14,22 @@
 
 from string import Template
 
-def make_temp_novel_gene_table(cursor, build, chrom = None, start = None, 
-                               end = None, tmp_tab = "temp_gene"):
-    """ Attaches a temporary database with a table that has the following fields:
-            - gene_ID
-            - chromosome
-            - start
-            - end
-            - strand
-        The purpose is to track novel genes from this run in order to match
-        transcripts to them when other forms of gene assignment have failed.
+import pandas as pd
+
+
+def make_temp_novel_gene_table(cursor, build, chrom=None, start=None, end=None, tmp_tab="temp_gene"):
+    """Attaches a temporary database with a table that has the following fields:
+        - gene_ID
+        - chromosome
+        - start
+        - end
+        - strand
+    The purpose is to track novel genes from this run in order to match
+    transcripts to them when other forms of gene assignment have failed.
     """
     if any(val == None for val in [chrom, start, end]):
-        command = Template(""" CREATE TEMPORARY TABLE IF NOT EXISTS $tmp_tab AS
+        command = Template(
+            """ CREATE TEMPORARY TABLE IF NOT EXISTS $tmp_tab AS
                                    SELECT gene_ID,
                                      chromosome,
                                      start,
@@ -41,9 +44,11 @@ def make_temp_novel_gene_table(cursor, build, chrom = None, start = None,
                                         LEFT JOIN vertex as v ON g.gene_ID = v.gene_ID
                                         LEFT JOIN location as loc ON loc.location_ID = v.vertex_ID
                                         WHERE loc.genome_build = '$build'
-                                        GROUP BY g.gene_ID); """)
+                                        GROUP BY g.gene_ID); """
+        )
     else:
-        command = Template(""" CREATE TEMPORARY TABLE IF NOT EXISTS $tmp_tab AS
+        command = Template(
+            """ CREATE TEMPORARY TABLE IF NOT EXISTS $tmp_tab AS
                                    SELECT gene_ID,
                                      chromosome,
                                      start,
@@ -63,29 +68,91 @@ def make_temp_novel_gene_table(cursor, build, chrom = None, start = None,
                                         AND ((start <= $start AND end >= $end)
                                           OR (start >= $start AND end <= $end)
                                           OR (start >= $start AND start <= $end)
-                                          OR (end >= $start AND end <= $end)); """)
+                                          OR (end >= $start AND end <= $end)); """
+        )
 
-    command = command.substitute({'tmp_tab':tmp_tab, 'build':build, 'chrom':chrom,
-                                  'start':start, 'end':end})
+    command = command.substitute({"tmp_tab": tmp_tab, "build": build, "chrom": chrom, "start": start, "end": end})
     cursor.execute(command)
 
     return tmp_tab
 
-def make_temp_monoexonic_transcript_table(cursor, build, chrom = None,
-                                          start = None, end = None,
-                                          tmp_tab = "temp_monoexon"):
-    """ Attaches a temporary database with a table that has the following fields:
-            - gene_ID
-            - transcript_ID
-            - chromosome
-            - start (min position)
-            - end (max position)
-            - strand
-        The purpose is to allow location-based matching for monoexonic query
-        transcripts. """
+
+def make_temp_transcript_table(cursor, build, chrom=None, start=None, end=None, tmp_tab="temp_transcript"):
+    """Attaches a temporary database with a table that has the following fields:
+        - gene_ID
+        - transcript_ID
+        - chromosome
+        - start (min position)
+        - end (max position)
+        - strand
+    The purpose is to allow location-based matching tiebreaking
+    transcripts."""
 
     if any(val == None for val in [chrom, start, end]):
-        command = Template(""" CREATE TEMPORARY TABLE IF NOT EXISTS $tmp_tab AS
+        command = Template(
+            """ CREATE TEMPORARY TABLE IF NOT EXISTS $tmp_tab AS
+                                   SELECT t.gene_ID,
+                                      t.transcript_ID,
+                                      loc1.chromosome,
+                                      genes.strand,
+                                      MIN(loc1.position, loc2.position) as min_pos,
+                                      MAX(loc1.position, loc2.position) as max_pos
+                                   FROM transcripts as t
+                                   LEFT JOIN location as loc1
+                                       ON loc1.location_ID = t.start_vertex
+                                   LEFT JOIN location as loc2
+                                       ON loc2.location_ID = t.end_vertex
+                                   LEFT JOIN genes
+                                       ON genes.gene_ID = t.gene_ID
+                                   WHERE loc1.genome_build = '$build'
+                                       AND loc2.genome_build = '$build' """
+        )
+    else:
+        command = Template(
+            """ CREATE TEMPORARY TABLE IF NOT EXISTS $tmp_tab AS
+                                   SELECT t.gene_ID,
+                                      t.transcript_ID,
+                                      loc1.chromosome,
+                                      genes.strand,
+                                      t.start_exon as exon_ID,
+                                      MIN(loc1.position, loc2.position) as min_pos,
+                                      MAX(loc1.position, loc2.position) as max_pos
+                                   FROM transcripts as t
+                                   LEFT JOIN location as loc1
+                                       ON loc1.location_ID = t.start_vertex
+                                   LEFT JOIN location as loc2
+                                       ON loc2.location_ID = t.end_vertex
+                                   LEFT JOIN genes
+                                       ON genes.gene_ID = t.gene_ID
+                                   WHERE loc1.genome_build = '$build'
+                                   AND loc2.genome_build = '$build'
+                                   AND loc1.chromosome = '$chrom'
+                                   AND ((min_pos <= $start AND max_pos >= $end)
+                                       OR (min_pos >= $start AND max_pos <= $end)
+                                       OR (min_pos >= $start AND min_pos <= $end)
+                                       OR (max_pos >= $start AND max_pos <= $end))"""
+        )
+
+    command = command.substitute({"build": build, "chrom": chrom, "start": start, "end": end, "tmp_tab": tmp_tab})
+    cursor.execute(command)
+
+    return tmp_tab
+
+
+def make_temp_monoexonic_transcript_table(cursor, build, chrom=None, start=None, end=None, tmp_tab="temp_monoexon"):
+    """Attaches a temporary database with a table that has the following fields:
+        - gene_ID
+        - transcript_ID
+        - chromosome
+        - start (min position)
+        - end (max position)
+        - strand
+    The purpose is to allow location-based matching for monoexonic query
+    transcripts."""
+
+    if any(val == None for val in [chrom, start, end]):
+        command = Template(
+            """ CREATE TEMPORARY TABLE IF NOT EXISTS $tmp_tab AS
                                    SELECT t.gene_ID,
                                       t.transcript_ID,
                                       loc1.chromosome,
@@ -106,9 +173,11 @@ def make_temp_monoexonic_transcript_table(cursor, build, chrom = None,
                                        ON genes.gene_ID = t.gene_ID
                                    WHERE n_exons = 1
                                        AND loc1.genome_build = '$build'
-                                       AND loc2.genome_build = '$build' """)
+                                       AND loc2.genome_build = '$build' """
+        )
     else:
-        command = Template(""" CREATE TEMPORARY TABLE IF NOT EXISTS $tmp_tab AS
+        command = Template(
+            """ CREATE TEMPORARY TABLE IF NOT EXISTS $tmp_tab AS
                                    SELECT t.gene_ID,
                                       t.transcript_ID,
                                       loc1.chromosome,
@@ -134,35 +203,36 @@ def make_temp_monoexonic_transcript_table(cursor, build, chrom = None,
                                    AND ((min_pos <= $start AND max_pos >= $end)
                                        OR (min_pos >= $start AND max_pos <= $end)
                                        OR (min_pos >= $start AND min_pos <= $end)
-                                       OR (max_pos >= $start AND max_pos <= $end))""")
+                                       OR (max_pos >= $start AND max_pos <= $end))"""
+        )
 
-    command = command.substitute({'build':build, 'chrom':chrom,
-                                  'start':start, 'end':end, 
-                                  'tmp_tab':tmp_tab})
+    command = command.substitute({"build": build, "chrom": chrom, "start": start, "end": end, "tmp_tab": tmp_tab})
     cursor.execute(command)
 
     return tmp_tab
 
-def make_location_dict(genome_build, cursor, chrom = None, start = None, end = None):
-    """ Format of dict:
-        chromosome -> dict(position -> SQLite3 row from location table)
 
-        old:
-            Key: chromosome, pos
-            Value: SQLite3 row from location table
+def make_location_dict(genome_build, cursor, chrom=None, start=None, end=None):
+    """Format of dict:
+    chromosome -> dict(position -> SQLite3 row from location table)
+
+    old:
+        Key: chromosome, pos
+        Value: SQLite3 row from location table
     """
     location_dict = {}
 
-    if any(val == None for val in [chrom, start,end]):
+    if any(val == None for val in [chrom, start, end]):
         query = Template("""SELECT * FROM location WHERE genome_build = '$build' """)
     else:
-        query = Template("""SELECT * FROM location
+        query = Template(
+            """SELECT * FROM location
                             WHERE genome_build = '$build'
                             AND chromosome = '$chrom'
                             AND position >= $start
-                            AND position <= $end""")
-    query = query.substitute({'build':genome_build, 'chrom':chrom,
-                              'start':start, 'end':end})
+                            AND position <= $end"""
+        )
+    query = query.substitute({"build": genome_build, "chrom": chrom, "start": start, "end": end})
     cursor.execute(query)
     for location in cursor.fetchall():
         chromosome = location["chromosome"]
@@ -174,16 +244,18 @@ def make_location_dict(genome_build, cursor, chrom = None, start = None, end = N
 
     return location_dict
 
-def make_edge_dict(cursor, build = None, chrom = None, start = None, end = None):
-    """ Format of dict:
-            Key: vertex1_vertex2_type
-            Value: SQLite3 row from edge table
+
+def make_edge_dict(cursor, build=None, chrom=None, start=None, end=None):
+    """Format of dict:
+    Key: vertex1_vertex2_type
+    Value: SQLite3 row from edge table
     """
     edge_dict = {}
     if any(val == None for val in [chrom, start, end, build]):
         query = """SELECT * FROM edge"""
     else:
-        query = Template("""SELECT e.*
+        query = Template(
+            """SELECT e.*
                             FROM edge AS e
                             LEFT JOIN location as loc1 ON e.v1 = loc1.location_ID
                             LEFT JOIN location as loc2 ON e.v2 = loc2.location_ID
@@ -191,9 +263,9 @@ def make_edge_dict(cursor, build = None, chrom = None, start = None, end = None)
                                  AND loc1.chromosome = "$chrom"
                                  AND (loc1.position >= $start AND loc1.position <= $end)
                                  AND (loc2.position >= $start AND loc2.position <= $end);
-                         """)
-        query = query.substitute({'build':build, 'chrom':chrom,
-                                  'start':start, 'end':end})
+                         """
+        )
+        query = query.substitute({"build": build, "chrom": chrom, "start": start, "end": end})
     cursor.execute(query)
     for edge in cursor.fetchall():
         vertex_1 = edge["v1"]
@@ -204,14 +276,16 @@ def make_edge_dict(cursor, build = None, chrom = None, start = None, end = None)
 
     return edge_dict
 
-def make_transcript_dict(cursor, build, chrom = None, start = None, end = None):
-    """ Format of dict:
-            Key: tuple consisting of edges in transcript path
-            Value: SQLite3 row from transcript table
+
+def make_transcript_dict(cursor, build, chrom=None, start=None, end=None):
+    """Format of dict:
+    Key: tuple consisting of edges in transcript path
+    Value: SQLite3 row from transcript table
     """
     transcript_dict = {}
     if any(val == None for val in [chrom, start, end]):
-         query = Template("""SELECT t.*,
+        query = Template(
+            """SELECT t.*,
                                 loc1.chromosome as chromosome,
                                 loc1.position as start_pos,
                                 loc2.position as end_pos
@@ -219,10 +293,12 @@ def make_transcript_dict(cursor, build, chrom = None, start = None, end = None):
                                 LEFT JOIN location as loc1 ON t.start_vertex = loc1.location_ID
                                 LEFT JOIN location as loc2 ON t.end_vertex = loc2.location_ID
                                 WHERE loc1.genome_build = '$build' AND loc2.genome_build = '$build';
-                          """)
+                          """
+        )
 
     else:
-        query = Template("""SELECT t.*,
+        query = Template(
+            """SELECT t.*,
                                 loc1.chromosome as chrom,
                                 loc1.position as start_pos,
                                 loc2.position as end_pos,
@@ -236,26 +312,25 @@ def make_transcript_dict(cursor, build, chrom = None, start = None, end = None):
                                          AND ((min_pos <= $start AND max_pos >= $end)
                                            OR (min_pos >= $start AND max_pos <= $end)
                                            OR (min_pos >= $start AND min_pos <= $end)
-                                           OR (max_pos >= $start AND max_pos <= $end))""")
+                                           OR (max_pos >= $start AND max_pos <= $end))"""
+        )
 
-    query = query.substitute({'build':build, 'chrom':chrom,
-                                  'start':start, 'end':end})
+    query = query.substitute({"build": build, "chrom": chrom, "start": start, "end": end})
     cursor.execute(query)
     for transcript in cursor.fetchall():
         transcript_path = transcript["jn_path"]
         if transcript_path != None:
-            transcript_path = transcript_path.split(",") + \
-                              [transcript["start_exon"], transcript["end_exon"]]
-            transcript_path = frozenset([ int(x) for x in transcript_path])
+            transcript_path = transcript_path.split(",") + [transcript["start_exon"], transcript["end_exon"]]
+            transcript_path = frozenset([int(x) for x in transcript_path])
         else:
             transcript_path = frozenset([transcript["start_exon"]])
         transcript_dict[transcript_path] = transcript
 
     return transcript_dict
 
-def make_vertex_2_gene_dict(cursor, build = None, chrom = None, start = None, end = None):
-    """ Create a dictionary that maps vertices to the genes that they belong to.
-    """
+
+def make_vertex_2_gene_dict(cursor, build=None, chrom=None, start=None, end=None):
+    """Create a dictionary that maps vertices to the genes that they belong to."""
     vertex_2_gene = {}
     if any(val == None for val in [chrom, start, end, build]):
         query = """SELECT vertex_ID,
@@ -264,7 +339,8 @@ def make_vertex_2_gene_dict(cursor, build = None, chrom = None, start = None, en
                        FROM vertex
                        LEFT JOIN genes ON vertex.gene_ID = genes.gene_ID"""
     else:
-        query = Template("""SELECT vertex_ID,
+        query = Template(
+            """SELECT vertex_ID,
                                    vertex.gene_ID,
                                    strand
                             FROM vertex
@@ -273,9 +349,9 @@ def make_vertex_2_gene_dict(cursor, build = None, chrom = None, start = None, en
                                 WHERE loc.genome_build = '$build'
                                      AND loc.chromosome = '$chrom'
                                      AND (loc.position >= $start AND loc.position <= $end)
-                         """)
-        query = query.substitute({'build':build, 'chrom':chrom,
-                                  'start':start, 'end':end})
+                         """
+        )
+        query = query.substitute({"build": build, "chrom": chrom, "start": start, "end": end})
 
     cursor.execute(query)
     for vertex_line in cursor.fetchall():
@@ -291,20 +367,20 @@ def make_vertex_2_gene_dict(cursor, build = None, chrom = None, start = None, en
 
     return vertex_2_gene
 
-def make_gene_start_or_end_dict(cursor, build, mode, chrom = None, start = None, end = None):
-    """ Select the starts (or ends) of known genes in the database and store 
-        in a dict. 
-        Format of dict:
-            Key: gene ID from database
-            Value: dict mapping positions to start vertices (or end vertices) of
-                   KNOWN transcripts from that gene
+
+def make_gene_start_or_end_dict(cursor, build, mode, chrom=None, start=None, end=None):
+    """Select the starts (or ends) of known genes in the database and store
+    in a dict.
+    Format of dict:
+        Key: gene ID from database
+        Value: dict mapping positions to start vertices (or end vertices) of
+               KNOWN transcripts from that gene
     """
     if mode not in ["start", "end"]:
-        raise ValueError(("Incorrect mode supplied to 'make_gene_start_or_end_dict'."
-                          " Expected 'start' or 'end'."))
+        raise ValueError(("Incorrect mode supplied to 'make_gene_start_or_end_dict'." " Expected 'start' or 'end'."))
 
     output_dict = {}
-    if any(val == None for val in [chrom, start,end]):
+    if any(val == None for val in [chrom, start, end]):
         query = """SELECT gene_ID,
                           %s_vertex as vertex,
                           loc1.position as %s
@@ -319,7 +395,8 @@ def make_gene_start_or_end_dict(cursor, build, mode, chrom = None, start = None,
         cursor.execute(query % (mode, mode, mode, build))
 
     else:
-        query = Template("""SELECT  gene_ID,
+        query = Template(
+            """SELECT  gene_ID,
                                     ${mode}_vertex as vertex,
                                     loc1.chromosome as chrom,
                                     loc1.position as $mode
@@ -333,14 +410,14 @@ def make_gene_start_or_end_dict(cursor, build, mode, chrom = None, start = None,
                                   AND ta.value = 'KNOWN'
                                   AND loc1.genome_build = '$build'
                                   AND chrom = '$chrom'
-                                  AND ($mode >= $start AND $mode <= $end)""")
-        query = query.substitute({'build':build, 'chrom':chrom,
-                                  'start':start, 'end':end, 'mode':mode})
+                                  AND ($mode >= $start AND $mode <= $end)"""
+        )
+        query = query.substitute({"build": build, "chrom": chrom, "start": start, "end": end, "mode": mode})
         cursor.execute(query)
 
     for entry in cursor.fetchall():
-        gene_ID = entry['gene_ID']
-        vertex = entry['vertex']
+        gene_ID = entry["gene_ID"]
+        vertex = entry["vertex"]
         pos = entry[mode]
 
         try:
@@ -350,4 +427,3 @@ def make_gene_start_or_end_dict(cursor, build, mode, chrom = None, start = None,
             output_dict[gene_ID][pos] = vertex
 
     return output_dict
-
