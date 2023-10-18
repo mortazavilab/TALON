@@ -297,6 +297,8 @@ def get_gene_and_transcript_novelty_types(gene_ID, transcript_ID, novelty_type):
     # Look for gene type
     if gene_ID in novelty_type.antisense_genes:
         curr_novel["gene_novelty"] = "Antisense"
+    elif gene_ID in novelty_type.fusion_genes:
+        curr_novel["gene_novelty"] = 'Fusion'
     elif gene_ID in novelty_type.intergenic_genes:
         curr_novel["gene_novelty"] = "Intergenic"
     elif gene_ID in novelty_type.known_genes:
@@ -317,6 +319,8 @@ def get_gene_and_transcript_novelty_types(gene_ID, transcript_ID, novelty_type):
         curr_novel["transcript_novelty"] = "Intergenic"
     elif transcript_ID in novelty_type.genomic_transcripts:
         curr_novel["transcript_novelty"] = "Genomic"
+    elif transcript_ID in novelty_type.fusion_transcripts:
+        curr_novel["transcript_novelty"] = "Fusion"
     elif transcript_ID in novelty_type.known_transcripts:
         curr_novel["transcript_novelty"] = "Known"
     else:
@@ -396,9 +400,14 @@ def make_novelty_type_struct(database, datasets):
     cursor = conn.cursor()
 
     novelty_type = dstruct.Struct()
+
+    # genes
     novelty_type.known_genes = set(qutils.fetch_all_known_genes_detected(cursor, datasets))
     novelty_type.antisense_genes = set(qutils.fetch_antisense_genes(cursor, datasets))
     novelty_type.intergenic_genes = set(qutils.fetch_intergenic_novel_genes(cursor, datasets))
+    novelty_type.fusion_genes = set(qutils.fetch_fusion_novel_genes(cursor, datasets))
+
+    # transcripts
     novelty_type.known_transcripts = set(qutils.fetch_all_known_transcripts_detected(cursor, datasets))
     novelty_type.ISM_transcripts = set(qutils.fetch_all_ISM_transcripts(cursor, datasets))
     novelty_type.ISM_prefix = set(qutils.fetch_prefix_ISM_transcripts(cursor, datasets))
@@ -408,6 +417,7 @@ def make_novelty_type_struct(database, datasets):
     novelty_type.antisense_transcripts = set(qutils.fetch_antisense_transcripts(cursor, datasets))
     novelty_type.intergenic_transcripts = set(qutils.fetch_intergenic_transcripts(cursor, datasets))
     novelty_type.genomic_transcripts = set(qutils.fetch_genomic_transcripts(cursor, datasets))
+    novelty_type.fusion_transcripts = set(qutils.fetch_fusion_transcripts(cursor, datasets))
 
     conn.close()
     return novelty_type

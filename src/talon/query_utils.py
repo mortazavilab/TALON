@@ -62,8 +62,8 @@ def fetch_reproducible_NNCs(cursor, datasets):
 
     datasets = format_for_IN(datasets)
     query = (
-        """SELECT gene_ID, 
-                      a.transcript_ID 
+        """SELECT gene_ID,
+                      a.transcript_ID
                FROM abundance as a
 	       LEFT JOIN transcript_annotations as ta
 	           ON ta.ID = a.transcript_ID
@@ -353,6 +353,21 @@ def fetch_intergenic_novel_genes(cursor, datasets):
     genes = [x[0] for x in cursor.fetchall()]
     return genes
 
+def fetch_fusion_novel_genes(cursor, datasets):
+    """Fetch IDs of novel genes denoted as fusion"""
+
+    datasets = format_for_IN(datasets)
+    query = (
+        """SELECT DISTINCT(gene_ID) FROM observed
+                   LEFT JOIN gene_annotations AS ga ON ga.ID = observed.gene_ID
+                   WHERE (ga.attribute = 'fusion_novel')
+                   AND observed.dataset IN """
+        + datasets
+    )
+    cursor.execute(query)
+    genes = [x[0] for x in cursor.fetchall()]
+    return genes
+
 
 def fetch_all_ISM_transcripts(cursor, datasets):
     """Fetch IDs of all ISM transcripts"""
@@ -360,7 +375,7 @@ def fetch_all_ISM_transcripts(cursor, datasets):
     datasets = format_for_IN(datasets)
     query = (
         """SELECT DISTINCT(transcript_ID) FROM observed
-                   LEFT JOIN transcript_annotations 
+                   LEFT JOIN transcript_annotations
                        AS ta ON ta.ID = observed.transcript_ID
                    WHERE (ta.attribute = 'ISM_transcript')
                    AND observed.dataset IN """
@@ -489,6 +504,21 @@ def fetch_genomic_transcripts(cursor, datasets):
     transcripts = [x[0] for x in cursor.fetchall()]
     return transcripts
 
+def fetch_fusion_transcripts(cursor, datasets):
+    """Fetch IDs of all fusion transcripts"""
+
+    datasets = format_for_IN(datasets)
+    query = (
+        """SELECT DISTINCT(transcript_ID) FROM observed
+                   LEFT JOIN transcript_annotations
+                       AS ta ON ta.ID = observed.transcript_ID
+                   WHERE (ta.attribute = 'fusion_transcript')
+                   AND observed.dataset IN """
+        + datasets
+    )
+    cursor.execute(query)
+    transcripts = [x[0] for x in cursor.fetchall()]
+    return transcripts
 
 def fetch_all_transcript_gene_pairs(cursor):
     """Return gene_ID - transcript_ID tuples from database"""
