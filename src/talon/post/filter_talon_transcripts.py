@@ -42,6 +42,14 @@ def getOptions():
         type="string",
     )
     parser.add_option(
+        "--filter_known",
+        dest="filter_known",
+        help="""Filter known transcripts according to the same input criteria;
+                              will not automatically pass them""",
+        default=False,
+        action="store_true"
+    )
+    parser.add_option(
         "--datasets",
         dest="datasets",
         default=None,
@@ -362,8 +370,10 @@ def filter_talon_transcripts(database, annot, datasets, options):
                             If this option is set to None, then it will
                             default to the total number of datasets in the
                             reads.
+    - options.filter_known: Filter known transcripts the same way that novel
+                            transcripts are filtered
     Please note that known transcripts are allowed through independently
-    of these parameters.
+    of these parameters, unless the filter_known option is on
     """
     # Known transcripts automatically pass the filter
     known = get_known_transcripts(database, annot, options.include_annot, datasets=datasets)
@@ -391,10 +401,12 @@ def filter_talon_transcripts(database, annot, datasets, options):
     dataset_filtered = filter_on_n_datasets(filtered_counts, options.min_datasets)
 
     # Join the known transcripts with the filtered ones and return
-    if len(dataset_filtered.index) != 0:
+    if len(dataset_filtered.index) != 0 and not options.filter_known:
         final_filtered = pd.concat(
             [known[["gene_ID", "transcript_ID"]], dataset_filtered[["gene_ID", "transcript_ID"]]]
         ).drop_duplicates()
+    elif options.filter_known:
+        final_filtered = dataset_filtered[["gene_ID", "transcript_ID"]]
     else:
         final_filtered = known
 
