@@ -80,7 +80,10 @@ def fetch_seq(chrom: str, start: int, stop: int, strand: str, genome: pyfaidx.Fa
     seq = genome[chrom][start:stop]
 
     if strand == "-":
-        seq = seq.reverse.complement
+        try:
+            seq = seq.reverse.complement
+        except:
+            ValueError(f"Problem getting reverse complement for {chr}, {start}, {stop}, {strand}")
 
     return str(seq)
 
