@@ -398,6 +398,10 @@ def filter_talon_transcripts(database, annot, datasets, options):
     # Perform n-dataset based filtering
     if options.min_datasets == None:
         options.min_datasets = len(set(list(reads.dataset)))
+    elif options.min_datasets > len(set(list(reads.dataset))):
+        print(f'min_datasets value {options.min_datasets} is larger than total # of datasets {len(reads.dataset.unique())}.')
+        print(f'Changing min_datasets to {len(reads.dataset.unique())}')
+        options.min_datasets = len(reads.dataset.unique())
     dataset_filtered = filter_on_n_datasets(filtered_counts, options.min_datasets)
 
     # Join the known transcripts with the filtered ones and return
