@@ -32,6 +32,12 @@ from . import process_sams as procsams
 from . import query_utils as qutils
 from . import transcript_utils as tutils
 
+# fix to maintain multiprocessing similar to python 3.7
+# see https://github.com/deeptools/HiCExplorer/issues/628
+# and https://chrissardegna.com/blog/multiprocessing-changes-python-3-8/
+if not mp.get_start_method(allow_none=True):
+    mp.set_start_method('fork')
+
 # set verbosity for pysam
 save = pysam.set_verbosity(0)
 # pysam.set_verbosity(save)

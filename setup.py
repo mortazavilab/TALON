@@ -46,7 +46,7 @@ setup(
         "License :: OSI Approved :: MIT License",
         "Topic :: Scientific/Engineering :: Bio-Informatics"
     ],
-    python_requires=">=3.6,<3.8",
+    python_requires=">=3.6,<3.9",
     install_requires=[
         "pandas",
         "pyranges",
